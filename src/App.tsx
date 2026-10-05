@@ -12,11 +12,12 @@ import { useMemories } from './data/useMemories'
 import type { Memory } from './types'
 
 export default function App() {
-  const { memories, loading, save, remove, duplicate } = useMemories()
+  const { memories, loading, save, remove, duplicate, reorder } = useMemories()
   const reduce = useReducedMotion()
   const [sheet, setSheet] = useState<SheetState | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
-  const [opening, setOpening] = useState<{ memory: Memory; rect: DOMRect } | null>(null)
+  const [opening, setOpening] = useState<{ memory: Memory; rect: DOMRect; mode: 'open' | 'close' } | null>(null)
+  const [revealed, setRevealed] = useState(false)
   const [shareId, setShareId] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Memory | null>(null)
 
@@ -25,8 +26,16 @@ export default function App() {
 
   const startOpen = useCallback((memory: Memory, rect: DOMRect) => {
     setOpenId(memory.id)
-    if (!reduce) setOpening({ memory, rect })
+    setRevealed(false)
+    if (!reduce) setOpening({ memory, rect, mode: 'open' })
   }, [reduce])
+
+  const closeBook = useCallback(() => {
+    const m = openId ? memories.find((x) => x.id === openId) : undefined
+    const rect = m ? document.querySelector(`[data-book-id="${m.id}"]`)?.getBoundingClientRect() : undefined
+    setOpenId(null)
+    if (m && rect && !reduce) setOpening({ memory: m, rect, mode: 'close' })
+  }, [openId, memories, reduce])
 
   const openWhenReady = useCallback((memory: Memory) => {
     // wait for the new book to appear in the grid, then open from its slot
@@ -39,6 +48,7 @@ export default function App() {
   }, [startOpen])
 
   const submit = async (m: Memory, isNew: boolean) => {
+    if (isNew) m = { ...m, order: Math.min(0, ...memories.map((x) => x.order ?? 0)) - 1 }
     await save(m)
     setSheet(null)
     if (isNew) {
@@ -62,7 +72,8 @@ export default function App() {
       <Home
         memories={memories}
         loading={loading}
-        hiddenId={opening?.memory.id ?? null}
+        hiddenId={opening?.mode === 'open' ? opening.memory.id : null}
+        onReorder={(ids) => void reorder(ids)}
         onAdd={() => setSheet({ mode: 'create' })}
         onOpen={startOpen}
         onEdit={(m) => setSheet({ mode: 'edit', id: m.id })}
@@ -76,7 +87,8 @@ export default function App() {
           <Canvas
             key={openMemory.id}
             memory={openMemory}
-            onBack={() => setOpenId(null)}
+            onBack={closeBook}
+            hidden={opening?.mode === 'open' && !revealed}
             onEdit={() => setSheet({ mode: 'edit', id: openMemory.id })}
             onTheme={() => setSheet({ mode: 'theme', id: openMemory.id })}
             onShare={() => setShareId(openMemory.id)}
@@ -89,7 +101,7 @@ export default function App() {
         {byId(shareId) && <ShareScreen key="share" memory={byId(shareId)!} onClose={() => setShareId(null)} />}
       </AnimatePresence>
 
-      {opening && <OpeningBook memory={opening.memory} rect={opening.rect} onDone={() => setOpening(null)} />}
+      {opening && <OpeningBook key={opening.mode} memory={opening.memory} rect={opening.rect} mode={opening.mode} onReveal={() => setRevealed(true)} onDone={() => setOpening(null)} />}
 
       <CreateMemorySheet
         state={sheet}

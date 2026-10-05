@@ -51,7 +51,7 @@ export async function fetchRoute(a: Place, b: Place): Promise<[number, number][]
     try {
       const ctl = new AbortController()
       const t = setTimeout(() => ctl.abort(), 5000)
-      const url = `https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=simplified&geometries=geojson`
+      const url = `https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`
       const res = await fetch(url, { signal: ctl.signal })
       clearTimeout(t)
       if (res.ok) {

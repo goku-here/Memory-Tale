@@ -17,7 +17,8 @@ export interface Repository {
 
 export const localRepo: Repository = {
   async listMemories() {
-    return db.memories.orderBy('createdAt').reverse().toArray()
+    const all = await db.memories.toArray()
+    return all.sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || b.createdAt - a.createdAt)
   },
   getMemory: (id) => db.memories.get(id),
   async saveMemory(m) {

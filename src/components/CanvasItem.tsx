@@ -1,12 +1,12 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { BringToFront, Copy, Frame, MapPin, Pencil, RotateCw, SendToBack, Trash2 } from 'lucide-react'
-import { memo, useLayoutEffect, useRef, type PointerEvent as RPE } from 'react'
+import { BringToFront, Check, Copy, Frame, ImagePlus, MapPin, Palette, Pencil, RotateCw, SendToBack, Trash2 } from 'lucide-react'
+import { memo, useLayoutEffect, useRef, useState, type PointerEvent as RPE } from 'react'
 import type { CanvasItem } from '../types'
 import { DrawItem } from './DrawLayer'
 import { MapCard } from './MapCard'
 import { PhotoFrame } from './PhotoFrame'
 import { StickerArt } from './stickers'
-import { StickyNote } from './StickyNote'
+import { NOTE_COLORS, StickyNote } from './StickyNote'
 
 interface ItemProps {
   item: CanvasItem
@@ -126,6 +126,8 @@ export interface SelectionActions {
   onBackward: () => void
   onEdit?: () => void
   onFrame?: () => void
+  onReplace?: () => void
+  onColor?: (color: string) => void
 }
 
 function TB({ label, onClick, children, danger }: { label: string; onClick: () => void; children: React.ReactNode; danger?: boolean }) {
@@ -146,7 +148,8 @@ export function SelectionOverlay({
   const cx = (item.x / 100) * canvasW
   const rad = (item.rotation * Math.PI) / 180
   const hh = (Math.abs(item.width * Math.sin(rad)) + Math.abs(item.height * Math.cos(rad))) / 2
-  const nButtons = 4 + (actions.onEdit ? 1 : 0) + (actions.onFrame ? 1 : 0)
+  const [colorsOpen, setColorsOpen] = useState(false)
+  const nButtons = 4 + (actions.onEdit ? 1 : 0) + (actions.onFrame ? 1 : 0) + (actions.onReplace ? 1 : 0) + (actions.onColor ? 1 : 0)
   const tbW = nButtons * 44 + 16
   const above = item.y - hh - 62
   const placeAbove = above > topLimit
@@ -206,12 +209,36 @@ export function SelectionOverlay({
           transition={{ type: 'spring', stiffness: 500, damping: 30 }}
         >
           {actions.onFrame && <TB label="Frame" onClick={actions.onFrame}><Frame size={19} /></TB>}
+          {actions.onReplace && <TB label="Change photo" onClick={actions.onReplace}><ImagePlus size={19} /></TB>}
+          {actions.onColor && <TB label="Note colour" onClick={() => setColorsOpen((v) => !v)}><Palette size={19} /></TB>}
           {actions.onEdit && <TB label="Edit" onClick={actions.onEdit}><Pencil size={18} /></TB>}
           <TB label="Duplicate" onClick={actions.onDuplicate}><Copy size={18} /></TB>
           <TB label="Bring forward" onClick={actions.onForward}><BringToFront size={19} /></TB>
           <TB label="Send backward" onClick={actions.onBackward}><SendToBack size={19} /></TB>
           <TB label="Delete" onClick={actions.onDelete} danger><Trash2 size={18} /></TB>
         </motion.div>}
+        {!hideToolbar && colorsOpen && actions.onColor && (
+          <motion.div
+            key="colors" data-ui
+            className="absolute flex items-center gap-0.5 rounded-full bg-white px-2"
+            style={{ left: tbX, top: placeAbove ? tbY - 54 : tbY + 56, x: '-50%', zIndex: 9600, boxShadow: '0 6px 22px rgba(20,24,40,.2), 0 0 0 1px rgba(20,24,40,.05)' }}
+            initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+          >
+            {NOTE_COLORS.map((c) => (
+              <motion.button
+                key={c} type="button" aria-label={`Colour ${c}`} whileTap={{ scale: 0.88 }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => actions.onColor?.(c)}
+                className="grid h-11 w-11 place-items-center rounded-full border-0 bg-transparent"
+              >
+                <span className="grid h-8 w-8 place-items-center rounded-full" style={{ background: c, boxShadow: 'inset 0 0 0 1.5px rgba(0,0,0,.12)' }}>
+                  {item.type === 'note' && item.props.color === c && <Check size={15} strokeWidth={3.2} color="#4a4338" />}
+                </span>
+              </motion.button>
+            ))}
+          </motion.div>
+        )}
       </AnimatePresence>
     </>
   )

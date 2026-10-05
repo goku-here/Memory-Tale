@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Image as ImageIcon, MapPin, MoreHorizontal, Pencil, Smile, StickyNote, Type, Flag } from 'lucide-react'
+import { Image as ImageIcon, MapPin, MoreHorizontal, Smile, StickyNote, Type, Flag } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 
 export type ToolId = 'sticker' | 'draw' | 'text' | 'photo' | 'note' | 'location' | 'divider'
@@ -68,7 +68,11 @@ export function BottomToolbar({ visible, onTool }: Props) {
               style={{ boxShadow: '0 10px 34px rgba(20,24,40,.2), 0 2px 6px rgba(20,24,40,.08), 0 0 0 1px rgba(20,24,40,.04)' }}
             >
               <Btn label="Sticker" onClick={() => pick('sticker')}><Smile size={23} strokeWidth={1.9} /></Btn>
-              <Btn label="Draw" onClick={() => pick('draw')}><Pencil size={22} strokeWidth={1.9} /></Btn>
+              <Btn label="Draw" onClick={() => pick('draw')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M15.2 3.6a2.1 2.1 0 0 1 3 3L8.4 16.4 4.6 17.4l1-3.8Z" />
+                  <path d="m13.6 5.2 3 3" />
+                  <path d="M3 21c2.2-2.2 3.6 1.2 6 0s3.6-2.6 5.4-1.2 3.2.4 4.6-.8" />
+                </svg></Btn>
               <Btn label="Text" onClick={() => pick('text')}><Type size={23} strokeWidth={1.9} /></Btn>
               <Btn label="Photo" onClick={() => pick('photo')}><ImageIcon size={23} strokeWidth={1.9} /></Btn>
               <span className="mx-1 h-7 w-px bg-neutral-200" aria-hidden />

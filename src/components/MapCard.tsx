@@ -3,16 +3,16 @@ import 'leaflet/dist/leaflet.css'
 import { useEffect, useRef } from 'react'
 import type { MapProps } from '../types'
 import { arcRoute } from '../lib/geo'
+import { PIN_TIP, pushPinSvg } from './PushPin'
 
-const pinHtml = (color: string, label: string) => `
-  <svg width="34" height="44" viewBox="0 0 34 44" style="filter:drop-shadow(0 3px 3px rgba(0,0,0,.35));overflow:visible">
-    <path d="M17 43C17 43 3 27 3 16a14 14 0 0 1 28 0c0 11-14 27-14 27Z" fill="${color}" stroke="#fff" stroke-width="3"/>
-    <circle cx="17" cy="16" r="7.5" fill="#fff"/>
-    <text x="17" y="20" text-anchor="middle" font-family="Manrope,sans-serif" font-weight="800" font-size="11" fill="${color}">${label}</text>
-  </svg>`
-
-const icon = (color: string, label: string) =>
-  L.divIcon({ className: 'keepsake-pin', html: pinHtml(color, label), iconSize: [34, 44], iconAnchor: [17, 42] })
+const W = 44
+const icon = (color: string) =>
+  L.divIcon({
+    className: 'keepsake-pin',
+    html: pushPinSvg(color, W),
+    iconSize: [W, (W * 80) / 60],
+    iconAnchor: [(PIN_TIP.x / 60) * W, (PIN_TIP.y / 80) * ((W * 80) / 60)],
+  })
 
 /** Non-interactive Leaflet map with two pins and an animated dotted route. */
 export function MapCard({ map }: { map: MapProps }) {
@@ -21,9 +21,6 @@ export function MapCard({ map }: { map: MapProps }) {
   useEffect(() => {
     const el = host.current
     if (!el) return
-    const css = getComputedStyle(el)
-    const c1 = css.getPropertyValue('--t-pin').trim() || '#E5486F'
-    const c2 = css.getPropertyValue('--t-pin2').trim() || '#F28C38'
 
     const m = L.map(el, {
       zoomControl: false, attributionControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false,
@@ -32,13 +29,15 @@ export function MapCard({ map }: { map: MapProps }) {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: true, maxZoom: 18, detectRetina: true }).addTo(m)
 
     const route = map.route?.length ? map.route : arcRoute(map.from, map.to)
-    const line = L.polyline(route, { weight: 4.5, dashArray: '1 10', lineCap: 'round', className: 'route-dots', opacity: 0.95 }).addTo(m)
-    L.marker([map.from.lat, map.from.lng], { icon: icon(c1, 'A'), interactive: false }).addTo(m)
-    L.marker([map.to.lat, map.to.lng], { icon: icon(c2, 'B'), interactive: false }).addTo(m)
+    L.polyline(route, { weight: 11, color: '#fff', opacity: 0.95, lineCap: 'round', lineJoin: 'round' }).addTo(m)
+    const line = L.polyline(route, { weight: 6.5, color: '#2F6BFF', lineCap: 'round', lineJoin: 'round' }).addTo(m)
+    L.polyline(route, { weight: 2.5, dashArray: '1 14', lineCap: 'round', className: 'route-dots', opacity: 0.9 }).addTo(m)
+    L.marker([map.from.lat, map.from.lng], { icon: icon('#5B6B7F'), interactive: false }).addTo(m)
+    L.marker([map.to.lat, map.to.lng], { icon: icon('#E5342F'), interactive: false, zIndexOffset: 500 }).addTo(m)
 
     const fit = () => {
       m.invalidateSize()
-      m.fitBounds(line.getBounds().pad(0.28), { animate: false, paddingTopLeft: [0, 6], paddingBottomRight: [0, 34] })
+      m.fitBounds(line.getBounds(), { animate: false, paddingTopLeft: [30, 62], paddingBottomRight: [30, 46] })
     }
     fit()
     const ro = new ResizeObserver(fit)
@@ -57,10 +56,10 @@ export function MapCard({ map }: { map: MapProps }) {
           className="pointer-events-none absolute inset-x-2 bottom-2 z-[500] flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-extrabold text-[#17171a]"
           style={{ background: 'rgba(255,255,255,.92)', boxShadow: '0 1px 4px rgba(0,0,0,.15)' }}
         >
-          <i className="h-2 w-2 shrink-0 rounded-full" style={{ background: 'var(--t-pin, #E5486F)' }} />
+          <i className="h-2 w-2 shrink-0 rounded-full" style={{ background: '#5B6B7F' }} />
           <span className="truncate">{map.from.name}</span>
           <span aria-hidden className="text-neutral-400">→</span>
-          <i className="h-2 w-2 shrink-0 rounded-full" style={{ background: 'var(--t-pin2, #F28C38)' }} />
+          <i className="h-2 w-2 shrink-0 rounded-full" style={{ background: '#E5342F' }} />
           <span className="truncate">{map.to.name}</span>
         </div>
         <span className="pointer-events-none absolute right-1.5 top-1 z-[500] text-[8px] font-semibold text-black/45">© OpenStreetMap</span>

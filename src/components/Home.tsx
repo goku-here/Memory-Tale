@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Copy, Palette, PenLine, Plus, Settings, Trash2 } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Memory } from '../types'
 import { BookCard, BookCover } from './BookCard'
 import { ToolSheet } from './ToolSheet'
@@ -11,6 +11,7 @@ interface HomeProps {
   loading: boolean
   hiddenId?: string | null
   onAdd: () => void
+  onReorder: (ids: string[]) => void
   onOpen: (m: Memory, rect: DOMRect) => void
   onEdit: (m: Memory) => void
   onTheme: (m: Memory) => void
@@ -34,12 +35,138 @@ function MenuRow({ icon, label, onClick, danger }: { icon: ReactNode; label: str
   )
 }
 
-export function Home({ memories, loading, hiddenId, onAdd, onOpen, onEdit, onTheme, onDuplicate, onDelete }: HomeProps) {
+export function Home({ memories, loading, hiddenId, onAdd, onReorder, onOpen, onEdit, onTheme, onDuplicate, onDelete }: HomeProps) {
   const [menu, setMenu] = useState<Memory | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [confirm, setConfirm] = useState<Memory | null>(null)
 
   const openMenu = (m: Memory) => { setMenu(m); setMenuOpen(true) }
+
+  /* ---- press / long-press-to-drag reordering ---- */
+  const [order, setOrder] = useState<string[]>([])
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [offset, setOffset] = useState<{ x: number; y: number } | null>(null)
+  const orderRef = useRef<string[]>([])
+  const press = useRef<{
+    id: string; sx: number; sy: number; timer: number; active: boolean; moved: boolean
+    slots: DOMRect[]; idx: number; gx: number; gy: number
+  } | null>(null)
+  const cb = useRef({ onOpen, openMenu, onReorder })
+  cb.current = { onOpen, openMenu, onReorder }
+  const memRef = useRef(memories)
+  memRef.current = memories
+
+  useEffect(() => {
+    if (press.current?.active) return
+    const ids = memories.map((m) => m.id)
+    orderRef.current = ids
+    setOrder(ids)
+  }, [memories])
+
+  const ordered = useMemo(() => {
+    const map = new Map(memories.map((m) => [m.id, m]))
+    const list = order.map((id) => map.get(id)).filter((m): m is Memory => !!m)
+    return list.length === memories.length ? list : memories
+  }, [order, memories])
+
+  const stable = useRef({
+    move: (e: PointerEvent) => onMoveRef.current(e),
+    up: (e: PointerEvent) => onUpRef.current(e),
+    cancel: (e: PointerEvent) => onCancelRef.current(e),
+    touch: (e: TouchEvent) => onTouchRef.current(e),
+  })
+
+  const endPress = useCallback(() => {
+    const st = press.current
+    if (!st) return
+    window.clearTimeout(st.timer)
+    window.removeEventListener('pointermove', stable.current.move)
+    window.removeEventListener('pointerup', stable.current.up)
+    window.removeEventListener('pointercancel', stable.current.cancel)
+    window.removeEventListener('touchmove', stable.current.touch)
+    press.current = null
+    setDragId(null)
+    setOffset(null)
+  }, [])
+
+  const onMoveRef = useRef<(e: PointerEvent) => void>(() => {})
+  const onUpRef = useRef<(e: PointerEvent) => void>(() => {})
+  const onCancelRef = useRef<(e: PointerEvent) => void>(() => {})
+  const onTouchRef = useRef<(e: TouchEvent) => void>(() => {})
+
+  onTouchRef.current = (e) => { if (press.current?.active && e.cancelable) e.preventDefault() }
+  onMoveRef.current = (e) => {
+    const st = press.current
+    if (!st) return
+    const d = Math.hypot(e.clientX - st.sx, e.clientY - st.sy)
+    if (!st.active) { if (d > 9) endPress(); return }
+    if (d > 8) st.moved = true
+    // nearest slot to the pointer
+    let best = st.idx, bd = Infinity
+    st.slots.forEach((r, i) => {
+      const dd = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2))
+      if (dd < bd) { bd = dd; best = i }
+    })
+    if (best !== st.idx) {
+      const next = [...orderRef.current]
+      const [it] = next.splice(st.idx, 1)
+      next.splice(best, 0, it)
+      orderRef.current = next
+      st.idx = best
+      navigator.vibrate?.(8)
+      setOrder(next)
+    }
+    const slot = st.slots[st.idx]
+    setOffset({ x: e.clientX - st.gx - slot.left, y: e.clientY - st.gy - slot.top })
+  }
+  onUpRef.current = () => {
+    const st = press.current
+    if (!st) return
+    const m = memRef.current.find((x) => x.id === st.id)
+    if (!st.active) {
+      const el = document.querySelector(`[data-book-id="${st.id}"]`)
+      const r = el?.getBoundingClientRect()
+      endPress()
+      if (m && r) cb.current.onOpen(m, r)
+      return
+    }
+    const moved = st.moved
+    const ids = orderRef.current
+    // keep the order we show until the saved list comes back
+    press.current = { ...st, active: false }
+    endPress()
+    if (!moved) { if (m) cb.current.openMenu(m) }
+    else if (ids.join() !== memRef.current.map((x) => x.id).join()) cb.current.onReorder(ids)
+  }
+  onCancelRef.current = () => endPress()
+
+  const onPress = useCallback((e: React.PointerEvent, m: Memory) => {
+    if (press.current || (e.pointerType === 'mouse' && e.button !== 0)) return
+    const idx = orderRef.current.indexOf(m.id)
+    const st = {
+      id: m.id, sx: e.clientX, sy: e.clientY, active: false, moved: false, slots: [] as DOMRect[], idx, gx: 0, gy: 0,
+      timer: window.setTimeout(() => {
+        const s = press.current
+        if (!s) return
+        s.slots = [...document.querySelectorAll('[data-book-wrap]')].map((el) => el.getBoundingClientRect())
+        const r = s.slots[s.idx]
+        if (!r) return endPress()
+        s.gx = s.sx - r.left
+        s.gy = s.sy - r.top
+        s.active = true
+        navigator.vibrate?.(14)
+        setDragId(s.id)
+        setOffset({ x: 0, y: 0 })
+      }, 450),
+    }
+    press.current = st
+    window.addEventListener('pointermove', stable.current.move)
+    window.addEventListener('pointerup', stable.current.up)
+    window.addEventListener('pointercancel', stable.current.cancel)
+    window.addEventListener('touchmove', stable.current.touch, { passive: false })
+  }, [endPress])
+
+  useEffect(() => endPress, [endPress])
   const closeMenu = () => setMenuOpen(false)
   const act = (fn: (m: Memory) => void) => () => { if (menu) fn(menu); closeMenu() }
 
@@ -73,8 +200,12 @@ export function Home({ memories, loading, hiddenId, onAdd, onOpen, onEdit, onThe
         ) : (
           <div className="grid grid-cols-2 gap-x-5 gap-y-12">
             <AnimatePresence mode="popLayout">
-              {memories.map((m, i) => (
-                <BookCard key={m.id} memory={m} index={i} hidden={hiddenId === m.id} onOpen={onOpen} onLongPress={openMenu} />
+              {ordered.map((m, i) => (
+                <BookCard
+                  key={m.id} memory={m} index={i} hidden={hiddenId === m.id}
+                  dragging={dragId === m.id} offset={dragId === m.id ? offset : null}
+                  onPress={onPress} onKeyOpen={onOpen}
+                />
               ))}
             </AnimatePresence>
           </div>

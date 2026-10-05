@@ -36,7 +36,11 @@ body {
 
 /* ---- map card ---- */
 @keyframes route-march { to { stroke-dashoffset: -20; } }
-.route-dots { stroke: var(--t-pin, #e5486f); animation: route-march 1.1s linear infinite; }
+.route-dots { stroke: #fff; animation: route-march 1.1s linear infinite; }
 .leaflet-container { font-family: var(--font-ui); background: #e9efe6; }
 .keepsake-pin { background: none; border: 0; }
 .leaflet-control-attribution { display: none; }
+
+/* hide scrollbars everywhere but keep scrolling */
+* { scrollbar-width: none; -ms-overflow-style: none; }
+*::-webkit-scrollbar { display: none; width: 0; height: 0; }

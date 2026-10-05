@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { ImagePlus } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import type { FrameId, PhotoProps } from '../types'
 import { frameHeight } from '../lib/items'
@@ -12,12 +13,13 @@ interface Props {
   onFrame: (frame: FrameId) => void
   onRadius: (radius: number) => void
   onCaption: (caption: string) => void
+  onReplace: () => void
 }
 
 const PREVIEW_W = 92
 
 /** Frame chooser for the selected photo: previews, polaroid caption, corner radius. */
-export function FramePicker({ photo, focusCaption, accent, onFrame, onRadius, onCaption }: Props) {
+export function FramePicker({ photo, focusCaption, accent, onFrame, onRadius, onCaption, onReplace }: Props) {
   const capRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
     if (focusCaption) setTimeout(() => capRef.current?.focus(), 350)
@@ -49,6 +51,12 @@ export function FramePicker({ photo, focusCaption, accent, onFrame, onRadius, on
       </div>
 
       <div className="space-y-5 px-5 pt-2">
+        <motion.button
+          type="button" whileTap={{ scale: 0.97 }} onClick={onReplace}
+          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border-0 bg-neutral-100 text-[15px] font-bold text-[#17171a]"
+        >
+          <ImagePlus size={19} /> Change photo
+        </motion.button>
         <label className="block">
           <span className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-neutral-400">Caption</span>
           <input

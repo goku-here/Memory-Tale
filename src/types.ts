@@ -32,6 +32,8 @@ export interface Memory {
   /** ISO date, yyyy-mm-dd */
   date: string
   createdAt: number
+  /** position on the home shelf (lower = earlier) */
+  order?: number
   members?: Member[]
 }
 

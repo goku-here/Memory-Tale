@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useRef, type CSSProperties, type Ref } from 'react'
+import { useEffect, useRef, type CSSProperties, type Ref } from 'react'
 import type { Memory } from '../types'
 import { getTheme } from './ThemeEngine'
 import { shade } from '../lib/color'
@@ -126,65 +126,56 @@ export function BookCover({
 interface BookCardProps {
   memory: Memory
   index: number
-  onOpen: (memory: Memory, rect: DOMRect) => void
-  onLongPress: (memory: Memory) => void
   hidden?: boolean
+  /** this card is the one being dragged */
+  dragging?: boolean
+  offset?: { x: number; y: number } | null
+  onPress: (e: React.PointerEvent, memory: Memory) => void
+  onKeyOpen: (memory: Memory, rect: DOMRect) => void
 }
 
-export function BookCard({ memory, index, onOpen, onLongPress, hidden }: BookCardProps) {
+export function BookCard({ memory, index, hidden, dragging, offset, onPress, onKeyOpen }: BookCardProps) {
   const ref = useRef<HTMLDivElement>(null)
-  const timer = useRef<number | undefined>(undefined)
-  const start = useRef<{ x: number; y: number } | null>(null)
-  const fired = useRef(false)
-
-  const clear = () => {
-    window.clearTimeout(timer.current)
-    start.current = null
-  }
+  const first = useRef(true)
+  useEffect(() => { first.current = false }, [])
+  const spring = { type: 'spring', stiffness: 260, damping: 24, delay: first.current ? Math.min(index, 8) * 0.06 : 0 } as const
 
   return (
     <motion.div
+      data-book-wrap
+      className="relative"
+      style={{ zIndex: dragging ? 30 : 0 }}
       initial={{ opacity: 0, y: 28, scale: 0.94 }}
       animate={{ opacity: hidden ? 0 : 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.9 }}
-      transition={{ type: 'spring', stiffness: 260, damping: 24, delay: Math.min(index, 8) * 0.06 }}
-      layout="position"
+      transition={spring}
+      layout={dragging ? false : 'position'}
     >
-      <motion.button
-        type="button"
-        aria-label={`Open ${memory.title}`}
-        data-book-id={memory.id}
-        className="no-select block w-full cursor-pointer border-0 bg-transparent p-0 text-left outline-none"
-        style={{ touchAction: 'manipulation' }}
-        whileTap={{ scale: 0.96 }}
-        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-        onContextMenu={(e) => e.preventDefault()}
-        onPointerDown={(e) => {
-          fired.current = false
-          start.current = { x: e.clientX, y: e.clientY }
-          timer.current = window.setTimeout(() => {
-            fired.current = true
-            navigator.vibrate?.(12)
-            onLongPress(memory)
-          }, 480)
-        }}
-        onPointerMove={(e) => {
-          if (start.current && Math.hypot(e.clientX - start.current.x, e.clientY - start.current.y) > 9) clear()
-        }}
-        onPointerUp={clear}
-        onPointerCancel={clear}
-        onPointerLeave={clear}
-        onClick={() => {
-          if (fired.current) return
-          const r = ref.current?.getBoundingClientRect()
-          if (r) onOpen(memory, r)
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) onLongPress(memory)
-        }}
+      <motion.div
+        animate={{ x: offset?.x ?? 0, y: offset?.y ?? 0, scale: dragging ? 1.07 : 1 }}
+        transition={dragging ? { x: { duration: 0 }, y: { duration: 0 }, scale: { type: 'spring', stiffness: 400, damping: 22 } } : { type: 'spring', stiffness: 380, damping: 30 }}
+        style={{ filter: dragging ? 'drop-shadow(0 18px 18px rgba(20,24,40,.25))' : undefined }}
       >
-        <BookCover memory={memory} ref={ref} />
-      </motion.button>
+        <motion.button
+          type="button"
+          aria-label={`Open ${memory.title}`}
+          data-book-id={memory.id}
+          className="no-select block w-full cursor-pointer border-0 bg-transparent p-0 text-left outline-none"
+          style={{ touchAction: 'pan-y' }}
+          whileTap={dragging ? undefined : { scale: 0.96 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+          onContextMenu={(e) => e.preventDefault()}
+          onPointerDown={(e) => onPress(e, memory)}
+          onClick={(e) => {
+            // pointer taps are handled in Home; this is keyboard / assistive-tech activation
+            if (e.detail !== 0) return
+            const r = ref.current?.getBoundingClientRect()
+            if (r) onKeyOpen(memory, r)
+          }}
+        >
+          <BookCover memory={memory} ref={ref} />
+        </motion.button>
+      </motion.div>
     </motion.div>
   )
 }

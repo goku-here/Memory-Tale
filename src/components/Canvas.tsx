@@ -30,6 +30,8 @@ interface CanvasProps {
   onTheme: () => void
   onShare: () => void
   onDelete: () => void
+  /** held invisible while the book-opening animation plays */
+  hidden?: boolean
 }
 
 type Sheet = 'frame' | 'sticker' | 'text' | 'draw' | 'location' | null
@@ -48,12 +50,13 @@ function MenuItem({ icon, label, onClick, danger }: { icon: ReactNode; label: st
 
 const HEADER_H = 116
 
-export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete }: CanvasProps) {
+export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, hidden }: CanvasProps) {
   const theme = getTheme(memory.themeId)
   const accent = theme.palette[0]
   const scroller = useRef<HTMLDivElement>(null)
   const surface = useRef<HTMLDivElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
+  const replaceInput = useRef<HTMLInputElement>(null)
   const scrollY = useMotionValue(0)
   const cv = useCanvas(memory.id)
   const { items, itemsRef, height, commit, live, begin, end, setHeight } = cv
@@ -197,6 +200,18 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete }: C
     }
   }
 
+  const replacePhoto = async (file?: File) => {
+    const target = itemsRef.current.find((i) => i.id === selectedId)
+    if (!file || target?.type !== 'photo') return
+    try {
+      const img = await compressImage(file, { maxSize: 1400, quality: 0.8 })
+      const aspect = img.width / img.height
+      patch(target.id, { height: frameHeight(target.props.frame, target.width, aspect), props: { src: img.dataUrl, aspect } }, true)
+    } catch {
+      toast("Couldn't read that photo")
+    }
+  }
+
   const addSticker = (s: StickerProps) => {
     const w = s.kind === 'emoji' ? 96 : s.kind === 'image' ? 140 : s.value.startsWith('tape') ? 170 : 120
     const ratio = stickerRatio(s)
@@ -283,6 +298,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete }: C
     onForward: () => reorder(1),
     onBackward: () => reorder(-1),
     onFrame: selected.type === 'photo' ? () => openFrame() : undefined,
+    onReplace: selected.type === 'photo' ? () => replaceInput.current?.click() : undefined,
+    onColor: selected.type === 'note' ? (color: string) => patch(selected.id, { props: { color } }, true) : undefined,
     onEdit:
       selected.type === 'text' ? openText
       : selected.type === 'note' || selected.type === 'divider' ? () => { begin(); setEditingId(selected.id) }
@@ -340,9 +357,9 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete }: C
   return (
     <motion.div
       className="fixed inset-0 z-40"
-      style={{ ...themeVars(theme), background: theme.canvasBg }}
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.98 }}
-      transition={{ duration: 0.25 }}
+      style={{ ...themeVars(theme), background: theme.canvasBg, pointerEvents: hidden ? 'none' : undefined }}
+      initial={{ opacity: 0 }} animate={{ opacity: hidden ? 0 : 1 }} exit={{ opacity: 0, transition: { duration: 0.08 } }}
+      transition={{ duration: 0.22 }}
     >
       <div
         ref={scroller}
@@ -468,6 +485,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete }: C
 
       <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => { void addPhotos(e.target.files); e.target.value = '' }} />
 
+      <input ref={replaceInput} type="file" accept="image/*" hidden onChange={(e) => { void replacePhoto(e.target.files?.[0]); e.target.value = '' }} />
+
       <BottomToolbar visible={!sheet && !editingId} accent={accent} onTool={onTool} />
 
       {/* ---- tool sheets ---- */}
@@ -481,6 +500,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete }: C
             onFrame={(frame) => patch(photoItem.id, { height: frameHeight(frame, photoItem.width, photoItem.props.aspect), props: { frame } })}
             onRadius={(radius) => patch(photoItem.id, { props: { radius } })}
             onCaption={(caption) => patch(photoItem.id, { props: { caption } })}
+            onReplace={() => replaceInput.current?.click()}
           />
         )}
       </ToolSheet>
@@ -508,7 +528,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete }: C
         open={sheet === 'location'} onClose={closeSheet} title="Location" snaps={[0.62, 0.92]} dim={0.18} z={55}
         onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, location: h }))}
       >
-        <LocationTool pins={[theme.palette[0], theme.palette[1] ?? accent]} accent={accent} onAdd={addMap} />
+        <LocationTool pins={['#5B6B7F', '#E5342F']} accent={accent} onAdd={addMap} />
       </ToolSheet>
 
       <ToolSheet

@@ -1,11 +1,15 @@
 import type { ReactNode } from 'react'
 import type { StickerProps } from '../types'
+import { PushPinArt } from './PushPin'
 
 export type StickerCategory = 'Love' | 'Travel' | 'Food' | 'Party' | 'Decor'
 export const STICKER_CATEGORIES: StickerCategory[] = ['Love', 'Travel', 'Food', 'Party', 'Decor']
 
 /** Hand-drawn style SVG stickers. `ratio` is width / height. */
 export const SVG_STICKERS: Record<string, { label: string; ratio: number; art: ReactNode }> = {
+  pin: { label: 'Red pin', ratio: 0.75, art: <PushPinArt color="#E5342F" /> },
+  'pin-blue': { label: 'Blue pin', ratio: 0.75, art: <PushPinArt color="#2F7BE5" /> },
+  'pin-yellow': { label: 'Yellow pin', ratio: 0.75, art: <PushPinArt color="#F5B921" /> },
   'tape-yellow': {
     label: 'Yellow tape', ratio: 2.6,
     art: (
@@ -134,10 +138,10 @@ const svgs = (...ids: string[]): StickerDef[] => ids.map((id) => ({ kind: 'svg' 
 
 export const STICKERS: Record<StickerCategory, StickerDef[]> = {
   Love: emojis('❤️💖💘💌💍🌹😍🥰💋💏🫶💞💕💝🧸'),
-  Travel: emojis('✈️🗺️🧳📸🏖️🌴⛰️🚗🚂🏝️🧭🎒⛵🗽🌅'),
+  Travel: [...svgs('pin', 'pin-blue'), ...emojis('✈️🗺️🧳📸🏖️🌴⛰️🚗🚂🏝️🧭🎒⛵🗽🌅')],
   Food: emojis('🍕🍔🍣🍝🍷🥂☕🍰🍩🍦🍓🌮🍿🥐🍜'),
   Party: emojis('🎉🎈🎂🎁🪩🥳🎊🍾🎶🎤✨🕺🎆🪅🎀'),
-  Decor: [...svgs('tape-yellow', 'tape-pink', 'tape-blue', 'bow', 'star-doodle', 'heart-doodle', 'sparkle', 'arrow', 'flower', 'speech-love', 'ticket', 'sun'), ...emojis('🌸🌼🍀🦋🌈⭐')],
+  Decor: [...svgs('pin', 'pin-blue', 'pin-yellow', 'tape-yellow', 'tape-pink', 'tape-blue', 'bow', 'star-doodle', 'heart-doodle', 'sparkle', 'arrow', 'flower', 'speech-love', 'ticket', 'sun'), ...emojis('🌸🌼🍀🦋🌈⭐')],
 }
 
 export function stickerRatio(p: StickerProps) {
