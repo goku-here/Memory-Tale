@@ -1,12 +1,13 @@
-import { AnimatePresence, motion, useMotionValue, useTransform } from 'framer-motion'
+import { AnimatePresence, motion, useMotionValue, useTransform, type MotionValue } from 'framer-motion'
 import { ArrowLeft, Check, Loader2, MoreHorizontal, Palette, PenLine, Redo2, Share2, Trash2, Undo2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useCanvas } from '../data/useCanvas'
 import { uid } from '../lib/id'
 import { compressImage } from '../lib/image'
-import { clamp, cloneItem, frameHeight, nextZ, normalizeZ, rnd } from '../lib/items'
+import { bookEase, clipAt } from '../lib/bookTransition'
+import { clamp, cloneItem, frameHeight, nextZ, rnd } from '../lib/items'
 import { useGestures } from '../lib/useGestures'
-import type { CanvasItem, FrameId, ItemPatch, MapProps, Stroke, StickerProps, TextProps } from '../types'
+import type { BubbleProps, CanvasItem, FrameId, ItemPatch, MapProps, Stroke, StickerProps, TextProps } from '../types'
 import { formatDate } from './BookCard'
 import { BottomToolbar, type ToolId } from './BottomToolbar'
 import { CanvasItemView, SelectionOverlay } from './CanvasItem'
@@ -19,7 +20,9 @@ import { stickerRatio } from './stickers'
 import { TextEditor } from './TextEditor'
 import { FloatingShapes, getTheme, themeVars } from './ThemeEngine'
 import { ToolSheet } from './ToolSheet'
+import { BubbleEditor } from './Bubble'
 import { LocationTool } from './LocationTool'
+import { THREAD_COLORS, ThreadsSvg, threadMid } from './Threads'
 import { IconButton, toast } from './ui'
 import type { Memory } from '../types'
 
@@ -30,11 +33,11 @@ interface CanvasProps {
   onTheme: () => void
   onShare: () => void
   onDelete: () => void
-  /** held invisible while the book-opening animation plays */
-  hidden?: boolean
+  /** while the book opens/closes the canvas shows through a window shaped like the book */
+  reveal?: { p: MotionValue<number>; rect: DOMRect }
 }
 
-type Sheet = 'frame' | 'sticker' | 'text' | 'draw' | 'location' | null
+type Sheet = 'frame' | 'sticker' | 'text' | 'draw' | 'location' | 'bubble' | null
 
 function MenuItem({ icon, label, onClick, danger }: { icon: ReactNode; label: string; onClick: () => void; danger?: boolean }) {
   return (
@@ -50,7 +53,7 @@ function MenuItem({ icon, label, onClick, danger }: { icon: ReactNode; label: st
 
 const HEADER_H = 116
 
-export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, hidden }: CanvasProps) {
+export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, reveal }: CanvasProps) {
   const theme = getTheme(memory.themeId)
   const accent = theme.palette[0]
   const scroller = useRef<HTMLDivElement>(null)
@@ -71,14 +74,22 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, hid
   const [sheetHs, setSheetHs] = useState<Record<string, number>>({})
   const [canvasW, setCanvasW] = useState(() => Math.min(window.innerWidth, 520))
   const [captionFocus, setCaptionFocus] = useState(false)
+  const [editMapId, setEditMapId] = useState<string | null>(null)
+  const [connectFrom, setConnectFrom] = useState<string | null>(null)
+  const slotInput = useRef<HTMLInputElement>(null)
+  const slotTarget = useRef<{ id: string; index: number } | null>(null)
   const [strokes, setStrokes] = useState<Stroke[]>([])
   const [pen, setPen] = useState({ color: accent, size: 6 })
   const sheetH = Math.max(0, ...Object.values(sheetHs))
 
-  const selected = useMemo(() => items.find((i) => i.id === selectedId), [items, selectedId])
+  const selected = useMemo(() => items.find((i) => i.id === selectedId && i.type !== 'thread'), [items, selectedId])
+  const selectedThread = useMemo(() => items.find((i): i is Extract<CanvasItem, { type: 'thread' }> => i.id === selectedId && i.type === 'thread'), [items, selectedId])
+  const visibleItems = useMemo(() => items.filter((i) => i.type !== 'thread'), [items])
   const photoCount = useMemo(() => items.filter((i) => i.type === 'photo').length, [items])
   const drawing = sheet === 'draw'
 
+  const idle = useMotionValue(1)
+  const clip = useTransform(reveal?.p ?? idle, (v) => (reveal ? clipAt(reveal.rect, bookEase(v)) : 'none'))
   const titleScale = useTransform(scrollY, [0, 120], [1, 0.82])
   const titleY = useTransform(scrollY, [0, 120], [0, -4])
   const subOpacity = useTransform(scrollY, [0, 80], [1, 0])
@@ -120,7 +131,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, hid
 
   /* ---------- gestures ---------- */
 
-  const { startItem, startHandle } = useGestures({
+  const { startItem: rawStart, startHandle } = useGestures({
     surfaceRef: surface, scrollerRef: scroller, itemsRef, heightRef, live, begin, end,
     onSelect: setSelectedId, onDragging: setDraggingId,
     topInset: HEADER_H + 40, bottomInset: 130,
@@ -130,8 +141,27 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, hid
       if (it.type === 'photo') openFrame(true)
       else if (it.type === 'text') openText()
       else if (it.type === 'note' || it.type === 'divider') { begin(); setEditingId(id) }
+      else if (it.type === 'bubble') openBubble()
     },
   })
+
+  const startItem = (e: React.PointerEvent, id: string) => {
+    if (connectFrom) {
+      e.preventDefault()
+      e.stopPropagation()
+      const from = connectFrom
+      setConnectFrom(null)
+      if (id === from) return
+      if (itemsRef.current.some((t) => t.type === 'thread' && ((t.props.a === from && t.props.b === id) || (t.props.a === id && t.props.b === from)))) {
+        toast('Already tied together')
+        return
+      }
+      commit((list) => [...list, { id: uid(), type: 'thread', x: 0, y: 0, width: 0, height: 0, rotation: 0, zIndex: 0, props: { a: from, b: id, color: THREAD_COLORS[0] } }])
+      toast('Tied with a thread')
+      return
+    }
+    rawStart(e, id)
+  }
 
   /* ---------- sheets ---------- */
 
@@ -142,7 +172,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, hid
       if (it?.type === 'text' && !it.props.text.trim()) live((l) => l.filter((x) => x.id !== it.id))
       end()
       if (it?.type === 'text' && !it.props.text.trim()) setSelectedId(null)
-    } else if (sheet === 'frame') end()
+    } else if (sheet === 'frame' || sheet === 'bubble') end()
     setSheet(null)
     setCaptionFocus(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -154,6 +184,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, hid
     setSheet('frame')
   }
   const openText = () => { begin(); setSheet('text') }
+  const openBubble = () => { begin(); setSheet('bubble') }
 
   function finishDrawing() {
     if (strokes.length) {
@@ -213,8 +244,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, hid
   }
 
   const addSticker = (s: StickerProps) => {
-    const w = s.kind === 'emoji' ? 96 : s.kind === 'image' ? 140 : s.value.startsWith('tape') ? 170 : 120
     const ratio = stickerRatio(s)
+    const w = s.kind === 'emoji' ? 96 : s.kind === 'image' ? 140 : ratio > 2.2 ? 190 : ratio > 1.5 ? 150 : 120
     addItem((z, c) => ({
       id: '', type: 'sticker', zIndex: z, x: c.x + rnd(-14, 14), y: c.y + rnd(-30, 30),
       width: w, height: w / ratio, rotation: Math.round(rnd(-12, 12)), props: s,
@@ -241,6 +272,12 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, hid
   }
 
   const addMap = (map: MapProps) => {
+    if (editMapId) {
+      patch(editMapId, { props: { ...map } }, true)
+      setEditMapId(null)
+      setSheet(null)
+      return
+    }
     const w = Math.round(clamp(canvasW * 0.78, 240, 340))
     setSheet(null)
     window.setTimeout(() => {
@@ -249,6 +286,41 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, hid
         rotation: Math.round(rnd(-3, 3) * 10) / 10, props: map,
       }))
     }, 120)
+  }
+
+  const addBubble = () => {
+    begin()
+    addItem((z, c) => ({
+      id: '', type: 'bubble', zIndex: z, x: c.x + rnd(-8, 8), y: c.y, width: 210, height: 150, rotation: Math.round(rnd(-4, 4)),
+      props: { text: 'Hello!', shape: 'speech', tail: 'left', font: "'Comic Neue', 'Comic Sans MS', cursive", size: 11 },
+    }), { record: false })
+    setSheet('bubble')
+  }
+
+  const addLine = () => {
+    const w = Math.round(clamp(canvasW * 0.86, 260, 380))
+    const id = addItem((z, c) => ({
+      id: '', type: 'clothesline', zIndex: z, x: 50, y: c.y, width: w, height: Math.round(w * 0.64), rotation: 0,
+      props: { photos: ['', '', ''] },
+    }))
+    slotTarget.current = { id, index: 0 }
+    window.setTimeout(() => slotInput.current?.click(), 150)
+  }
+
+  const fillSlots = async (files: FileList | null) => {
+    const t = slotTarget.current
+    if (!files?.length || !t) return
+    try {
+      const imgs = await Promise.all([...files].slice(0, 3 - t.index).map((f) => compressImage(f, { maxSize: 900, quality: 0.8 })))
+      commit((list) => list.map((i) => {
+        if (i.id !== t.id || i.type !== 'clothesline') return i
+        const photos = [...i.props.photos] as [string, string, string]
+        imgs.forEach((m, k) => { photos[t.index + k] = m.dataUrl })
+        return { ...i, props: { photos } }
+      }))
+    } catch {
+      toast("Couldn't read that photo")
+    }
   }
 
   const addDivider = () => {
@@ -269,6 +341,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, hid
       case 'note': addNote(); break
       case 'divider': addDivider(); break
       case 'location': setSheet('location'); break
+      case 'bubble': addBubble(); break
+      case 'line': addLine(); break
     }
   }
 
@@ -277,13 +351,13 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, hid
   const reorder = (dir: 1 | -1) => {
     if (!selected) return
     commit((list) => {
-      const order = [...list].sort((a, b) => a.zIndex - b.zIndex)
+      const order = list.filter((x) => x.type !== 'thread').sort((a, b) => a.zIndex - b.zIndex)
       const i = order.findIndex((x) => x.id === selected.id)
       const j = i + dir
       if (j < 0 || j >= order.length) return list
       ;[order[i], order[j]] = [order[j], order[i]]
       const z = new Map(order.map((x, k) => [x.id, k + 1]))
-      return normalizeZ(list.map((x) => ({ ...x, zIndex: z.get(x.id)! })))
+      return list.map((x) => (z.has(x.id) ? { ...x, zIndex: z.get(x.id)! } : x))
     })
   }
 
@@ -294,14 +368,17 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, hid
       commit((list) => { const c = cloneItem(selected, nextZ(list)); id = c.id; return [...list, c] })
       setSelectedId(id)
     },
-    onDelete: () => { commit((l) => l.filter((x) => x.id !== selected.id)); setSelectedId(null) },
+    onDelete: () => { commit((l) => l.filter((x) => x.id !== selected.id && !(x.type === 'thread' && (x.props.a === selected.id || x.props.b === selected.id)))); setSelectedId(null) },
+    onConnect: () => { setConnectFrom(selected.id); toast('Tap another item to tie the thread') },
     onForward: () => reorder(1),
     onBackward: () => reorder(-1),
     onFrame: selected.type === 'photo' ? () => openFrame() : undefined,
     onReplace: selected.type === 'photo' ? () => replaceInput.current?.click() : undefined,
     onColor: selected.type === 'note' ? (color: string) => patch(selected.id, { props: { color } }, true) : undefined,
     onEdit:
-      selected.type === 'text' ? openText
+      selected.type === 'map' ? () => { setEditMapId(selected.id); setSheet('location') }
+      : selected.type === 'text' ? openText
+      : selected.type === 'bubble' ? openBubble
       : selected.type === 'note' || selected.type === 'divider' ? () => { begin(); setEditingId(selected.id) }
       : undefined,
   }
@@ -351,14 +428,16 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, hid
   const onEditDone = useCallback(() => { setEditingId(null); end() }, [end])
   const onMeasure = useCallback((id: string, h: number) => live((l) => l.map((i) => (i.id === id ? { ...i, height: h } : i))), [live])
 
+  const editMap = items.find((i) => i.id === editMapId)
+  const bubbleItem = selected?.type === 'bubble' ? selected : undefined
   const textItem = selected?.type === 'text' ? selected : undefined
   const photoItem = selected?.type === 'photo' ? selected : undefined
 
   return (
     <motion.div
       className="fixed inset-0 z-40"
-      style={{ ...themeVars(theme), background: theme.canvasBg, pointerEvents: hidden ? 'none' : undefined }}
-      initial={{ opacity: 0 }} animate={{ opacity: hidden ? 0 : 1 }} exit={{ opacity: 0, transition: { duration: 0.08 } }}
+      style={{ ...themeVars(theme), background: theme.canvasBg, pointerEvents: reveal ? 'none' : undefined, clipPath: clip }}
+      initial={{ opacity: reveal ? 1 : 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.06 } }}
       transition={{ duration: 0.22 }}
     >
       <div
@@ -440,13 +519,16 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, hid
             onClick={(e) => {
               if ((e.target as HTMLElement).closest('[data-item],[data-ui]')) return
               setSelectedId(null)
+              setConnectFrom(null)
             }}
           >
             <FloatingShapes theme={theme} />
             <AnimatePresence initial={false}>
-              {items.map((it) => (
+              {visibleItems.map((it) => (
                 <CanvasItemView
                   key={it.id} item={it}
+                  selected={selectedId === it.id}
+                  onSlot={(id, index) => { slotTarget.current = { id, index }; slotInput.current?.click() }}
                   dragging={draggingId === it.id}
                   editing={editingId === it.id}
                   onPointerDown={startItem}
@@ -456,6 +538,36 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, hid
                 />
               ))}
             </AnimatePresence>
+
+            <ThreadsSvg items={items} canvasW={canvasW} selectedId={selectedId} onSelect={setSelectedId} />
+            {selectedThread && !drawing && (() => {
+              const m = threadMid(items, selectedThread, canvasW)
+              if (!m) return null
+              return (
+                <motion.div
+                  data-ui key={selectedThread.id}
+                  className="absolute flex items-center rounded-full bg-white px-1.5"
+                  style={{ left: Math.min(Math.max(m.x, 150), canvasW - 150), top: m.y - 62, x: '-50%', zIndex: 9600, boxShadow: '0 6px 22px rgba(20,24,40,.2), 0 0 0 1px rgba(20,24,40,.05)' }}
+                  initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                >
+                  {THREAD_COLORS.map((c) => (
+                    <button
+                      key={c} type="button" aria-label={`Thread colour ${c}`} onClick={() => patch(selectedThread.id, { props: { color: c } }, true)}
+                      className="grid h-11 w-9 place-items-center border-0 bg-transparent"
+                    >
+                      <span className="h-6 w-6 rounded-full" style={{ background: c, boxShadow: selectedThread.props.color === c ? `0 0 0 2px #fff, 0 0 0 3.5px ${c}` : 'none' }} />
+                    </button>
+                  ))}
+                  <button
+                    type="button" aria-label="Remove thread" onClick={() => { commit((l) => l.filter((x) => x.id !== selectedThread.id)); setSelectedId(null) }}
+                    className="grid h-11 w-11 place-items-center border-0 bg-transparent text-[#d6455d]"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </motion.div>
+              )
+            })()}
 
             {selected && actions && !drawing && editingId !== selected.id && draggingId !== selected.id && (
               <SelectionOverlay item={selected} canvasW={canvasW} topLimit={(scroller.current?.scrollTop ?? 0) + 8} accent={accent} actions={actions} hideToolbar={!!sheet} />
@@ -485,6 +597,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, hid
 
       <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => { void addPhotos(e.target.files); e.target.value = '' }} />
 
+      <input ref={slotInput} type="file" accept="image/*" multiple hidden onChange={(e) => { void fillSlots(e.target.files); e.target.value = '' }} />
+
       <input ref={replaceInput} type="file" accept="image/*" hidden onChange={(e) => { void replacePhoto(e.target.files?.[0]); e.target.value = '' }} />
 
       <BottomToolbar visible={!sheet && !editingId} accent={accent} onTool={onTool} />
@@ -502,6 +616,15 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, hid
             onCaption={(caption) => patch(photoItem.id, { props: { caption } })}
             onReplace={() => replaceInput.current?.click()}
           />
+        )}
+      </ToolSheet>
+
+      <ToolSheet
+        open={sheet === 'bubble' && !!bubbleItem} onClose={closeSheet} title="Chat bubble" snaps={[0.58, 0.88]} dim={0.18} z={55}
+        onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, bubble: h }))}
+      >
+        {bubbleItem && (
+          <BubbleEditor value={bubbleItem.props as BubbleProps} accent={accent} onChange={(p) => patch(bubbleItem.id, { props: p })} />
         )}
       </ToolSheet>
 
@@ -525,10 +648,10 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, hid
       </ToolSheet>
 
       <ToolSheet
-        open={sheet === 'location'} onClose={closeSheet} title="Location" snaps={[0.62, 0.92]} dim={0.18} z={55}
+        open={sheet === 'location'} onClose={() => { setEditMapId(null); closeSheet() }} title="Location" snaps={[0.62, 0.92]} dim={0.18} z={55}
         onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, location: h }))}
       >
-        <LocationTool pins={['#5B6B7F', '#E5342F']} accent={accent} onAdd={addMap} />
+        <LocationTool key={editMapId ?? 'new'} initial={editMap?.type === 'map' ? editMap.props : undefined} pins={['#3a4150', '#EA4335']} accent={accent} onAdd={addMap} />
       </ToolSheet>
 
       <ToolSheet

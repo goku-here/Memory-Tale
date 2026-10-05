@@ -1,9 +1,13 @@
 import type { ReactNode } from 'react'
 import type { StickerProps } from '../types'
 import { PushPinArt } from './PushPin'
+import { PACK_SVGS } from './stickerPacks'
 
-export type StickerCategory = 'Love' | 'Travel' | 'Food' | 'Party' | 'Decor'
-export const STICKER_CATEGORIES: StickerCategory[] = ['Love', 'Travel', 'Food', 'Party', 'Decor']
+export type StickerCategory =
+  | 'Love' | 'Comic' | 'Doodles' | 'Paper' | 'Words' | 'Travel' | 'Food' | 'Party' | 'Mood' | 'Nature' | 'Animals' | 'Decor'
+export const STICKER_CATEGORIES: StickerCategory[] = [
+  'Love', 'Comic', 'Doodles', 'Paper', 'Words', 'Travel', 'Food', 'Party', 'Mood', 'Nature', 'Animals', 'Decor',
+]
 
 /** Hand-drawn style SVG stickers. `ratio` is width / height. */
 export const SVG_STICKERS: Record<string, { label: string; ratio: number; art: ReactNode }> = {
@@ -130,6 +134,8 @@ export const SVG_STICKERS: Record<string, { label: string; ratio: number; art: R
   },
 }
 
+Object.assign(SVG_STICKERS, PACK_SVGS)
+
 export interface StickerDef extends StickerProps { label?: string }
 
 const emojis = (s: string): StickerDef[] => [...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(s)]
@@ -138,10 +144,20 @@ const svgs = (...ids: string[]): StickerDef[] => ids.map((id) => ({ kind: 'svg' 
 
 export const STICKERS: Record<StickerCategory, StickerDef[]> = {
   Love: emojis('❤️💖💘💌💍🌹😍🥰💋💏🫶💞💕💝🧸'),
-  Travel: [...svgs('pin', 'pin-blue'), ...emojis('✈️🗺️🧳📸🏖️🌴⛰️🚗🚂🏝️🧭🎒⛵🗽🌅')],
-  Food: emojis('🍕🍔🍣🍝🍷🥂☕🍰🍩🍦🍓🌮🍿🥐🍜'),
+  Comic: [
+    ...svgs('c-bump', 'c-peek', 'c-boom', 'c-pow', 'c-wow', 'c-gasp', 'c-sigh', 'c-mwah', 'c-gulp', 'c-zzz', 'c-shock', 'c-what'),
+    ...emojis('💢💦💥💫😳😱🥵😤'),
+  ],
+  Doodles: svgs('d-loop', 'd-rings', 'd-hearts', 'd-wave', 'd-bolt', 'd-crown', 'd-spiral', 'd-check', 'd-cross', 'd-circle', 'd-star', 'arrow', 'star-doodle', 'sparkle'),
+  Paper: svgs('tape-green-torn', 'tape-black', 'tape-yellow', 'tape-pink', 'tape-blue', 'p-kraft', 'p-pink', 'p-blue', 'p-lined', 'p-green', 'p-tag', 'p-clip', 'p-corners', 'p-postmark', 'ticket'),
+  Words: svgs('w-love', 'w-best', 'w-xoxo', 'w-memories', 'w-date', 'w-hello', 'w-forever', 'w-us', 'w-vibes', 'w-cheers', 'w-fav', 'w-mine', 'speech-love'),
+  Travel: [...svgs('pin', 'pin-blue', 'sun'), ...emojis('✈️🗺️🧳📸🏖️🌴⛰️🚗🚂🏝️🧭🎒⛵🗽🌅')],
+  Food: emojis('🍕🍔🍣🍝🍷🥂☕🍰🍩🍦🍓🌮🍿🥐🍜🧋'),
   Party: emojis('🎉🎈🎂🎁🪩🥳🎊🍾🎶🎤✨🕺🎆🪅🎀'),
-  Decor: [...svgs('pin', 'pin-blue', 'pin-yellow', 'tape-yellow', 'tape-pink', 'tape-blue', 'bow', 'star-doodle', 'heart-doodle', 'sparkle', 'arrow', 'flower', 'speech-love', 'ticket', 'sun'), ...emojis('🌸🌼🍀🦋🌈⭐')],
+  Mood: emojis('😍🥰😂🥹😎🤗😴🤔🥳😭😘🙈😌🫠🤭😇'),
+  Nature: emojis('🌿🌸🌻🍃🌙☀️⭐🌈🌲🍂🌊🔥❄️🌷🍄'),
+  Animals: emojis('🐶🐱🐻🐼🦊🐰🐥🦄🐢🐬🦋🐝🐧🦉🐙'),
+  Decor: [...svgs('pin-yellow', 'bow', 'heart-doodle', 'flower'), ...emojis('🌼🍀🕯️🪴🎞️📷🎧💌')],
 }
 
 export function stickerRatio(p: StickerProps) {
@@ -156,9 +172,9 @@ export function dieCut(width: number) {
   return dirs.map(([x, y]) => `drop-shadow(${x}px ${y}px 0 #fff)`).join(' ') + ' drop-shadow(0 3px 5px rgba(30,25,40,.3))'
 }
 
-export function StickerArt({ sticker, width }: { sticker: StickerProps; width: number }) {
+export function StickerArt({ sticker, width, preview }: { sticker: StickerProps; width: number; preview?: boolean }) {
   return (
-    <div className="h-full w-full" style={{ containerType: 'inline-size', filter: dieCut(width) }}>
+    <div className="h-full w-full" style={{ containerType: 'inline-size', filter: preview ? 'drop-shadow(0 1px 2px rgba(30,25,40,.3))' : dieCut(width) }}>
       {sticker.kind === 'emoji' && (
         <div className="grid h-full w-full place-items-center leading-none" style={{ fontSize: '74cqw' }}>{sticker.value}</div>
       )}

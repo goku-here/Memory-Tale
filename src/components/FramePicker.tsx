@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ImagePlus } from 'lucide-react'
+import { Replace } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import type { FrameId, PhotoProps } from '../types'
 import { frameHeight } from '../lib/items'
@@ -55,7 +55,7 @@ export function FramePicker({ photo, focusCaption, accent, onFrame, onRadius, on
           type="button" whileTap={{ scale: 0.97 }} onClick={onReplace}
           className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border-0 bg-neutral-100 text-[15px] font-bold text-[#17171a]"
         >
-          <ImagePlus size={19} /> Change photo
+          <Replace size={19} /> Change photo
         </motion.button>
         <label className="block">
           <span className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-neutral-400">Caption</span>

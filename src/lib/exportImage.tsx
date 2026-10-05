@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { ItemBody } from '../components/CanvasItem'
 import { formatDate } from '../components/BookCard'
 import { getTheme } from '../components/ThemeEngine'
+import { ThreadsSvg } from '../components/Threads'
 import { repo } from '../data/repo'
 import type { CanvasItem, Memory } from '../types'
 
@@ -11,8 +12,9 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 function ExportView({ memory, items, width }: { memory: Memory; items: CanvasItem[]; width: number }) {
   const theme = getTheme(memory.themeId)
   const photos = items.filter((i) => i.type === 'photo').length
-  const top = items.length ? Math.min(...items.map((i) => i.y - i.height / 2)) : 0
-  const bottom = items.length ? Math.max(...items.map((i) => i.y + i.height / 2)) : 300
+  const solid = items.filter((i) => i.type !== 'thread')
+  const top = solid.length ? Math.min(...solid.map((i) => i.y - i.height / 2)) : 0
+  const bottom = solid.length ? Math.max(...solid.map((i) => i.y + i.height / 2)) : 300
   const offset = Math.max(0, top - 40)
   const bodyH = Math.max(320, bottom - offset + 60)
   return (
@@ -35,7 +37,7 @@ function ExportView({ memory, items, width }: { memory: Memory; items: CanvasIte
           backgroundImage: `radial-gradient(${theme.dot} 1.5px, transparent 1.7px)`, backgroundSize: '22px 22px',
         }}
       >
-        {[...items].sort((a, b) => a.zIndex - b.zIndex).map((it) => (
+        {[...items].filter((i) => i.type !== 'thread').sort((a, b) => a.zIndex - b.zIndex).map((it) => (
           <div
             key={it.id}
             style={{
@@ -46,6 +48,7 @@ function ExportView({ memory, items, width }: { memory: Memory; items: CanvasIte
             <ItemBody item={it} />
           </div>
         ))}
+        <ThreadsSvg items={items} canvasW={width} offsetY={offset} />
       </div>
       <div style={{ padding: '10px 0 22px', textAlign: 'center', fontSize: 12, fontWeight: 800, letterSpacing: '.12em', color: '#b5b5bd' }}>
         MADE WITH KEEPSAKE

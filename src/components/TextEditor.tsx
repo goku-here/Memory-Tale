@@ -13,6 +13,10 @@ export const TEXT_FONTS: { label: string; css: string }[] = [
   { label: 'Bebas', css: "'Bebas Neue', sans-serif" },
   { label: 'Poppins', css: "'Poppins', sans-serif" },
   { label: 'Typewriter', css: "'Special Elite', monospace" },
+  { label: 'Comic', css: "'Comic Neue', 'Comic Sans MS', cursive" },
+  { label: 'Hand', css: "'Patrick Hand', cursive" },
+  { label: 'Luckiest', css: "'Luckiest Guy', cursive" },
+  { label: 'Gochi', css: "'Gochi Hand', cursive" },
 ]
 
 interface Props {

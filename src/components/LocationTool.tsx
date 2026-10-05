@@ -117,16 +117,20 @@ interface Props {
   pins: [string, string]
   accent: string
   onAdd: (map: MapProps) => void
+  /** pre-fill when editing an existing map card */
+  initial?: MapProps
 }
 
 /** Starting point + destination search with a live preview of the map card. */
-export function LocationTool({ pins, accent, onAdd }: Props) {
-  const [from, setFrom] = useState<Place | null>(null)
-  const [to, setTo] = useState<Place | null>(null)
-  const [route, setRoute] = useState<[number, number][] | undefined>()
+export function LocationTool({ pins, accent, onAdd, initial }: Props) {
+  const [from, setFrom] = useState<Place | null>(initial?.from ?? null)
+  const [to, setTo] = useState<Place | null>(initial?.to ?? null)
+  const [route, setRoute] = useState<[number, number][] | undefined>(initial?.route)
+  const first = useRef(!!initial)
   const [routing, setRouting] = useState(false)
 
   useEffect(() => {
+    if (first.current) { first.current = false; return }
     setRoute(undefined)
     if (!from || !to) return
     let alive = true
@@ -166,7 +170,7 @@ export function LocationTool({ pins, accent, onAdd }: Props) {
           className="flex h-13 min-h-12 w-full items-center justify-center gap-2 rounded-full border-0 bg-[#17171a] text-[15px] font-semibold text-white disabled:opacity-35"
           style={ready ? { boxShadow: `0 8px 22px ${accent}55` } : undefined}
         >
-          <Check size={18} strokeWidth={3} /> Add map card
+          <Check size={18} strokeWidth={3} /> {initial ? 'Update map card' : 'Add map card'}
         </motion.button>
         <p className="m-0 mt-2 text-center text-[11.5px] text-neutral-400">Search by OpenStreetMap Nominatim. Map data © OpenStreetMap contributors.</p>
       </div>

@@ -1,7 +1,9 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { BringToFront, Check, Copy, Frame, ImagePlus, MapPin, Palette, Pencil, RotateCw, SendToBack, Trash2 } from 'lucide-react'
+import { BringToFront, Check, Copy, Frame, MapPin, Palette, Pencil, Replace, RotateCw, SendToBack, Spline, Trash2 } from 'lucide-react'
 import { memo, useLayoutEffect, useRef, useState, type PointerEvent as RPE } from 'react'
 import type { CanvasItem } from '../types'
+import { BubbleBody } from './Bubble'
+import { ClotheslineBody } from './Clothesline'
 import { DrawItem } from './DrawLayer'
 import { MapCard } from './MapCard'
 import { PhotoFrame } from './PhotoFrame'
@@ -10,6 +12,8 @@ import { NOTE_COLORS, StickyNote } from './StickyNote'
 
 interface ItemProps {
   item: CanvasItem
+  selected: boolean
+  onSlot: (id: string, index: number) => void
   dragging: boolean
   editing: boolean
   onPointerDown: (e: RPE, id: string) => void
@@ -69,8 +73,8 @@ function DividerBody({ item, editing, onEditText, onEditDone }: { item: Extract<
 
 /** The visual content of an item, shared by the live canvas and the PNG export. */
 export function ItemBody({
-  item, editing = false, onMeasure = () => {}, onEditText = () => {}, onEditDone = () => {},
-}: { item: CanvasItem; editing?: boolean; onMeasure?: ItemProps['onMeasure']; onEditText?: ItemProps['onEditText']; onEditDone?: ItemProps['onEditDone'] }) {
+  item, editing = false, selected = false, onSlot, onMeasure = () => {}, onEditText = () => {}, onEditDone = () => {},
+}: { item: CanvasItem; editing?: boolean; selected?: boolean; onSlot?: (i: number) => void; onMeasure?: ItemProps['onMeasure']; onEditText?: ItemProps['onEditText']; onEditDone?: ItemProps['onEditDone'] }) {
   switch (item.type) {
     case 'photo': return <PhotoFrame photo={item.props} width={item.width} />
     case 'sticker': return <StickerArt sticker={item.props} width={item.width} />
@@ -79,13 +83,16 @@ export function ItemBody({
     case 'draw': return <DrawItem draw={item.props} />
     case 'map': return <MapCard map={item.props} />
     case 'divider': return <DividerBody item={item} editing={editing} onEditText={onEditText} onEditDone={onEditDone} />
+    case 'bubble': return <BubbleBody bubble={item.props} width={item.width} height={item.height} />
+    case 'clothesline': return <ClotheslineBody line={item.props} selected={selected} onSlot={onSlot} />
+    case 'thread': return null
   }
 }
 
 /** One item on the canvas. Positioned by centre (x in %, y in px). */
-export const CanvasItemView = memo(function CanvasItemView({ item, dragging, editing, onPointerDown, onMeasure, onEditText, onEditDone }: ItemProps) {
+export const CanvasItemView = memo(function CanvasItemView({ item, selected, onSlot, dragging, editing, onPointerDown, onMeasure, onEditText, onEditDone }: ItemProps) {
   const body = (
-    <ItemBody item={item} editing={editing} onMeasure={onMeasure} onEditText={onEditText} onEditDone={onEditDone} />
+    <ItemBody item={item} editing={editing} selected={selected} onSlot={(i) => onSlot(item.id, i)} onMeasure={onMeasure} onEditText={onEditText} onEditDone={onEditDone} />
   )
 
   return (
@@ -127,6 +134,7 @@ export interface SelectionActions {
   onEdit?: () => void
   onFrame?: () => void
   onReplace?: () => void
+  onConnect?: () => void
   onColor?: (color: string) => void
 }
 
@@ -149,7 +157,7 @@ export function SelectionOverlay({
   const rad = (item.rotation * Math.PI) / 180
   const hh = (Math.abs(item.width * Math.sin(rad)) + Math.abs(item.height * Math.cos(rad))) / 2
   const [colorsOpen, setColorsOpen] = useState(false)
-  const nButtons = 4 + (actions.onEdit ? 1 : 0) + (actions.onFrame ? 1 : 0) + (actions.onReplace ? 1 : 0) + (actions.onColor ? 1 : 0)
+  const nButtons = 4 + (actions.onEdit ? 1 : 0) + (actions.onFrame ? 1 : 0) + (actions.onReplace ? 1 : 0) + (actions.onConnect ? 1 : 0) + (actions.onColor ? 1 : 0)
   const tbW = nButtons * 44 + 16
   const above = item.y - hh - 62
   const placeAbove = above > topLimit
@@ -209,9 +217,10 @@ export function SelectionOverlay({
           transition={{ type: 'spring', stiffness: 500, damping: 30 }}
         >
           {actions.onFrame && <TB label="Frame" onClick={actions.onFrame}><Frame size={19} /></TB>}
-          {actions.onReplace && <TB label="Change photo" onClick={actions.onReplace}><ImagePlus size={19} /></TB>}
+          {actions.onReplace && <TB label="Change photo" onClick={actions.onReplace}><Replace size={19} /></TB>}
           {actions.onColor && <TB label="Note colour" onClick={() => setColorsOpen((v) => !v)}><Palette size={19} /></TB>}
           {actions.onEdit && <TB label="Edit" onClick={actions.onEdit}><Pencil size={18} /></TB>}
+          {actions.onConnect && <TB label="Tie with thread" onClick={actions.onConnect}><Spline size={19} /></TB>}
           <TB label="Duplicate" onClick={actions.onDuplicate}><Copy size={18} /></TB>
           <TB label="Bring forward" onClick={actions.onForward}><BringToFront size={19} /></TB>
           <TB label="Send backward" onClick={actions.onBackward}><SendToBack size={19} /></TB>

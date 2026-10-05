@@ -1,4 +1,4 @@
-import { AnimatePresence, MotionConfig, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, MotionConfig, useMotionValue, useReducedMotion } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import { useCallback, useState } from 'react'
 import { Canvas } from './components/Canvas'
@@ -17,7 +17,7 @@ export default function App() {
   const [sheet, setSheet] = useState<SheetState | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const [opening, setOpening] = useState<{ memory: Memory; rect: DOMRect; mode: 'open' | 'close' } | null>(null)
-  const [revealed, setRevealed] = useState(false)
+  const progress = useMotionValue(0)
   const [shareId, setShareId] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Memory | null>(null)
 
@@ -26,16 +26,18 @@ export default function App() {
 
   const startOpen = useCallback((memory: Memory, rect: DOMRect) => {
     setOpenId(memory.id)
-    setRevealed(false)
+    progress.set(0)
     if (!reduce) setOpening({ memory, rect, mode: 'open' })
-  }, [reduce])
+  }, [reduce, progress])
 
   const closeBook = useCallback(() => {
     const m = openId ? memories.find((x) => x.id === openId) : undefined
     const rect = m ? document.querySelector(`[data-book-id="${m.id}"]`)?.getBoundingClientRect() : undefined
-    setOpenId(null)
-    if (m && rect && !reduce) setOpening({ memory: m, rect, mode: 'close' })
-  }, [openId, memories, reduce])
+    if (m && rect && !reduce) {
+      progress.set(1)
+      setOpening({ memory: m, rect, mode: 'close' })
+    } else setOpenId(null)
+  }, [openId, memories, reduce, progress])
 
   const openWhenReady = useCallback((memory: Memory) => {
     // wait for the new book to appear in the grid, then open from its slot
@@ -88,7 +90,7 @@ export default function App() {
             key={openMemory.id}
             memory={openMemory}
             onBack={closeBook}
-            hidden={opening?.mode === 'open' && !revealed}
+            reveal={opening ? { p: progress, rect: opening.rect } : undefined}
             onEdit={() => setSheet({ mode: 'edit', id: openMemory.id })}
             onTheme={() => setSheet({ mode: 'theme', id: openMemory.id })}
             onShare={() => setShareId(openMemory.id)}
@@ -101,7 +103,12 @@ export default function App() {
         {byId(shareId) && <ShareScreen key="share" memory={byId(shareId)!} onClose={() => setShareId(null)} />}
       </AnimatePresence>
 
-      {opening && <OpeningBook key={opening.mode} memory={opening.memory} rect={opening.rect} mode={opening.mode} onReveal={() => setRevealed(true)} onDone={() => setOpening(null)} />}
+      {opening && (
+        <OpeningBook
+          key={opening.mode} memory={opening.memory} rect={opening.rect} mode={opening.mode} progress={progress}
+          onDone={() => { if (opening.mode === 'close') setOpenId(null); setOpening(null) }}
+        />
+      )}
 
       <CreateMemorySheet
         state={sheet}

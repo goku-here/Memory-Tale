@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Image as ImageIcon, MapPin, MoreHorizontal, Smile, StickyNote, Type, Flag } from 'lucide-react'
+import { Image as ImageIcon, Images, MapPin, MessageCircle, MoreHorizontal, Smile, StickyNote, Type, Flag } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 
-export type ToolId = 'sticker' | 'draw' | 'text' | 'photo' | 'note' | 'location' | 'divider'
+export type ToolId = 'sticker' | 'draw' | 'text' | 'photo' | 'note' | 'location' | 'divider' | 'bubble' | 'line'
 
 interface Props {
   visible: boolean
@@ -43,13 +43,15 @@ export function BottomToolbar({ visible, onTool }: Props) {
               {more && (
                 <motion.div
                   role="menu"
-                  className="pointer-events-auto absolute bottom-[68px] right-0 w-48 origin-bottom-right rounded-3xl bg-white p-1.5"
+                  className="pointer-events-auto absolute bottom-[68px] right-0 w-56 origin-bottom-right rounded-3xl bg-white p-1.5"
                   style={{ boxShadow: '0 14px 40px rgba(20,24,40,.22), 0 0 0 1px rgba(20,24,40,.04)' }}
                   initial={{ opacity: 0, scale: 0.8, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.85, y: 6 }}
                   transition={{ type: 'spring', stiffness: 480, damping: 30 }}
                 >
                   {([
                     ['note', 'Sticky note', <StickyNote size={19} key="n" />],
+                    ['bubble', 'Chat bubble', <MessageCircle size={19} key="b" />],
+                    ['line', 'Polaroid line', <Images size={19} key="p" />],
                     ['location', 'Location', <MapPin size={19} key="l" />],
                     ['divider', 'Stop divider', <Flag size={19} key="d" />],
                   ] as [ToolId, string, ReactNode][]).map(([id, label, icon]) => (

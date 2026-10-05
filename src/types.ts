@@ -93,6 +93,26 @@ export interface DividerProps {
   color: string
 }
 
+export type BubbleShape = 'speech' | 'thought' | 'shout' | 'whisper' | 'box'
+export interface BubbleProps {
+  text: string
+  shape: BubbleShape
+  /** which side the tail points to */
+  tail: 'left' | 'right' | 'none'
+  font: string
+  size: number
+}
+export interface ClotheslineProps {
+  /** three photo slots (data URLs, '' = empty) */
+  photos: [string, string, string]
+}
+export interface ThreadProps {
+  /** ids of the two connected items */
+  a: string
+  b: string
+  color: string
+}
+
 export interface ItemBase {
   id: string
   /** centre, in percent of the canvas width */
@@ -114,6 +134,9 @@ export type CanvasItem = ItemBase &
     | { type: 'draw'; props: DrawProps }
     | { type: 'map'; props: MapProps }
     | { type: 'divider'; props: DividerProps }
+    | { type: 'bubble'; props: BubbleProps }
+    | { type: 'clothesline'; props: ClotheslineProps }
+    | { type: 'thread'; props: ThreadProps }
   )
 
 export type ItemType = CanvasItem['type']
