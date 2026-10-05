@@ -33,3 +33,10 @@ body {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+
+/* ---- map card ---- */
+@keyframes route-march { to { stroke-dashoffset: -20; } }
+.route-dots { stroke: var(--t-pin, #e5486f); animation: route-march 1.1s linear infinite; }
+.leaflet-container { font-family: var(--font-ui); background: #e9efe6; }
+.keepsake-pin { background: none; border: 0; }
+.leaflet-control-attribution { display: none; }

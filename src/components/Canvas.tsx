@@ -6,7 +6,7 @@ import { uid } from '../lib/id'
 import { compressImage } from '../lib/image'
 import { clamp, cloneItem, frameHeight, nextZ, normalizeZ, rnd } from '../lib/items'
 import { useGestures } from '../lib/useGestures'
-import type { CanvasItem, FrameId, ItemPatch, Stroke, StickerProps, TextProps } from '../types'
+import type { CanvasItem, FrameId, ItemPatch, MapProps, Stroke, StickerProps, TextProps } from '../types'
 import { formatDate } from './BookCard'
 import { BottomToolbar, type ToolId } from './BottomToolbar'
 import { CanvasItemView, SelectionOverlay } from './CanvasItem'
@@ -19,6 +19,7 @@ import { stickerRatio } from './stickers'
 import { TextEditor } from './TextEditor'
 import { FloatingShapes, getTheme, themeVars } from './ThemeEngine'
 import { ToolSheet } from './ToolSheet'
+import { LocationTool } from './LocationTool'
 import { IconButton, toast } from './ui'
 import type { Memory } from '../types'
 
@@ -223,6 +224,17 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete }: C
     setEditingId(id)
   }
 
+  const addMap = (map: MapProps) => {
+    const w = Math.round(clamp(canvasW * 0.78, 240, 340))
+    setSheet(null)
+    window.setTimeout(() => {
+      addItem((z, c) => ({
+        id: '', type: 'map', zIndex: z, x: 50, y: c.y, width: w, height: Math.round(w * 0.78),
+        rotation: Math.round(rnd(-3, 3) * 10) / 10, props: map,
+      }))
+    }, 120)
+  }
+
   const addDivider = () => {
     const n = itemsRef.current.filter((i) => i.type === 'divider').length + 1
     addItem((z, c) => ({
@@ -240,7 +252,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete }: C
       case 'draw': setStrokes([]); setPen((p) => ({ ...p })); setSheet('draw'); break
       case 'note': addNote(); break
       case 'divider': addDivider(); break
-      case 'location': toast('Locations arrive in the next step'); break
+      case 'location': setSheet('location'); break
     }
   }
 
@@ -489,6 +501,13 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete }: C
             onChange={(p) => patch(textItem.id, { props: p })}
           />
         )}
+      </ToolSheet>
+
+      <ToolSheet
+        open={sheet === 'location'} onClose={closeSheet} title="Location" snaps={[0.62, 0.92]} dim={0.18} z={55}
+        onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, location: h }))}
+      >
+        <LocationTool pins={[theme.palette[0], theme.palette[1] ?? accent]} accent={accent} onAdd={addMap} />
       </ToolSheet>
 
       <ToolSheet

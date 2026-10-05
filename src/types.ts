@@ -83,6 +83,8 @@ export interface Place {
 export interface MapProps {
   from: Place
   to: Place
+  /** route polyline as [lat, lng] pairs (road route or a curved arc) */
+  route?: [number, number][]
 }
 export interface DividerProps {
   label: string

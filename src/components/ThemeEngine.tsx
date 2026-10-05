@@ -92,6 +92,8 @@ export function themeVars(theme: Theme): CSSProperties {
     ['--t-dot' as string]: theme.dot,
     ['--t-accent' as string]: theme.accent,
     ['--t-font' as string]: theme.font,
+    ['--t-pin' as string]: theme.palette[0],
+    ['--t-pin2' as string]: theme.palette[1],
   }
 }
 
