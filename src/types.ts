@@ -34,3 +34,85 @@ export interface Memory {
   createdAt: number
   members?: Member[]
 }
+
+/* ---------------- canvas items ---------------- */
+
+export type FrameId = 'polaroid' | 'rounded' | 'circle' | 'heart' | 'arch' | 'film' | 'stamp' | 'none'
+
+export interface PhotoProps {
+  src: string
+  /** natural width / height of the photo */
+  aspect: number
+  frame: FrameId
+  /** corner radius in px at a 200px-wide item (scales with the item) */
+  radius: number
+  caption: string
+}
+export interface StickerProps {
+  kind: 'emoji' | 'svg' | 'image'
+  /** emoji character, svg sticker id, or image data URL */
+  value: string
+}
+export interface TextProps {
+  text: string
+  font: string
+  size: number
+  color: string
+  align: 'left' | 'center' | 'right'
+}
+export interface NoteProps {
+  text: string
+  color: string
+}
+export interface Stroke {
+  color: string
+  size: number
+  points: [number, number][]
+}
+export interface DrawProps {
+  strokes: Stroke[]
+  /** the box (px) the stroke points are expressed in */
+  w: number
+  h: number
+}
+export interface Place {
+  name: string
+  lat: number
+  lng: number
+}
+export interface MapProps {
+  from: Place
+  to: Place
+}
+export interface DividerProps {
+  label: string
+  color: string
+}
+
+export interface ItemBase {
+  id: string
+  /** centre, in percent of the canvas width */
+  x: number
+  /** centre, in px from the top of the canvas */
+  y: number
+  width: number
+  height: number
+  rotation: number
+  zIndex: number
+}
+
+export type CanvasItem = ItemBase &
+  (
+    | { type: 'photo'; props: PhotoProps }
+    | { type: 'sticker'; props: StickerProps }
+    | { type: 'text'; props: TextProps }
+    | { type: 'note'; props: NoteProps }
+    | { type: 'draw'; props: DrawProps }
+    | { type: 'map'; props: MapProps }
+    | { type: 'divider'; props: DividerProps }
+  )
+
+export type ItemType = CanvasItem['type']
+
+/** Partial update for any item: base fields + a partial props bag. */
+export type ItemPatch = Partial<ItemBase> & { props?: Record<string, unknown> }
