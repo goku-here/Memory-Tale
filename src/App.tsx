@@ -5,6 +5,7 @@ import { Canvas } from './components/Canvas'
 import { CreateMemorySheet, type SheetState } from './components/CreateMemorySheet'
 import { Home } from './components/Home'
 import { OpeningBook } from './components/OpeningBook'
+import { ShareScreen } from './components/ShareScreen'
 import { getTheme } from './components/ThemeEngine'
 import { ConfirmDialog, ToastHost, toast } from './components/ui'
 import { useMemories } from './data/useMemories'
@@ -16,6 +17,7 @@ export default function App() {
   const [sheet, setSheet] = useState<SheetState | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const [opening, setOpening] = useState<{ memory: Memory; rect: DOMRect } | null>(null)
+  const [shareId, setShareId] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Memory | null>(null)
 
   const byId = useCallback((id?: string | null) => memories.find((m) => m.id === id), [memories])
@@ -77,10 +79,14 @@ export default function App() {
             onBack={() => setOpenId(null)}
             onEdit={() => setSheet({ mode: 'edit', id: openMemory.id })}
             onTheme={() => setSheet({ mode: 'theme', id: openMemory.id })}
-            onShare={() => toast('Share screen arrives in the last step')}
+            onShare={() => setShareId(openMemory.id)}
             onDelete={() => setConfirmDelete(openMemory)}
           />
         )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {byId(shareId) && <ShareScreen key="share" memory={byId(shareId)!} onClose={() => setShareId(null)} />}
       </AnimatePresence>
 
       {opening && <OpeningBook memory={opening.memory} rect={opening.rect} onDone={() => setOpening(null)} />}

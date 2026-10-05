@@ -1,12 +1,18 @@
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 import { defineConfig } from 'vite'
+
+// `npm run dev:https` serves over HTTPS so a phone on your LAN gets a secure context
+// (needed for the Web Share API, clipboard, camera and service workers).
+const https = process.env.HTTPS === '1'
 
 export default defineConfig({
   server: { host: true, port: 5173 },
   preview: { host: true, port: 4173 },
   plugins: [
+    ...(https ? [basicSsl()] : []),
     react(),
     tailwindcss(),
     VitePWA({

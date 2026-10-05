@@ -5,6 +5,8 @@ export interface CanvasDoc {
   memoryId: string
   items: unknown[]
   height?: number
+  /** canvas width in px when saved (reference for exports) */
+  width?: number
   updatedAt: number
 }
 

@@ -67,18 +67,26 @@ function DividerBody({ item, editing, onEditText, onEditDone }: { item: Extract<
   )
 }
 
+/** The visual content of an item, shared by the live canvas and the PNG export. */
+export function ItemBody({
+  item, editing = false, onMeasure = () => {}, onEditText = () => {}, onEditDone = () => {},
+}: { item: CanvasItem; editing?: boolean; onMeasure?: ItemProps['onMeasure']; onEditText?: ItemProps['onEditText']; onEditDone?: ItemProps['onEditDone'] }) {
+  switch (item.type) {
+    case 'photo': return <PhotoFrame photo={item.props} width={item.width} />
+    case 'sticker': return <StickerArt sticker={item.props} width={item.width} />
+    case 'text': return <TextBody item={item} onMeasure={onMeasure} />
+    case 'note': return <StickyNote text={item.props.text} color={item.props.color} editing={editing} onChange={(t) => onEditText(item.id, t)} onDone={onEditDone} />
+    case 'draw': return <DrawItem draw={item.props} />
+    case 'map': return <MapCard map={item.props} />
+    case 'divider': return <DividerBody item={item} editing={editing} onEditText={onEditText} onEditDone={onEditDone} />
+  }
+}
+
 /** One item on the canvas. Positioned by centre (x in %, y in px). */
 export const CanvasItemView = memo(function CanvasItemView({ item, dragging, editing, onPointerDown, onMeasure, onEditText, onEditDone }: ItemProps) {
-  let body
-  switch (item.type) {
-    case 'photo': body = <PhotoFrame photo={item.props} width={item.width} />; break
-    case 'sticker': body = <StickerArt sticker={item.props} width={item.width} />; break
-    case 'text': body = <TextBody item={item} onMeasure={onMeasure} />; break
-    case 'note': body = <StickyNote text={item.props.text} color={item.props.color} editing={editing} onChange={(t) => onEditText(item.id, t)} onDone={onEditDone} />; break
-    case 'draw': body = <DrawItem draw={item.props} />; break
-    case 'map': body = <MapCard map={item.props} />; break
-    case 'divider': body = <DividerBody item={item} editing={editing} onEditText={onEditText} onEditDone={onEditDone} />; break
-  }
+  const body = (
+    <ItemBody item={item} editing={editing} onMeasure={onMeasure} onEditText={onEditText} onEditDone={onEditDone} />
+  )
 
   return (
     <motion.div

@@ -4,7 +4,7 @@ import type { Memory } from '../types'
 import { getTheme } from './ThemeEngine'
 import { shade } from '../lib/color'
 
-const GRAIN =
+export const GRAIN =
   "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' seed='4' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .9 -.15'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")"
 const WEAVE =
   'repeating-linear-gradient(115deg, rgba(255,255,255,.07) 0 1px, transparent 1px 3px), repeating-linear-gradient(25deg, rgba(0,0,0,.05) 0 1px, transparent 1px 4px)'

@@ -1,32 +1,37 @@
-# React + TypeScript + Vite
+# Keepsake
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A mobile-first PWA scrapbook for couples and friends. React + TypeScript + Vite + Tailwind + Framer Motion.
+Everything is stored on the device (IndexedDB via Dexie); there is no backend yet.
 
-Currently, two official plugins are available:
+## Run
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev          # http://<your-LAN-ip>:5173 (reachable from your phone)
+npm run dev:https    # same, over HTTPS (self-signed) for Share / clipboard / install on a phone
+npm run build && npm run preview   # production build with the service worker
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+On a phone, open the LAN address printed by Vite. Use `dev:https` (accept the certificate warning) if you want
+the Web Share API, copy-link fallback, camera and "Add to Home Screen" to behave like production; browsers only
+allow those on secure origins.
+
+## Layout
+
+| Path | What |
+| --- | --- |
+| `src/data/repo.ts` | `Repository` interface + Dexie implementation. **Swap this file for Firebase later.** |
+| `src/data/useCanvas.ts` | items, undo/redo, debounced auto-save |
+| `src/lib/useGestures.ts` | pointer gestures: drag, pinch, rotate, resize handles, edge auto-scroll |
+| `src/components/ThemeEngine.tsx` | category themes, cover palette, floating shapes |
+| `src/components/BookCard.tsx` | the leather notebook (`BookCover`) and the home grid card |
+| `src/components/Canvas.tsx` | the canvas screen; tools live in `ToolSheet` bottom sheets |
+| `src/components/ShareScreen.tsx`, `src/lib/exportImage.tsx` | share screen and long-PNG export |
+
+Item record: `{ id, type, x (% of canvas width), y (px), width, height, rotation, zIndex, props }`.
+`x`/`y` are the item's centre.
+
+## Notes
+
+- Place search uses OpenStreetMap Nominatim and routes use the public OSRM demo server (no API keys, light use only).
+- Photos are compressed in the browser (max 1400 px, JPEG 0.8) and stored as data URLs in IndexedDB.

@@ -84,9 +84,10 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete }: C
   useEffect(() => {
     const el = surface.current
     if (!el) return
-    const ro = new ResizeObserver(() => setCanvasW(el.getBoundingClientRect().width))
+    const ro = new ResizeObserver(() => { const w = el.getBoundingClientRect().width; setCanvasW(w); cv.setWidth(w) })
     ro.observe(el)
     return () => ro.disconnect()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   /* ---------- item helpers ---------- */

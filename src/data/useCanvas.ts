@@ -21,6 +21,7 @@ export function useCanvas(memoryId: string) {
 
   const ref = useRef<CanvasItem[]>([])
   const heightRef = useRef(MIN_HEIGHT)
+  const widthRef = useRef(390)
   const past = useRef<CanvasItem[][]>([])
   const future = useRef<CanvasItem[][]>([])
   const base = useRef<CanvasItem[] | null>(null)
@@ -38,7 +39,7 @@ export function useCanvas(memoryId: string) {
     window.clearTimeout(timer.current)
     if (!dirty.current) return
     dirty.current = false
-    await repo.saveCanvas({ memoryId, items: ref.current, height: heightRef.current, updatedAt: Date.now() })
+    await repo.saveCanvas({ memoryId, items: ref.current, height: heightRef.current, width: widthRef.current, updatedAt: Date.now() })
     setStatus('saved')
   }, [memoryId])
 
@@ -120,8 +121,10 @@ export function useCanvas(memoryId: string) {
     setStatus('saving')
   }, [])
 
+  const setWidth = useCallback((w: number) => { widthRef.current = w }, [])
+
   return {
-    items, itemsRef: ref, height, loaded, status, commit, begin, live, end, undo, redo, setHeight,
+    setWidth, items, itemsRef: ref, height, loaded, status, commit, begin, live, end, undo, redo, setHeight,
     canUndo: past.current.length > 0, canRedo: future.current.length > 0,
   }
 }
