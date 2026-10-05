@@ -153,6 +153,7 @@ export function BookCard({ memory, index, onOpen, onLongPress, hidden }: BookCar
       <motion.button
         type="button"
         aria-label={`Open ${memory.title}`}
+        data-book-id={memory.id}
         className="no-select block w-full cursor-pointer border-0 bg-transparent p-0 text-left outline-none"
         style={{ touchAction: 'manipulation' }}
         whileTap={{ scale: 0.96 }}

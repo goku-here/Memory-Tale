@@ -37,7 +37,7 @@ export const THEMES: Record<CategoryId, Theme> = {
   },
   dinner: {
     id: 'dinner', name: 'Dinner', emoji: '🍷', font: "'Playfair Display', serif",
-    palette: ['#7B1E3A', '#C9A24B', '#3B0F1E', '#E8D9B5', '#FFFFFF'], accent: '#C9A24B',
+    palette: ['#7B1E3A', '#C9A24B', '#E8D9B5', '#3B0F1E', '#FFFFFF'], accent: '#C9A24B',
     canvasBg: '#F8F2EC', dot: '#DAC6AC', cover: '#C98F7E', shapes: ['🍷', '🕯️', '🍝', '✨'],
     blurb: 'Burgundy and gold, candle-lit',
   },
@@ -61,7 +61,7 @@ export const THEMES: Record<CategoryId, Theme> = {
   },
   anniversary: {
     id: 'anniversary', name: 'Anniversary', emoji: '🥂', font: "'Special Elite', monospace",
-    palette: ['#8E2B3D', '#B8860B', '#4A1B26', '#E9D8A6', '#FFFFFF'], accent: '#B8860B',
+    palette: ['#8E2B3D', '#B8860B', '#E9D8A6', '#4A1B26', '#FFFFFF'], accent: '#B8860B',
     canvasBg: '#FAF5EA', dot: '#E3D5AB', cover: '#EBD9A0', shapes: ['🥂', '💍', '🕊️', '✨'],
     blurb: 'Champagne and deep red, like a love letter',
   },

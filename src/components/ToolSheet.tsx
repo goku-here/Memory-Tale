@@ -133,7 +133,7 @@ export function ToolSheet({
           )}
         </div>
         <div
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+          className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain"
           style={{ paddingBottom: hidden + 24 + 0, touchAction: 'pan-y' }}
         >
           {children}
