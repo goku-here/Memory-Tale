@@ -66,7 +66,7 @@ Photos are synced as compressed copies inside Firestore (free Spark plan). Full-
 
 ## Original-quality photos (Supabase Storage)
 
-Signed-in users' photos also upload the untouched original to the private-by-path `originals` bucket (free plan, no card).
+Signed-in users' photos also upload the untouched original to the private-by-path `Originals` bucket (free plan, no card).
 Setup: create the bucket, set `VITE_SUPABASE_URL` / `VITE_SUPABASE_KEY` in `frontend/.env.local`, and run `backend/supabase.sql`
 in the Supabase SQL Editor. The Frame sheet then shows **Download original quality**.
 Later hardening: put uploads behind a Supabase Edge Function that verifies the Firebase ID token.

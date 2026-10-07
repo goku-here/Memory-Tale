@@ -4,7 +4,7 @@ const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const key = import.meta.env.VITE_SUPABASE_KEY as string | undefined
 
 export const supabaseConfigured = Boolean(url && key)
-export const ORIGINALS = 'originals'
+export const ORIGINALS = 'Originals'
 /** originals above this size are skipped (the compressed copy is still used) */
 export const MAX_ORIGINAL_BYTES = 20 * 1024 * 1024
 
