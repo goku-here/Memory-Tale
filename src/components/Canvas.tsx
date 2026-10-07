@@ -68,6 +68,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
 
   const [menu, setMenu] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const selectedIdRef = useRef<string | null>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [sheet, setSheet] = useState<Sheet>(null)
@@ -82,6 +83,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   const [pen, setPen] = useState({ color: accent, size: 6 })
   const sheetH = Math.max(0, ...Object.values(sheetHs))
 
+  selectedIdRef.current = selectedId
   const selected = useMemo(() => items.find((i) => i.id === selectedId && i.type !== 'thread'), [items, selectedId])
   const selectedThread = useMemo(() => items.find((i): i is Extract<CanvasItem, { type: 'thread' }> => i.id === selectedId && i.type === 'thread'), [items, selectedId])
   const visibleItems = useMemo(() => items.filter((i) => i.type !== 'thread'), [items])
@@ -134,6 +136,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   const { startItem: rawStart, startHandle } = useGestures({
     surfaceRef: surface, scrollerRef: scroller, itemsRef, heightRef, live, begin, end,
     onSelect: setSelectedId, onDragging: setDraggingId,
+    isSelected: (id) => selectedIdRef.current === id,
     topInset: HEADER_H + 40, bottomInset: 130,
     onDoubleTap: (id) => {
       const it = itemsRef.current.find((i) => i.id === id)

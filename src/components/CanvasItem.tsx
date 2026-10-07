@@ -101,7 +101,7 @@ export const CanvasItemView = memo(function CanvasItemView({ item, selected, onS
       className="no-select absolute"
       style={{
         left: `${item.x}%`, top: item.y, width: item.width, height: item.type === 'text' ? 'auto' : item.height,
-        x: '-50%', y: '-50%', rotate: item.rotation, zIndex: item.zIndex, touchAction: 'pan-y',
+        x: '-50%', y: '-50%', rotate: item.rotation, zIndex: item.zIndex, touchAction: selected ? 'none' : 'pan-y',
         cursor: dragging ? 'grabbing' : 'grab',
       }}
       initial={{ scale: 0.5, opacity: 0 }}

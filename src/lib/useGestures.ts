@@ -30,6 +30,8 @@ export interface GestureOptions {
   onSelect: (id: string) => void
   onDragging: (id: string | null) => void
   onDoubleTap?: (id: string) => void
+  /** already-selected items can be dragged straight away on touch */
+  isSelected?: (id: string) => boolean
   /** px at the top of the viewport covered by the sticky header */
   topInset?: number
   /** px at the bottom of the viewport covered by the toolbar */
@@ -261,7 +263,7 @@ export function useGestures(opts: GestureOptions) {
     if (e.button > 0) return
     const p = { x: e.clientX, y: e.clientY }
     // Touch: items only pick up after a 1 s press, so plain scrolling over them never selects or moves them.
-    if (e.pointerType === 'touch' && mode === 'drag') {
+    if (e.pointerType === 'touch' && mode === 'drag' && !o.current.isSelected?.(id)) {
       if (hold.current) return
       const pid = e.pointerId
       hold.current = {
