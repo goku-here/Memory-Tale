@@ -57,7 +57,7 @@ export function useGestures(opts: GestureOptions) {
   const g = useRef<G | null>(null)
   const lastTap = useRef<{ id: string; t: number } | null>(null)
   const raf = useRef(0)
-  const fns = useRef<{ move: (e: PointerEvent) => void; up: (e: PointerEvent) => void; down: (e: PointerEvent) => void }>(null!)
+  const fns = useRef<{ move: (e: PointerEvent) => void; up: (e: PointerEvent) => void; down: (e: PointerEvent) => void; touch: (e: TouchEvent) => void }>(null!)
 
   const geometry = () => {
     const r = o.current.surfaceRef.current!.getBoundingClientRect()
@@ -169,6 +169,7 @@ export function useGestures(opts: GestureOptions) {
     window.removeEventListener('pointerup', fns.current.up)
     window.removeEventListener('pointercancel', fns.current.up)
     window.removeEventListener('pointerdown', fns.current.down, true)
+    window.removeEventListener('touchmove', fns.current.touch)
     g.current = null
     o.current.onDragging(null)
     o.current.end()
@@ -182,7 +183,8 @@ export function useGestures(opts: GestureOptions) {
     }
   }
 
-  fns.current = {
+  fns.current ||= {
+    touch: (e) => { if (g.current && e.cancelable) e.preventDefault() },
     move: (e) => {
       const st = g.current
       if (!st || !st.pointers.has(e.pointerId)) return
@@ -213,14 +215,13 @@ export function useGestures(opts: GestureOptions) {
     },
   }
 
-  const start = (e: RPointerEvent, id: string, mode: Mode) => {
+  const HOLD_MS = 1000
+
+  /** begin a gesture for an already-down pointer */
+  const activate = (pointerId: number, p: Pt, id: string, mode: Mode) => {
     if (g.current) return
-    if (e.button > 0) return
-    e.preventDefault()
-    e.stopPropagation()
-    const p = { x: e.clientX, y: e.clientY }
     const st: G = {
-      id, mode, pointers: new Map([[e.pointerId, p]]), moved: false, t0: performance.now(), last: p,
+      id, mode, pointers: new Map([[pointerId, p]]), moved: false, t0: performance.now(), last: p,
       base: { cx: 0, cy: 0, w: 0, h: 0, rot: 0, size: 0, p, d: 1, a: 0, scrollTop: 0 },
     }
     g.current = st
@@ -233,11 +234,57 @@ export function useGestures(opts: GestureOptions) {
     window.addEventListener('pointerup', f.up)
     window.addEventListener('pointercancel', f.up)
     window.addEventListener('pointerdown', f.down, true)
+    window.addEventListener('touchmove', f.touch, { passive: false })
     if (mode === 'drag') autoScroll()
   }
 
+  const hold = useRef<{ timer: number; x: number; y: number; id: number } | null>(null)
+  const cancelHold = () => {
+    const h = hold.current
+    if (!h) return
+    window.clearTimeout(h.timer)
+    hold.current = null
+    window.removeEventListener('pointermove', holdMove)
+    window.removeEventListener('pointerup', holdEnd)
+    window.removeEventListener('pointercancel', holdEnd)
+  }
+  function holdMove(e: PointerEvent) {
+    const h = hold.current
+    if (h && e.pointerId === h.id && Math.hypot(e.clientX - h.x, e.clientY - h.y) > 6) cancelHold() // it's a scroll
+  }
+  function holdEnd(e: PointerEvent) {
+    if (hold.current && e.pointerId === hold.current.id) cancelHold()
+  }
+
+  const start = (e: RPointerEvent, id: string, mode: Mode) => {
+    if (g.current) return
+    if (e.button > 0) return
+    const p = { x: e.clientX, y: e.clientY }
+    // Touch: items only pick up after a 1 s press, so plain scrolling over them never selects or moves them.
+    if (e.pointerType === 'touch' && mode === 'drag') {
+      if (hold.current) return
+      const pid = e.pointerId
+      hold.current = {
+        id: pid, x: p.x, y: p.y,
+        timer: window.setTimeout(() => {
+          const pos = { x: hold.current?.x ?? p.x, y: hold.current?.y ?? p.y }
+          cancelHold()
+          navigator.vibrate?.(18)
+          activate(pid, pos, id, 'drag')
+        }, HOLD_MS),
+      }
+      window.addEventListener('pointermove', holdMove)
+      window.addEventListener('pointerup', holdEnd)
+      window.addEventListener('pointercancel', holdEnd)
+      return
+    }
+    e.preventDefault()
+    e.stopPropagation()
+    activate(e.pointerId, p, id, mode)
+  }
+
   const stop = useCallback(() => { cancelAnimationFrame(raf.current) }, [])
-  useEffect(() => () => { stop(); if (g.current) finish() }, [stop]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { stop(); cancelHold(); if (g.current) finish() }, [stop]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     startItem: (e: RPointerEvent, id: string) => start(e, id, 'drag'),
