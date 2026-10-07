@@ -36,6 +36,11 @@ export interface Memory {
   createdAt: number
   /** position on the home shelf (lower = earlier) */
   order?: number
+  /** last local/remote change, used to decide which copy wins when syncing */
+  updatedAt?: number
+  /** cloud: Firebase uid of the creator, and everyone who may open it */
+  ownerId?: string
+  memberIds?: string[]
   members?: Member[]
 }
 

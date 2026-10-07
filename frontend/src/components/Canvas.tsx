@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, useMotionValue, useTransform, type MotionValue } from 'framer-motion'
 import { ArrowLeft, Check, Loader2, MoreHorizontal, Palette, PenLine, Redo2, Share2, Trash2, Undo2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useAuth } from '../data/useAuth'
 import { useCanvas } from '../data/useCanvas'
 import { uid } from '../lib/id'
 import { compressImage } from '../lib/image'
@@ -61,7 +62,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   const fileInput = useRef<HTMLInputElement>(null)
   const replaceInput = useRef<HTMLInputElement>(null)
   const scrollY = useMotionValue(0)
-  const cv = useCanvas(memory.id)
+  const { user } = useAuth()
+  const cv = useCanvas(memory.id, user?.uid)
   const { items, itemsRef, height, commit, live, begin, end, setHeight } = cv
   const heightRef = useRef(height)
   heightRef.current = height

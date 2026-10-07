@@ -54,3 +54,12 @@ Sign-in is optional and only adds your name and photo (Settings sheet, book-cove
 4. **Authentication → Settings → Authorized domains**: add every host you sign in from. `localhost` is allowed by default.
    Google rejects raw IP addresses (e.g. `192.168.x.x`), so to test on a phone use a tunnel hostname (ngrok / Cloudflare Tunnel)
    and add that hostname here; also add your production domain.
+
+## Cloud sync (Firestore)
+
+Signed-in users' books sync through Firestore (no Storage needed). One-time setup:
+
+1. Firebase console → **Firestore Database → Rules** → replace everything with the contents of `backend/firestore.rules` → **Publish**.
+2. Sign in from Settings. Existing local books upload automatically; Settings shows "Cloud sync on".
+
+Photos are synced as compressed copies inside Firestore (free Spark plan). Full-quality originals need Storage (later).

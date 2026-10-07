@@ -13,12 +13,15 @@ export interface CanvasDoc {
 class KeepsakeDB extends Dexie {
   memories!: Table<Memory, string>
   canvases!: Table<CanvasDoc, string>
+  /** images pulled from the cloud, keyed by content id */
+  assets!: Table<{ id: string; data: string }, string>
   constructor() {
     super('keepsake')
     this.version(1).stores({
       memories: 'id, createdAt',
       canvases: 'memoryId',
     })
+    this.version(2).stores({ memories: 'id, createdAt', canvases: 'memoryId', assets: 'id' })
   }
 }
 

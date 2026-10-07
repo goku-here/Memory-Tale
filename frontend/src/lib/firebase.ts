@@ -1,5 +1,6 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app'
 import { getAuth, GoogleAuthProvider, type Auth } from 'firebase/auth'
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, type Firestore } from 'firebase/firestore'
 
 const cfg = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string | undefined,
@@ -13,6 +14,7 @@ export const firebaseConfigured = Boolean(cfg.apiKey && cfg.authDomain && cfg.pr
 
 let app: FirebaseApp | null = null
 let auth: Auth | null = null
+let fs: Firestore | null = null
 
 export function getFirebaseAuth(): Auth | null {
   if (!firebaseConfigured) return null
@@ -21,6 +23,16 @@ export function getFirebaseAuth(): Auth | null {
     auth = getAuth(app)
   }
   return auth
+}
+
+/** Firestore with an offline cache, so edits made without a connection sync later. */
+export function getDb(): Firestore | null {
+  if (!firebaseConfigured) return null
+  getFirebaseAuth() // makes sure the app is initialised
+  if (!fs && app) {
+    fs = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) })
+  }
+  return fs
 }
 
 export const googleProvider = () => {

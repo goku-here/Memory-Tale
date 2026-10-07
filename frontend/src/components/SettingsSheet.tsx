@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion'
 import { Loader2, LogOut } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../data/useAuth'
+import { getSyncStatus, onSyncStatus } from '../data/sync'
 import { ToolSheet } from './ToolSheet'
 import { toast } from './ui'
 
@@ -20,6 +21,8 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
   const { configured, loading, user, signIn, logOut } = useAuth()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [sync, setSync] = useState(getSyncStatus())
+  useEffect(() => onSyncStatus(setSync), [])
 
   const doSignIn = async () => {
     setBusy(true)
@@ -51,7 +54,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
         ) : (
           <div className="rounded-3xl bg-neutral-50 p-5 text-center">
             <p className="m-0 mb-4 text-[14.5px] leading-relaxed text-neutral-600">
-              Sign in to put your name and photo on your books. Your memories stay on this device.
+              Sign in to put your name and photo on your books. Your books then sync across your devices.
             </p>
             <motion.button
               type="button" whileTap={{ scale: 0.96 }} onClick={() => void doSignIn()} disabled={!configured || busy || loading}
@@ -74,6 +77,17 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
         )}
 
         {user && (
+          <div className="rounded-2xl bg-neutral-50 px-4 py-3 text-[13.5px]" role="status">
+            <div className="flex items-center gap-2 font-bold">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ background: sync.state === 'synced' ? '#2E9E6B' : sync.state === 'error' ? '#d6455d' : '#F5B921' }} />
+              {sync.state === 'synced' ? 'Cloud sync on' : sync.state === 'error' ? 'Sync problem' : 'Syncing…'}
+            </div>
+            {sync.state === 'error' && <p className="m-0 mt-1 leading-snug text-neutral-600">{sync.message}</p>}
+            {sync.state === 'synced' && <p className="m-0 mt-1 leading-snug text-neutral-500">Your books are backed up and available on every device you sign in on.</p>}
+          </div>
+        )}
+
+        {user && (
           <motion.button
             type="button" whileTap={{ scale: 0.96 }} onClick={() => void logOut()}
             className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full border-0 bg-neutral-100 text-[15px] font-semibold text-[#d6455d]"
@@ -81,7 +95,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
             <LogOut size={18} /> Sign out
           </motion.button>
         )}
-        <p className="m-0 text-center text-[12px] text-neutral-400">Keepsake v1 · data stored locally</p>
+        <p className="m-0 text-center text-[12px] text-neutral-400">Keepsake v1</p>
       </div>
     </ToolSheet>
   )

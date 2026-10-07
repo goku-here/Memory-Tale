@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { repo } from './repo'
+import { pushCanvas, reportError, subscribeCanvas } from './sync'
 import type { CanvasItem } from '../types'
 import { MIN_HEIGHT } from '../lib/items'
 
@@ -12,7 +13,7 @@ const same = (a: CanvasItem[], b: CanvasItem[]) => a === b || (a.length === b.le
  *  - commit(): a discrete change that is recorded in history
  *  - begin()/live()/end(): a continuous gesture (drag, pinch) → one history entry
  */
-export function useCanvas(memoryId: string) {
+export function useCanvas(memoryId: string, uid?: string) {
   const [items, setItems] = useState<CanvasItem[]>([])
   const [height, setHeightState] = useState(MIN_HEIGHT)
   const [loaded, setLoaded] = useState(false)
@@ -39,9 +40,11 @@ export function useCanvas(memoryId: string) {
     window.clearTimeout(timer.current)
     if (!dirty.current) return
     dirty.current = false
-    await repo.saveCanvas({ memoryId, items: ref.current, height: heightRef.current, width: widthRef.current, updatedAt: Date.now() })
+    const items = ref.current
+    await repo.saveCanvas({ memoryId, items, height: heightRef.current, width: widthRef.current, updatedAt: Date.now() })
+    if (uid) void pushCanvas(memoryId, items).catch(reportError)
     setStatus('saved')
-  }, [memoryId])
+  }, [memoryId, uid])
 
   const schedule = useCallback(() => {
     window.clearTimeout(timer.current)
@@ -72,6 +75,27 @@ export function useCanvas(memoryId: string) {
     document.addEventListener('visibilitychange', onHide)
     return () => { window.removeEventListener('pagehide', onHide); document.removeEventListener('visibilitychange', onHide) }
   }, [flush])
+
+  /* ---- cloud: apply other people's / devices' changes ---- */
+  useEffect(() => {
+    if (!uid || !loaded) return
+    return subscribeCanvas(memoryId, async (upserts, removed, first, remoteAt) => {
+      const mine = await repo.loadCanvas(memoryId)
+      const localAt = mine?.updatedAt ?? 0
+      let next = ref.current
+      for (const it of upserts) {
+        const at = next.findIndex((x) => x.id === it.id)
+        // first snapshot: only take remote versions that are newer than what this device saved
+        if (at >= 0 && first && remoteAt <= localAt) continue
+        next = at >= 0 ? next.map((x, i) => (i === at ? it : x)) : [...next, it]
+      }
+      if (removed.length) next = next.filter((x) => !removed.includes(x.id))
+      if (next === ref.current) return
+      ref.current = next
+      setItems(next)
+      await repo.saveCanvas({ memoryId, items: next, height: heightRef.current, width: widthRef.current, updatedAt: Math.max(Date.now(), remoteAt) })
+    })
+  }, [uid, loaded, memoryId])
 
   const commit = useCallback((fn: Updater) => {
     const cur = ref.current
