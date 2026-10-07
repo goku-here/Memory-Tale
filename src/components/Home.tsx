@@ -4,13 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type { Memory } from '../types'
 import { BookCard, BookCover } from './BookCard'
 import { ToolSheet } from './ToolSheet'
-import { ConfirmDialog, IconButton, toast } from './ui'
+import { ConfirmDialog, IconButton } from './ui'
 
 interface HomeProps {
   memories: Memory[]
   loading: boolean
   hiddenId?: string | null
   onAdd: () => void
+  onSettings: () => void
   onReorder: (ids: string[]) => void
   onOpen: (m: Memory, rect: DOMRect) => void
   onEdit: (m: Memory) => void
@@ -35,7 +36,7 @@ function MenuRow({ icon, label, onClick, danger }: { icon: ReactNode; label: str
   )
 }
 
-export function Home({ memories, loading, hiddenId, onAdd, onReorder, onOpen, onEdit, onTheme, onDuplicate, onDelete }: HomeProps) {
+export function Home({ memories, loading, hiddenId, onAdd, onSettings, onReorder, onOpen, onEdit, onTheme, onDuplicate, onDelete }: HomeProps) {
   const [menu, setMenu] = useState<Memory | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [confirm, setConfirm] = useState<Memory | null>(null)
@@ -174,7 +175,7 @@ export function Home({ memories, loading, hiddenId, onAdd, onReorder, onOpen, on
     <div className="relative mx-auto min-h-full max-w-[520px]" style={{ background: 'linear-gradient(180deg,#fff 0%,#fff 55%,#f1f3f8 100%)' }}>
       <header className="flex items-center justify-between px-6" style={{ paddingTop: 'calc(var(--safe-top) + 28px)' }}>
         <h1 className="m-0 text-[34px] font-extrabold leading-none tracking-tight">Memories</h1>
-        <IconButton label="Settings" onClick={() => toast('Settings are coming soon')}>
+        <IconButton label="Settings" onClick={onSettings}>
           <Settings size={21} strokeWidth={2} />
         </IconButton>
       </header>

@@ -5,7 +5,9 @@ import { Canvas } from './components/Canvas'
 import { CreateMemorySheet, type SheetState } from './components/CreateMemorySheet'
 import { Home } from './components/Home'
 import { OpeningBook } from './components/OpeningBook'
+import { SettingsSheet } from './components/SettingsSheet'
 import { ShareScreen } from './components/ShareScreen'
+import { useAuth } from './data/useAuth'
 import { getTheme } from './components/ThemeEngine'
 import { ConfirmDialog, ToastHost, toast } from './components/ui'
 import { useMemories } from './data/useMemories'
@@ -18,6 +20,8 @@ export default function App() {
   const [openId, setOpenId] = useState<string | null>(null)
   const [opening, setOpening] = useState<{ memory: Memory; rect: DOMRect; mode: 'open' | 'close' } | null>(null)
   const progress = useMotionValue(0)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const { user } = useAuth()
   const [shareId, setShareId] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Memory | null>(null)
 
@@ -50,7 +54,10 @@ export default function App() {
   }, [startOpen])
 
   const submit = async (m: Memory, isNew: boolean) => {
-    if (isNew) m = { ...m, order: Math.min(0, ...memories.map((x) => x.order ?? 0)) - 1 }
+    if (isNew) {
+      m = { ...m, order: Math.min(0, ...memories.map((x) => x.order ?? 0)) - 1 }
+      if (user) m = { ...m, members: [{ id: user.uid, name: user.name, color: getTheme(m.themeId).palette[0], photo: user.photo ?? undefined }] }
+    }
     await save(m)
     setSheet(null)
     if (isNew) {
@@ -75,6 +82,7 @@ export default function App() {
         memories={memories}
         loading={loading}
         hiddenId={opening?.mode === 'open' ? opening.memory.id : null}
+        onSettings={() => setSettingsOpen(true)}
         onReorder={(ids) => void reorder(ids)}
         onAdd={() => setSheet({ mode: 'create' })}
         onOpen={startOpen}
@@ -127,6 +135,7 @@ export default function App() {
           setConfirmDelete(null)
         }}
       />
+      <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <ToastHost />
     </MotionConfig>
   )

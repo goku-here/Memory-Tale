@@ -11,6 +11,8 @@ export interface Member {
   id: string
   name: string
   color: string
+  /** profile photo URL (Google account) */
+  photo?: string
 }
 
 export interface Cover {

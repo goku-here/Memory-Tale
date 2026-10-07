@@ -100,7 +100,7 @@ export function BookCover({
                   marginLeft: i ? '-2.4cqw' : 0, boxShadow: '0 0 0 .6cqw rgba(255,255,255,.85)',
                 }}
               >
-                {m.name.slice(0, 1).toUpperCase()}
+                {m.photo ? <img src={m.photo} alt={m.name} referrerPolicy="no-referrer" className="h-full w-full rounded-full object-cover" /> : m.name.slice(0, 1).toUpperCase()}
               </span>
             ))}
           </div>
