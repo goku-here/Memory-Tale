@@ -9,7 +9,7 @@ import { getTheme } from './ThemeEngine'
 import { toast } from './ui'
 
 /** Placeholder invite link until accounts / Firebase exist. */
-export const inviteLink = (m: Memory) => `https://keepsake.app/invite/${m.id}`
+export const inviteLink = (m: Memory) => `https://memorytale.app/invite/${m.id}`
 
 export function ShareScreen({ memory, onClose }: { memory: Memory; onClose: () => void }) {
   const theme = getTheme(memory.themeId)
@@ -17,7 +17,7 @@ export function ShareScreen({ memory, onClose }: { memory: Memory; onClose: () =
   const base = memory.cover.type === 'color' ? memory.cover.value : memory.cover.avg ?? theme.cover
 
   const share = async () => {
-    const data = { title: memory.title, text: `Come see our memory “${memory.title}” on Keepsake`, url: inviteLink(memory) }
+    const data = { title: memory.title, text: `Come see our memory “${memory.title}” on Memory Tale`, url: inviteLink(memory) }
     try {
       if (navigator.share) await navigator.share(data)
       else throw new Error('no-share')

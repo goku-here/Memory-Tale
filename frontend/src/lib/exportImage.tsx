@@ -51,7 +51,7 @@ function ExportView({ memory, items, width }: { memory: Memory; items: CanvasIte
         <ThreadsSvg items={items} canvasW={width} offsetY={offset} />
       </div>
       <div style={{ padding: '10px 0 22px', textAlign: 'center', fontSize: 12, fontWeight: 800, letterSpacing: '.12em', color: '#b5b5bd' }}>
-        MADE WITH KEEPSAKE
+        MADE WITH MEMORY TALE
       </div>
     </div>
   )

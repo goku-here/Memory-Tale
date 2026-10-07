@@ -1,4 +1,4 @@
-# Keepsake
+# Memory Tale
 
 A mobile-first PWA scrapbook for couples and friends. React + TypeScript + Vite + Tailwind + Framer Motion.
 Everything is stored on the device (IndexedDB via Dexie); there is no backend yet.

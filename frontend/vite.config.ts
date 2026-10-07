@@ -19,8 +19,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Keepsake',
-        short_name: 'Keepsake',
+        name: 'Memory Tale',
+        short_name: 'Memory Tale',
         description: 'A memory scrapbook for couples and friends.',
         theme_color: '#F6F5F2',
         background_color: '#F6F5F2',
