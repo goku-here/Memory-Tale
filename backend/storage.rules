@@ -1,0 +1,15 @@
+rules_version = '2';
+
+// DRAFT: photos live at memories/{memoryId}/original/* and memories/{memoryId}/display/*
+service firebase.storage {
+  match /b/{bucket}/o {
+    function memory() { return firestore.get(/databases/(default)/documents/memories/$(memoryId)).data; }
+
+    match /memories/{memoryId}/{allPaths=**} {
+      allow read: if request.auth != null && request.auth.uid in memory().memberIds;
+      allow write: if request.auth != null && request.auth.uid in memory().memberIds
+        && request.resource.size < 20 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+  }
+}
