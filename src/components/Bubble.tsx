@@ -19,6 +19,7 @@ export const BUBBLE_SHAPES: { id: BubbleShape; label: string }[] = [
 ]
 
 const INK = '#17171a'
+export const BUBBLE_STROKE_COLORS = ['#17171A', '#FFFFFF', '#E5486F', '#F28C38', '#FFC93C', '#2F7BE5', '#2E9E6B', '#6B4FBB']
 
 function spikes(cx: number, cy: number, rx: number, ry: number, n = 18) {
   const pts: string[] = []
@@ -37,6 +38,8 @@ export function BubbleBody({
   bubble, width, height, editing = false, onChange, onDone,
 }: { bubble: BubbleProps; width: number; height: number; editing?: boolean; onChange?: (t: string) => void; onDone?: () => void }) {
   const { shape, tail, text, font, size } = bubble
+  const ink = bubble.strokeColor ?? INK
+  const sw = bubble.stroke ?? 2.6
   const H = (100 * height) / Math.max(1, width)
   const hasTail = (shape === 'speech' || shape === 'thought' || shape === 'whisper') && tail !== 'none'
   const tailH = hasTail ? Math.min(20, H * 0.22) : 0
@@ -50,7 +53,7 @@ export function BubbleBody({
     return `${(cx + rx * Math.cos(a)).toFixed(2)} ${(cy + ry * Math.sin(a)).toFixed(2)}`
   }
   const flip = tail === 'right' ? 'translate(100 0) scale(-1 1)' : undefined
-  const common = { fill: '#fff', stroke: INK, strokeWidth: 2.6, vectorEffect: 'non-scaling-stroke' as const, strokeLinejoin: 'round' as const }
+  const common = { fill: '#fff', stroke: ink, strokeWidth: sw, vectorEffect: 'non-scaling-stroke' as const, strokeLinejoin: 'round' as const }
 
   let art
   if (shape === 'box') {
@@ -177,6 +180,29 @@ export function BubbleEditor({ value, accent, onChange }: EditorProps) {
               style={{ fontFamily: f.css, ...(on ? { background: '#17171a', color: '#fff' } : { background: '#f1f1f3', color: '#333' }) }}
             >
               {f.label}
+            </motion.button>
+          )
+        })}
+      </div>
+
+      <div className="flex items-center gap-3 px-5">
+        <span className="w-14 text-[12px] font-bold uppercase tracking-wider text-neutral-400">Outline</span>
+        <input
+          type="range" min={0} max={10} step={0.5} value={value.stroke ?? 2.6} aria-label="Outline thickness"
+          onChange={(e) => onChange({ stroke: +e.target.value })} className="h-11 flex-1" style={{ accentColor: accent }}
+        />
+      </div>
+
+      <div className="no-scrollbar flex gap-1 overflow-x-auto px-4" style={{ touchAction: 'pan-x' }} role="radiogroup" aria-label="Outline colour">
+        {BUBBLE_STROKE_COLORS.map((c) => {
+          const on = (value.strokeColor ?? INK).toLowerCase() === c.toLowerCase()
+          return (
+            <motion.button
+              key={c} type="button" role="radio" aria-checked={on} aria-label={`Outline ${c}`} whileTap={{ scale: 0.88 }}
+              onClick={() => onChange({ strokeColor: c })}
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-0 bg-transparent"
+            >
+              <span className="h-8 w-8 rounded-full" style={{ background: c, boxShadow: on ? `0 0 0 2px #fff, 0 0 0 4px ${accent}` : 'inset 0 0 0 1px rgba(0,0,0,.18)' }} />
             </motion.button>
           )
         })}

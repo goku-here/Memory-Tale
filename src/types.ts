@@ -101,6 +101,10 @@ export interface BubbleProps {
   tail: 'left' | 'right' | 'none'
   font: string
   size: number
+  /** outline thickness in px (default 2.6) */
+  stroke?: number
+  /** outline colour (default ink) */
+  strokeColor?: string
 }
 export interface ClotheslineProps {
   /** three photo slots (data URLs, '' = empty) */
