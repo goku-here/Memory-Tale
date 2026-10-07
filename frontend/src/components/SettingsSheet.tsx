@@ -19,10 +19,18 @@ function GoogleG() {
 export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { configured, loading, user, signIn, logOut } = useAuth()
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
 
   const doSignIn = async () => {
     setBusy(true)
-    try { await signIn() } catch { toast("Couldn't sign in. Please try again.") } finally { setBusy(false) }
+    try {
+      await signIn()
+    } catch (e) {
+      const code = (e as { code?: string }).code ?? (e as Error).message
+      console.error('Google sign-in failed:', e)
+      setError(code)
+      toast("Couldn't sign in")
+    } finally { setBusy(false) }
   }
 
   return (
@@ -52,6 +60,11 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
               {busy || loading ? <Loader2 size={19} className="animate-spin" /> : <GoogleG />}
               Continue with Google
             </motion.button>
+            {error && (
+              <p className="m-0 mt-3 break-words text-[12.5px] leading-snug text-[#d6455d]">
+                Sign-in error: <b>{error}</b>
+              </p>
+            )}
             {!configured && (
               <p className="m-0 mt-3 text-[12.5px] leading-snug text-amber-700">
                 Google sign-in isn't set up yet. Add your Firebase keys to <b>.env.local</b> (see README).
