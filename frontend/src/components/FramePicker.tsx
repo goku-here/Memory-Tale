@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Replace } from 'lucide-react'
+import { Download, Replace } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import type { FrameId, PhotoProps } from '../types'
 import { frameHeight } from '../lib/items'
@@ -14,12 +14,14 @@ interface Props {
   onRadius: (radius: number) => void
   onCaption: (caption: string) => void
   onReplace: () => void
+  /** present when the full-quality original is stored in the cloud */
+  onOriginal?: () => void
 }
 
 const PREVIEW_W = 92
 
 /** Frame chooser for the selected photo: previews, polaroid caption, corner radius. */
-export function FramePicker({ photo, focusCaption, accent, onFrame, onRadius, onCaption, onReplace }: Props) {
+export function FramePicker({ photo, focusCaption, accent, onFrame, onRadius, onCaption, onReplace, onOriginal }: Props) {
   const capRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
     if (focusCaption) setTimeout(() => capRef.current?.focus(), 350)
@@ -57,6 +59,14 @@ export function FramePicker({ photo, focusCaption, accent, onFrame, onRadius, on
         >
           <Replace size={19} /> Change photo
         </motion.button>
+        {onOriginal && (
+          <motion.button
+            type="button" whileTap={{ scale: 0.97 }} onClick={onOriginal}
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border-0 bg-neutral-100 text-[15px] font-bold text-[#17171a]"
+          >
+            <Download size={19} /> Download original quality
+          </motion.button>
+        )}
         <label className="block">
           <span className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-neutral-400">Caption</span>
           <input

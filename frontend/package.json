@@ -11,6 +11,7 @@
     "dev:https": "cross-env HTTPS=1 vite"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
     "canvas-confetti": "^1.9.4",
     "dexie": "^4.4.6",
     "firebase": "^12.19.0",

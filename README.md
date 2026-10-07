@@ -63,3 +63,10 @@ Signed-in users' books sync through Firestore (no Storage needed). One-time setu
 2. Sign in from Settings. Existing local books upload automatically; Settings shows "Cloud sync on".
 
 Photos are synced as compressed copies inside Firestore (free Spark plan). Full-quality originals need Storage (later).
+
+## Original-quality photos (Supabase Storage)
+
+Signed-in users' photos also upload the untouched original to the private-by-path `originals` bucket (free plan, no card).
+Setup: create the bucket, set `VITE_SUPABASE_URL` / `VITE_SUPABASE_KEY` in `frontend/.env.local`, and run `backend/supabase.sql`
+in the Supabase SQL Editor. The Frame sheet then shows **Download original quality**.
+Later hardening: put uploads behind a Supabase Edge Function that verifies the Firebase ID token.

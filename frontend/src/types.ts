@@ -56,6 +56,8 @@ export interface PhotoProps {
   /** corner radius in px at a 200px-wide item (scales with the item) */
   radius: number
   caption: string
+  /** storage path of the full-quality original (Supabase `originals` bucket) */
+  original?: string
 }
 export interface StickerProps {
   kind: 'emoji' | 'svg' | 'image'

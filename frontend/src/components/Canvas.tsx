@@ -5,6 +5,7 @@ import { useAuth } from '../data/useAuth'
 import { useCanvas } from '../data/useCanvas'
 import { uid } from '../lib/id'
 import { compressImage } from '../lib/image'
+import { downloadOriginal, uploadOriginal } from '../lib/supabase'
 import { bookEase, clipAt } from '../lib/bookTransition'
 import { clamp, cloneItem, frameHeight, nextZ, rnd } from '../lib/items'
 import { useGestures } from '../lib/useGestures'
@@ -210,7 +211,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     try {
       const imgs = await Promise.all([...files].map((f) => compressImage(f, { maxSize: 1400, quality: 0.8 })))
       const w = Math.round(clamp(canvasW * 0.5, 150, 250))
-      let lastId = ''
+      const ids = imgs.map(() => uid())
+      const lastId = ids[ids.length - 1]
       commit((list) => {
         let z = nextZ(list)
         const c = viewCenter()
@@ -220,9 +222,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
           const col = i % cols
           const row = Math.floor(i / cols)
           const h = frameHeight('polaroid', w, aspect)
-          lastId = uid()
           return {
-            id: lastId, type: 'photo', zIndex: z++, width: w, height: h, rotation: Math.round(rnd(-7, 7) * 10) / 10,
+            id: ids[i], type: 'photo', zIndex: z++, width: w, height: h, rotation: Math.round(rnd(-7, 7) * 10) / 10,
             x: cols === 1 ? c.x : col === 0 ? 29 + rnd(-3, 3) : 71 + rnd(-3, 3),
             y: c.y + row * (h + 26) + rnd(-6, 6),
             props: { src: img.dataUrl, aspect, frame: 'polaroid' as FrameId, radius: 4, caption: '' },
@@ -231,9 +232,26 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
         return [...list, ...added]
       })
       setSelectedId(lastId)
+      // keep the untouched original in the cloud (background; never blocks adding the photo)
+      if (user) {
+        [...files].forEach((f, i) => {
+          void uploadOriginal(f, `${user.uid}/${memory.id}`).then((path) => { if (path) patch(ids[i], { props: { original: path } }) })
+        })
+      }
     } catch {
       toast("Couldn't read that photo")
     }
+  }
+
+  const saveOriginal = async (path: string) => {
+    toast('Downloading original…')
+    const blob = await downloadOriginal(path)
+    if (!blob) return toast("Couldn't fetch the original")
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = path.split('/').pop() ?? 'photo.jpg'
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000)
   }
 
   const replacePhoto = async (file?: File) => {
@@ -242,7 +260,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     try {
       const img = await compressImage(file, { maxSize: 1400, quality: 0.8 })
       const aspect = img.width / img.height
-      patch(target.id, { height: frameHeight(target.props.frame, target.width, aspect), props: { src: img.dataUrl, aspect } }, true)
+      patch(target.id, { height: frameHeight(target.props.frame, target.width, aspect), props: { src: img.dataUrl, aspect, original: undefined } }, true)
+      if (user) void uploadOriginal(file, `${user.uid}/${memory.id}`).then((path) => { if (path) patch(target.id, { props: { original: path } }) })
     } catch {
       toast("Couldn't read that photo")
     }
@@ -620,6 +639,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
             onRadius={(radius) => patch(photoItem.id, { props: { radius } })}
             onCaption={(caption) => patch(photoItem.id, { props: { caption } })}
             onReplace={() => replaceInput.current?.click()}
+            onOriginal={photoItem.props.original ? () => void saveOriginal(photoItem.props.original!) : undefined}
           />
         )}
       </ToolSheet>
