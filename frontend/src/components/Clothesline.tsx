@@ -14,8 +14,8 @@ const yAt = (x: number) => {
 
 /** Three Polaroids hanging from a twine line with clothespins; tap a slot to add a photo. */
 export function ClotheslineBody({
-  line, selected, onSlot,
-}: { line: ClotheslineProps; selected: boolean; onSlot?: (i: number) => void }) {
+  line, selected, onSlot, onView,
+}: { line: ClotheslineProps; selected: boolean; onSlot?: (i: number) => void; onView?: (i: number) => void }) {
   const down = useRef<{ x: number; y: number; sel: boolean } | null>(null)
   return (
     <div className="relative h-full w-full" style={{ containerType: 'inline-size' }}>
@@ -35,6 +35,7 @@ export function ClotheslineBody({
                 const d = down.current
                 if (!d || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8) return
                 if (!src || d.sel) onSlot?.(i)
+                else onView?.(i)
               }}
               className="relative block w-full border-0 bg-white p-0"
               style={{ padding: '2cqw 2cqw 7.5cqw', boxShadow: '0 1px 2px rgba(40,30,30,.18), 0 8px 14px rgba(40,30,30,.2)', cursor: 'pointer' }}

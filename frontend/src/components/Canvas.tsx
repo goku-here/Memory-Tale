@@ -24,6 +24,7 @@ import { TextEditor } from './TextEditor'
 import { FloatingShapes, getTheme, themeVars } from './ThemeEngine'
 import { ToolSheet } from './ToolSheet'
 import { BubbleEditor } from './Bubble'
+import { Lightbox } from './Lightbox'
 import { LocationTool } from './LocationTool'
 import { THREAD_COLORS, ThreadsSvg, threadMid } from './Threads'
 import { IconButton, toast } from './ui'
@@ -80,6 +81,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   const [canvasW, setCanvasW] = useState(() => Math.min(window.innerWidth, 520))
   const [captionFocus, setCaptionFocus] = useState(false)
   const [editMapId, setEditMapId] = useState<string | null>(null)
+  const [viewer, setViewer] = useState<{ src: string; original?: string; caption?: string } | null>(null)
   const [busy, setBusy] = useState<{ done: number; total: number } | null>(null)
   const [connectFrom, setConnectFrom] = useState<string | null>(null)
   const slotInput = useRef<HTMLInputElement>(null)
@@ -141,6 +143,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   const { startItem: rawStart, startHandle } = useGestures({
     surfaceRef: surface, scrollerRef: scroller, itemsRef, heightRef, live, begin, end,
     onSelect: setSelectedId, onDragging: setDraggingId,
+    onTap: (id) => viewItem(id),
     isSelected: (id) => selectedIdRef.current === id,
     topInset: HEADER_H + 40, bottomInset: 130,
     onDoubleTap: (id) => {
@@ -170,10 +173,20 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     }
     rawStart(e, id)
   }
+  /** open a photo full-screen (photo items, or a filled slot of the polaroid line) */
+  function viewItem(id: string) {
+    const it = itemsRef.current.find((i) => i.id === id)
+    if (it?.type === 'photo') setViewer({ src: it.props.src, original: it.props.original, caption: it.props.frame === 'polaroid' ? it.props.caption : undefined })
+  }
   const startItemRef = useRef(startItem)
   startItemRef.current = startItem
   // stable identities keep the memoised items from re-rendering on every drag frame
   const startItemStable = useCallback((e: React.PointerEvent, id: string) => startItemRef.current(e, id), [])
+  const onViewSlot = useCallback((id: string, index: number) => {
+    const it = itemsRef.current.find((i) => i.id === id)
+    const src = it?.type === 'clothesline' ? it.props.photos[index] : ''
+    if (src) setViewer({ src })
+  }, [itemsRef])
   const onSlot = useCallback((id: string, index: number) => { slotTarget.current = { id, index }; slotInput.current?.click() }, [])
 
   /* ---------- sheets ---------- */
@@ -418,6 +431,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     onConnect: () => { setConnectFrom(selected.id); toast('Tap another item to tie the thread') },
     onForward: () => reorder(1),
     onBackward: () => reorder(-1),
+    onView: selected.type === 'photo' ? () => viewItem(selected.id) : undefined,
     onFrame: selected.type === 'photo' ? () => openFrame() : undefined,
     onReplace: selected.type === 'photo' ? () => replaceInput.current?.click() : undefined,
     onColor: selected.type === 'note' ? (color: string) => patch(selected.id, { props: { color } }, true) : undefined,
@@ -459,6 +473,18 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     scrollY.set(el.scrollTop)
     if (el.scrollTop + el.clientHeight > heightRef.current - 700) setHeight(heightRef.current + 1200)
   }
+
+  // laptop shortcut: Space opens the selected photo
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName
+      if (e.key !== ' ' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON' || sheet || viewer) return
+      if (selected?.type === 'photo') { e.preventDefault(); viewItem(selected.id) }
+    }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, sheet, viewer])
 
   const run = (fn: () => void) => () => { setMenu(false); fn() }
 
@@ -575,6 +601,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
                   key={it.id} item={it} canvasW={canvasW}
                   selected={selectedId === it.id}
                   onSlot={onSlot}
+                  onViewSlot={onViewSlot}
                   dragging={draggingId === it.id}
                   editing={editingId === it.id}
                   onPointerDown={startItemStable}
@@ -671,6 +698,10 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       <input ref={slotInput} type="file" accept="image/*" multiple hidden onChange={(e) => { void fillSlots(e.target.files); e.target.value = '' }} />
 
       <input ref={replaceInput} type="file" accept="image/*" hidden onChange={(e) => { void replacePhoto(e.target.files?.[0]); e.target.value = '' }} />
+
+      <AnimatePresence>
+        {viewer && <Lightbox key="viewer" src={viewer.src} original={viewer.original} caption={viewer.caption} onClose={() => setViewer(null)} />}
+      </AnimatePresence>
 
       <BottomToolbar visible={!sheet && !editingId} accent={accent} onTool={onTool} />
 

@@ -30,6 +30,8 @@ export interface GestureOptions {
   onSelect: (id: string) => void
   onDragging: (id: string | null) => void
   onDoubleTap?: (id: string) => void
+  /** a quick touch tap on an item that was not picked up (no hold) */
+  onTap?: (id: string) => void
   /** already-selected items can be dragged straight away on touch */
   isSelected?: (id: string) => boolean
   /** px at the top of the viewport covered by the sticky header */
@@ -240,7 +242,7 @@ export function useGestures(opts: GestureOptions) {
     if (mode === 'drag') autoScroll()
   }
 
-  const hold = useRef<{ timer: number; x: number; y: number; id: number } | null>(null)
+  const hold = useRef<{ timer: number; x: number; y: number; id: number; itemId: string } | null>(null)
   const cancelHold = () => {
     const h = hold.current
     if (!h) return
@@ -255,7 +257,11 @@ export function useGestures(opts: GestureOptions) {
     if (h && e.pointerId === h.id && Math.hypot(e.clientX - h.x, e.clientY - h.y) > 6) cancelHold() // it's a scroll
   }
   function holdEnd(e: PointerEvent) {
-    if (hold.current && e.pointerId === hold.current.id) cancelHold()
+    const h = hold.current
+    if (!h || e.pointerId !== h.id) return
+    const id = h.itemId
+    cancelHold()
+    if (e.type === 'pointerup') o.current.onTap?.(id)
   }
 
   const start = (e: RPointerEvent, id: string, mode: Mode) => {
@@ -267,7 +273,7 @@ export function useGestures(opts: GestureOptions) {
       if (hold.current) return
       const pid = e.pointerId
       hold.current = {
-        id: pid, x: p.x, y: p.y,
+        id: pid, x: p.x, y: p.y, itemId: id,
         timer: window.setTimeout(() => {
           const pos = { x: hold.current?.x ?? p.x, y: hold.current?.y ?? p.y }
           cancelHold()
