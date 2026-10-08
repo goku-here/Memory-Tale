@@ -29,7 +29,11 @@ export function useMemories() {
         for (const { type, memory } of changes) {
           if (type === 'removed') { await repo.deleteMemory(memory.id); continue }
           const mine = await db.memories.get(memory.id)
-          if (!mine || (memory.updatedAt ?? 0) > (mine.updatedAt ?? 0)) await db.memories.put(memory)
+          if (!mine && !first) {
+            // a book that was just shared with me: put it first on my shelf
+            const orders = (await db.memories.toArray()).map((m) => m.order ?? 0)
+            await db.memories.put({ ...memory, order: Math.min(0, ...orders) - 1 })
+          } else if (!mine || (memory.updatedAt ?? 0) > (mine.updatedAt ?? 0)) await db.memories.put(memory)
         }
         if (first) {
           const remoteIds = new Set(changes.map((c) => c.memory.id))

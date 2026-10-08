@@ -31,6 +31,7 @@ const P = {
   backup: 'mt-pref-backup',
   copyShared: 'mt-pref-copyshared',
   wifi: 'mt-pref-wifi',
+  paused: 'mt-pref-paused',
   asked: (m: string) => `mt-asked:${m}`,
   copyBook: (m: string) => `mt-copy:${m}`,
 }
@@ -40,6 +41,8 @@ export const prefs = {
   setBackup: (v: boolean) => localStorage.setItem(P.backup, v ? '1' : '0'),
   copyShared: () => flag(P.copyShared, false),
   setCopyShared: (v: boolean) => localStorage.setItem(P.copyShared, v ? '1' : '0'),
+  paused: () => flag(P.paused, false),
+  setPaused: (v: boolean) => localStorage.setItem(P.paused, v ? '1' : '0'),
   wifiOnly: () => flag(P.wifi, true),
   setWifiOnly: (v: boolean) => localStorage.setItem(P.wifi, v ? '1' : '0'),
   /** per book: 1 = keep copies, 0 = no, null = ask / use the default */
@@ -53,11 +56,15 @@ export const prefs = {
 export interface DriveStatus {
   /** originals waiting to be saved to my Drive */
   queued: number
+  /** progress of the current upload run */
+  uploading: { done: number; total: number } | null
+  /** why nothing is moving right now */
+  blocked: 'paused' | 'wifi' | 'offline' | null
   replicating: { done: number; total: number; skipped: number } | null
   needsReconnect: boolean
   error?: string
 }
-let status: DriveStatus = { queued: 0, replicating: null, needsReconnect: false }
+let status: DriveStatus = { queued: 0, uploading: null, blocked: null, replicating: null, needsReconnect: false }
 const subs = new Set<(s: DriveStatus) => void>()
 export const getDriveStatus = () => status
 export const onDriveStatus = (f: (s: DriveStatus) => void) => { subs.add(f); return () => { subs.delete(f) } }
@@ -65,6 +72,7 @@ const setStatus = (p: Partial<DriveStatus>) => { status = { ...status, ...p }; s
 
 const onCellular = () => (navigator as unknown as { connection?: { type?: string } }).connection?.type === 'cellular'
 const wifiBlocked = () => prefs.wifiOnly() && onCellular()
+const blockedReason = (): DriveStatus['blocked'] => (prefs.paused() ? 'paused' : navigator.onLine === false ? 'offline' : wifiBlocked() ? 'wifi' : null)
 
 /* ---------- records ---------- */
 const col = (memoryId: string) => { const d = getDb(); return d ? collection(d, 'memories', memoryId, 'originals') : null }
@@ -93,6 +101,20 @@ export function startOriginals(uid: string) {
   kick()
   window.addEventListener('online', kick)
 }
+/** Pause or resume all saving of originals on this device. */
+export function setOriginalsPaused(paused: boolean) {
+  prefs.setPaused(paused)
+  setStatus({ blocked: blockedReason() })
+  if (!paused) { kick(); if (lastReplicate) void replicateBook(lastReplicate.memoryId, lastReplicate.uid, { repair: true }) }
+}
+/** "Try again now": clears the retry counters and runs the queue immediately. */
+export async function retryOriginalsNow() {
+  for (const j of await db.uploads.toArray()) await db.uploads.update(j.id, { tries: 0, createdAt: Math.min(j.createdAt, Date.now()) })
+  setStatus({ error: undefined })
+  kick()
+}
+let lastReplicate: { memoryId: string; uid: string } | null = null
+
 export function stopOriginals() {
   uidNow = null
   window.removeEventListener('online', kick)
@@ -112,14 +134,20 @@ export async function queueOriginal(file: Blob & { name?: string }, memoryId: st
 
 export async function processUploads() {
   if (running || !uidNow || !isConnected()) return
+  const reason = blockedReason()
+  setStatus({ blocked: reason })
+  if (reason) return
   running = true
   const uid = uidNow
+  let done = 0
+  const total = await db.uploads.count()
   try {
     for (;;) {
       const job = (await db.uploads.orderBy('createdAt').first())
       if (!job) break
       if (job.tries >= 6) { await db.uploads.update(job.id, { createdAt: Date.now() + 86_400_000 }); continue }
-      if (navigator.onLine === false) break
+      if (blockedReason()) { setStatus({ blocked: blockedReason() }); break }
+      setStatus({ uploading: { done, total: Math.max(total, done + 1) } })
       const t = await getToken(false)
       if (!t) { setStatus({ needsReconnect: true }); break }
       setStatus({ needsReconnect: false })
@@ -138,7 +166,8 @@ export async function processUploads() {
           }, { merge: true })
         }
         await db.uploads.delete(job.id)
-        setStatus({ error: undefined })
+        done++
+        setStatus({ error: undefined, uploading: { done, total: Math.max(total, done) } })
       } catch (e) {
         if (e instanceof DriveError && e.status === 401) { setStatus({ needsReconnect: true }); break }
         await db.uploads.update(job.id, { tries: job.tries + 1 })
@@ -149,6 +178,7 @@ export async function processUploads() {
     }
   } finally {
     running = false
+    setStatus({ uploading: null })
     await refreshQueued()
     if (uidNow && (await db.uploads.count()) > 0 && isConnected()) {
       window.clearTimeout(retry)
@@ -195,7 +225,9 @@ const replicating = new Set<string>()
  * With `repair` it also checks that my existing copies still exist and re-copies deleted ones.
  */
 export async function replicateBook(memoryId: string, uid: string, opts: { repair?: boolean } = {}) {
-  if (!isConnected() || replicating.has(memoryId) || wifiBlocked()) return null
+  if (!isConnected() || replicating.has(memoryId)) return null
+  lastReplicate = { memoryId, uid }
+  if (blockedReason()) { setStatus({ blocked: blockedReason() }); return null }
   replicating.add(memoryId)
   const d = getDb()
   let done = 0
@@ -211,7 +243,7 @@ export async function replicateBook(memoryId: string, uid: string, opts: { repai
     if (!todo.length) return { done: 0, skipped: 0 }
     setStatus({ replicating: { done: 0, total: todo.length, skipped: 0 } })
     for (const r of todo) {
-      if (wifiBlocked() || navigator.onLine === false) break
+      if (blockedReason()) { setStatus({ blocked: blockedReason() }); break }
       let blob: Blob | null = null
       for (const c of Object.values(r.copies)) { blob = await downloadShared(c.fileId); if (blob) break }
       if (!blob) skipped++

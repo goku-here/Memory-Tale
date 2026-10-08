@@ -43,7 +43,20 @@ export default function App() {
 
   // after joining, open the book as soon as it has synced down to this device
   useEffect(() => {
-    if (pendingOpen && memories.some((m) => m.id === pendingOpen)) { setOpenId(pendingOpen); setPendingOpen(null) }
+    const m = pendingOpen ? memories.find((x) => x.id === pendingOpen) : undefined
+    if (!m) return
+    setPendingOpen(null)
+    // let the shelf settle, bring the new book into view, then open it with the same book animation as everywhere else
+    window.setTimeout(() => {
+      const el = document.querySelector(`[data-book-id="${m.id}"]`)
+      el?.scrollIntoView({ block: 'center' })
+      window.setTimeout(() => {
+        const rect = document.querySelector(`[data-book-id="${m.id}"]`)?.getBoundingClientRect()
+        if (rect && rect.top >= 0 && rect.bottom <= window.innerHeight) startOpen(m, rect)
+        else setOpenId(m.id)
+      }, 450)
+    }, 650)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingOpen, memories])
 
   const closeInvite = (memoryId?: string) => {
