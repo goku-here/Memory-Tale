@@ -17,6 +17,9 @@ interface G {
   moved: boolean
   t0: number
   last: Pt
+  /** picked up by a long press (lifting the finger afterwards is not a tap) */
+  held: boolean
+  touch: boolean
 }
 
 export interface GestureOptions {
@@ -60,6 +63,7 @@ export function useGestures(opts: GestureOptions) {
   o.current = opts
   const g = useRef<G | null>(null)
   const lastTap = useRef<{ id: string; t: number } | null>(null)
+  const pendingTap = useRef(0)
   const raf = useRef(0)
   const fns = useRef<{ move: (e: PointerEvent) => void; up: (e: PointerEvent) => void; down: (e: PointerEvent) => void; touch: (e: TouchEvent) => void }>(null!)
 
@@ -177,13 +181,20 @@ export function useGestures(opts: GestureOptions) {
     g.current = null
     o.current.onDragging(null)
     o.current.end()
-    if (st && !st.moved && st.mode === 'drag' && performance.now() - st.t0 < 450) {
+    if (st && !st.held && !st.moved && st.mode === 'drag' && performance.now() - st.t0 < 450) {
       const now = performance.now()
       const lt = lastTap.current
       if (lt && lt.id === st.id && now - lt.t < 380) {
         lastTap.current = null
+        window.clearTimeout(pendingTap.current)
         o.current.onDoubleTap?.(st.id)
-      } else lastTap.current = { id: st.id, t: now }
+      } else {
+        lastTap.current = { id: st.id, t: now }
+        // a single tap on an already-selected item (e.g. open a photo) waits to be sure it is not a double tap
+        const id = st.id
+        window.clearTimeout(pendingTap.current)
+        if (st.touch) pendingTap.current = window.setTimeout(() => o.current.onTap?.(id), 340)
+      }
     }
   }
 
@@ -196,7 +207,7 @@ export function useGestures(opts: GestureOptions) {
       const p = { x: e.clientX, y: e.clientY }
       st.pointers.set(e.pointerId, p)
       st.last = p
-      if (!st.moved && dist(p, st.base.p) > 6) st.moved = true
+      if (!st.moved && dist(p, st.base.p) > 10) st.moved = true
       update()
     },
     up: (e) => {
@@ -222,10 +233,10 @@ export function useGestures(opts: GestureOptions) {
   const HOLD_MS = 400
 
   /** begin a gesture for an already-down pointer */
-  const activate = (pointerId: number, p: Pt, id: string, mode: Mode) => {
+  const activate = (pointerId: number, p: Pt, id: string, mode: Mode, held = false, touch = false) => {
     if (g.current) return
     const st: G = {
-      id, mode, pointers: new Map([[pointerId, p]]), moved: false, t0: performance.now(), last: p,
+      id, mode, pointers: new Map([[pointerId, p]]), moved: false, t0: performance.now(), last: p, held, touch,
       base: { cx: 0, cy: 0, w: 0, h: 0, rot: 0, size: 0, p, d: 1, a: 0, scrollTop: 0 },
     }
     g.current = st
@@ -254,7 +265,7 @@ export function useGestures(opts: GestureOptions) {
   }
   function holdMove(e: PointerEvent) {
     const h = hold.current
-    if (h && e.pointerId === h.id && Math.hypot(e.clientX - h.x, e.clientY - h.y) > 6) cancelHold() // it's a scroll
+    if (h && e.pointerId === h.id && Math.hypot(e.clientX - h.x, e.clientY - h.y) > 10) cancelHold() // it's a scroll
   }
   function holdEnd(e: PointerEvent) {
     const h = hold.current
@@ -278,7 +289,7 @@ export function useGestures(opts: GestureOptions) {
           const pos = { x: hold.current?.x ?? p.x, y: hold.current?.y ?? p.y }
           cancelHold()
           navigator.vibrate?.(18)
-          activate(pid, pos, id, 'drag')
+          activate(pid, pos, id, 'drag', true, true)
         }, HOLD_MS),
       }
       window.addEventListener('pointermove', holdMove)
@@ -288,7 +299,7 @@ export function useGestures(opts: GestureOptions) {
     }
     e.preventDefault()
     e.stopPropagation()
-    activate(e.pointerId, p, id, mode)
+    activate(e.pointerId, p, id, mode, false, e.pointerType === 'touch')
   }
 
   const stop = useCallback(() => { cancelAnimationFrame(raf.current) }, [])

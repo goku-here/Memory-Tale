@@ -24,7 +24,7 @@ import { TextEditor } from './TextEditor'
 import { FloatingShapes, getTheme, themeVars } from './ThemeEngine'
 import { ToolSheet } from './ToolSheet'
 import { BubbleEditor } from './Bubble'
-import { Lightbox } from './Lightbox'
+import { Lightbox, type ViewerImage } from './Lightbox'
 import { LocationTool } from './LocationTool'
 import { THREAD_COLORS, ThreadsSvg, threadMid } from './Threads'
 import { IconButton, toast } from './ui'
@@ -81,7 +81,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   const [canvasW, setCanvasW] = useState(() => Math.min(window.innerWidth, 520))
   const [captionFocus, setCaptionFocus] = useState(false)
   const [editMapId, setEditMapId] = useState<string | null>(null)
-  const [viewer, setViewer] = useState<{ src: string; original?: string; caption?: string } | null>(null)
+  const [viewer, setViewer] = useState<{ images: ViewerImage[]; start: number } | null>(null)
   const [busy, setBusy] = useState<{ done: number; total: number } | null>(null)
   const [connectFrom, setConnectFrom] = useState<string | null>(null)
   const slotInput = useRef<HTMLInputElement>(null)
@@ -174,19 +174,32 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     rawStart(e, id)
   }
   /** open a photo full-screen (photo items, or a filled slot of the polaroid line) */
+  function openViewer(key: string) {
+    // every photo on the canvas, in reading order (top to bottom, left to right)
+    const images: (ViewerImage & { y: number; x: number })[] = []
+    for (const it of itemsRef.current) {
+      if (it.type === 'photo') {
+        images.push({ key: it.id, src: it.props.src, original: it.props.original, caption: it.props.frame === 'polaroid' ? it.props.caption : undefined, y: it.y, x: it.x })
+      } else if (it.type === 'clothesline') {
+        it.props.photos.forEach((src, n) => { if (src) images.push({ key: `${it.id}#${n}`, src, y: it.y, x: it.x - 30 + n * 30 }) })
+      }
+    }
+    images.sort((a, b) => Math.round(a.y / 120) - Math.round(b.y / 120) || a.x - b.x)
+    const start = Math.max(0, images.findIndex((m) => m.key === key))
+    if (images.length) setViewer({ images, start })
+  }
   function viewItem(id: string) {
     const it = itemsRef.current.find((i) => i.id === id)
-    if (it?.type === 'photo') setViewer({ src: it.props.src, original: it.props.original, caption: it.props.frame === 'polaroid' ? it.props.caption : undefined })
+    if (it?.type === 'photo') openViewer(id)
   }
   const startItemRef = useRef(startItem)
   startItemRef.current = startItem
   // stable identities keep the memoised items from re-rendering on every drag frame
   const startItemStable = useCallback((e: React.PointerEvent, id: string) => startItemRef.current(e, id), [])
   const onViewSlot = useCallback((id: string, index: number) => {
-    const it = itemsRef.current.find((i) => i.id === id)
-    const src = it?.type === 'clothesline' ? it.props.photos[index] : ''
-    if (src) setViewer({ src })
-  }, [itemsRef])
+    openViewer(`${id}#${index}`)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const onSlot = useCallback((id: string, index: number) => { slotTarget.current = { id, index }; slotInput.current?.click() }, [])
 
   /* ---------- sheets ---------- */
@@ -700,7 +713,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       <input ref={replaceInput} type="file" accept="image/*" hidden onChange={(e) => { void replacePhoto(e.target.files?.[0]); e.target.value = '' }} />
 
       <AnimatePresence>
-        {viewer && <Lightbox key="viewer" src={viewer.src} original={viewer.original} caption={viewer.caption} onClose={() => setViewer(null)} />}
+        {viewer && <Lightbox key="viewer" images={viewer.images} start={viewer.start} onClose={() => setViewer(null)} />}
       </AnimatePresence>
 
       <BottomToolbar visible={!sheet && !editingId} accent={accent} onTool={onTool} />
