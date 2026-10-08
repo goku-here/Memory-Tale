@@ -168,7 +168,7 @@ export function stickerRatio(p: StickerProps) {
 export function dieCut(width: number) {
   const t = Math.max(2, Math.min(5, width * 0.032))
   const d = t * 0.72
-  const dirs: [number, number][] = [[t, 0], [-t, 0], [0, t], [0, -t], [d, d], [-d, d], [d, -d], [-d, -d]]
+  const dirs: [number, number][] = [[t, 0], [-t, 0], [0, t], [0, -t], [d, d], [-d, -d]]
   return dirs.map(([x, y]) => `drop-shadow(${x}px ${y}px 0 #fff)`).join(' ') + ' drop-shadow(0 3px 5px rgba(30,25,40,.3))'
 }
 

@@ -8,6 +8,7 @@ import { compressImage } from '../lib/image'
 import { downloadOriginal, uploadOriginal } from '../lib/supabase'
 import { bookEase, clipAt } from '../lib/bookTransition'
 import { clamp, cloneItem, frameHeight, nextZ, rnd } from '../lib/items'
+import { placeInOrder } from '../lib/layout'
 import { useGestures } from '../lib/useGestures'
 import type { BubbleProps, CanvasItem, FrameId, ItemPatch, MapProps, Stroke, StickerProps, TextProps } from '../types'
 import { formatDate } from './BookCard'
@@ -79,6 +80,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   const [canvasW, setCanvasW] = useState(() => Math.min(window.innerWidth, 520))
   const [captionFocus, setCaptionFocus] = useState(false)
   const [editMapId, setEditMapId] = useState<string | null>(null)
+  const [busy, setBusy] = useState<{ done: number; total: number } | null>(null)
   const [connectFrom, setConnectFrom] = useState<string | null>(null)
   const slotInput = useRef<HTMLInputElement>(null)
   const slotTarget = useRef<{ id: string; index: number } | null>(null)
@@ -168,6 +170,11 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     }
     rawStart(e, id)
   }
+  const startItemRef = useRef(startItem)
+  startItemRef.current = startItem
+  // stable identities keep the memoised items from re-rendering on every drag frame
+  const startItemStable = useCallback((e: React.PointerEvent, id: string) => startItemRef.current(e, id), [])
+  const onSlot = useCallback((id: string, index: number) => { slotTarget.current = { id, index }; slotInput.current?.click() }, [])
 
   /* ---------- sheets ---------- */
 
@@ -208,37 +215,52 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
 
   const addPhotos = async (files: FileList | null) => {
     if (!files?.length) return
+    const list = [...files]
     try {
-      const imgs = await Promise.all([...files].map((f) => compressImage(f, { maxSize: 1400, quality: 0.8 })))
-      const w = Math.round(clamp(canvasW * 0.5, 150, 250))
+      // one at a time keeps memory low on phones and lets us show real progress
+      const imgs: Awaited<ReturnType<typeof compressImage>>[] = []
+      for (let i = 0; i < list.length; i++) {
+        setBusy({ done: i, total: list.length })
+        imgs.push(await compressImage(list[i], { maxSize: 1400, quality: 0.8 }))
+      }
+      setBusy({ done: list.length, total: list.length })
+      const w = Math.round(clamp(canvasW * (imgs.length === 1 ? 0.52 : 0.4), 140, 230))
       const ids = imgs.map(() => uid())
-      const lastId = ids[ids.length - 1]
-      commit((list) => {
-        let z = nextZ(list)
-        const c = viewCenter()
-        const added = imgs.map((img, i) => {
-          const aspect = img.width / img.height
-          const cols = imgs.length === 1 ? 1 : 2
-          const col = i % cols
-          const row = Math.floor(i / cols)
-          const h = frameHeight('polaroid', w, aspect)
-          return {
-            id: ids[i], type: 'photo', zIndex: z++, width: w, height: h, rotation: Math.round(rnd(-7, 7) * 10) / 10,
-            x: cols === 1 ? c.x : col === 0 ? 29 + rnd(-3, 3) : 71 + rnd(-3, 3),
-            y: c.y + row * (h + 26) + rnd(-6, 6),
-            props: { src: img.dataUrl, aspect, frame: 'polaroid' as FrameId, radius: 4, caption: '' },
-          } satisfies CanvasItem
-        })
-        return [...list, ...added]
+      const sizes = imgs.map((img) => ({ width: w, height: frameHeight('polaroid', w, img.width / img.height), rotation: Math.round(rnd(-2, 2) * 10) / 10 }))
+      // start under the header, at the top of what is visible, then flow downward in selection order
+      const r = surface.current!.getBoundingClientRect()
+      const startY = Math.max(140, HEADER_H + 24 - r.top)
+      const spots = placeInOrder(sizes, itemsRef.current, canvasW, startY)
+      commit((cur) => {
+        let z = nextZ(cur)
+        return [...cur, ...imgs.map((img, i) => ({
+          id: ids[i], type: 'photo' as const, zIndex: z++, width: sizes[i].width, height: sizes[i].height, rotation: sizes[i].rotation,
+          x: spots[i].x, y: spots[i].y,
+          props: { src: img.dataUrl, aspect: img.width / img.height, frame: 'polaroid' as FrameId, radius: 4, caption: '' },
+        }))]
       })
-      setSelectedId(lastId)
-      // keep the untouched original in the cloud (background; never blocks adding the photo)
+      setSelectedId(ids[0])
+      // bring the first photo into view
+      const first = spots[0]
+      const sc = scroller.current
+      if (sc && first) {
+        const topInView = r.top + first.y - sizes[0].height / 2
+        if (topInView < HEADER_H + 10 || topInView > window.innerHeight - 220) {
+          sc.scrollBy({ top: topInView - (HEADER_H + 30), behavior: 'smooth' })
+        }
+      }
+      setBusy(null)
+      // keep the untouched originals in the cloud, one by one, in the background
       if (user) {
-        [...files].forEach((f, i) => {
-          void uploadOriginal(f, `${user.uid}/${memory.id}`).then((path) => { if (path) patch(ids[i], { props: { original: path } }) })
-        })
+        void (async () => {
+          for (let i = 0; i < list.length; i++) {
+            const path = await uploadOriginal(list[i], `${user.uid}/${memory.id}`)
+            if (path) patch(ids[i], { props: { original: path } })
+          }
+        })()
       }
     } catch {
+      setBusy(null)
       toast("Couldn't read that photo")
     }
   }
@@ -550,12 +572,12 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
             <AnimatePresence initial={false}>
               {visibleItems.map((it) => (
                 <CanvasItemView
-                  key={it.id} item={it}
+                  key={it.id} item={it} canvasW={canvasW}
                   selected={selectedId === it.id}
-                  onSlot={(id, index) => { slotTarget.current = { id, index }; slotInput.current?.click() }}
+                  onSlot={onSlot}
                   dragging={draggingId === it.id}
                   editing={editingId === it.id}
-                  onPointerDown={startItem}
+                  onPointerDown={startItemStable}
                   onMeasure={onMeasure}
                   onEditText={onEditText}
                   onEditDone={onEditDone}
@@ -620,6 +642,31 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       )}
 
       <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => { void addPhotos(e.target.files); e.target.value = '' }} />
+
+      <AnimatePresence>
+        {busy && (
+          <motion.div
+            className="fixed inset-0 z-[75] grid place-items-center bg-black/30 backdrop-blur-[2px]"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} role="status" aria-live="polite"
+          >
+            <motion.div
+              className="flex w-[240px] flex-col items-center gap-3 rounded-3xl bg-white px-6 py-7 shadow-2xl"
+              initial={{ scale: 0.9, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95 }}
+            >
+              <Loader2 size={30} className="animate-spin" style={{ color: accent }} />
+              <div className="text-[15px] font-extrabold">Adding {busy.total === 1 ? 'photo' : `photos`}…</div>
+              {busy.total > 1 && (
+                <>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100">
+                    <div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${(busy.done / busy.total) * 100}%`, background: accent }} />
+                  </div>
+                  <div className="text-[12.5px] font-semibold text-neutral-400">{Math.min(busy.done + 1, busy.total)} of {busy.total}</div>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <input ref={slotInput} type="file" accept="image/*" multiple hidden onChange={(e) => { void fillSlots(e.target.files); e.target.value = '' }} />
 

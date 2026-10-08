@@ -1,9 +1,10 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Copy, Palette, PenLine, Plus, Settings, Trash2 } from 'lucide-react'
+import { Copy, Palette, PenLine, Plus, Trash2, User } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Memory } from '../types'
 import { BookCard, BookCover } from './BookCard'
 import { ToolSheet } from './ToolSheet'
+import { useAuth } from '../data/useAuth'
 import { ConfirmDialog, IconButton } from './ui'
 
 interface HomeProps {
@@ -37,6 +38,7 @@ function MenuRow({ icon, label, onClick, danger }: { icon: ReactNode; label: str
 }
 
 export function Home({ memories, loading, hiddenId, onAdd, onSettings, onReorder, onOpen, onEdit, onTheme, onDuplicate, onDelete }: HomeProps) {
+  const { user } = useAuth()
   const [menu, setMenu] = useState<Memory | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [confirm, setConfirm] = useState<Memory | null>(null)
@@ -175,8 +177,16 @@ export function Home({ memories, loading, hiddenId, onAdd, onSettings, onReorder
     <div className="relative mx-auto min-h-full max-w-[520px]" style={{ background: 'linear-gradient(180deg,#fff 0%,#fff 55%,#f1f3f8 100%)' }}>
       <header className="flex items-center justify-between px-6" style={{ paddingTop: 'calc(var(--safe-top) + 28px)' }}>
         <h1 className="m-0 text-[34px] font-extrabold leading-none tracking-tight">Memories</h1>
-        <IconButton label="Settings" onClick={onSettings}>
-          <Settings size={21} strokeWidth={2} />
+        <IconButton label={user ? `Profile and settings (${user.name})` : 'Sign in and settings'} onClick={onSettings} className={user ? '!p-0 overflow-hidden' : ''}>
+          {user ? (
+            user.photo ? (
+              <img src={user.photo} alt="" referrerPolicy="no-referrer" className="h-full w-full rounded-full object-cover" />
+            ) : (
+              <span className="grid h-full w-full place-items-center rounded-full bg-[#17171a] text-[16px] font-bold text-white">{user.name.slice(0, 1).toUpperCase()}</span>
+            )
+          ) : (
+            <User size={21} strokeWidth={2} />
+          )}
         </IconButton>
       </header>
 

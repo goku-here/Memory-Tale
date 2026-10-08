@@ -12,6 +12,7 @@ import { NOTE_COLORS, StickyNote } from './StickyNote'
 
 interface ItemProps {
   item: CanvasItem
+  canvasW: number
   selected: boolean
   onSlot: (id: string, index: number) => void
   dragging: boolean
@@ -90,7 +91,7 @@ export function ItemBody({
 }
 
 /** One item on the canvas. Positioned by centre (x in %, y in px). */
-export const CanvasItemView = memo(function CanvasItemView({ item, selected, onSlot, dragging, editing, onPointerDown, onMeasure, onEditText, onEditDone }: ItemProps) {
+export const CanvasItemView = memo(function CanvasItemView({ item, canvasW, selected, onSlot, dragging, editing, onPointerDown, onMeasure, onEditText, onEditDone }: ItemProps) {
   const body = (
     <ItemBody item={item} editing={editing} selected={selected} onSlot={(i) => onSlot(item.id, i)} onMeasure={onMeasure} onEditText={onEditText} onEditDone={onEditDone} />
   )
@@ -100,9 +101,11 @@ export const CanvasItemView = memo(function CanvasItemView({ item, selected, onS
       data-item={item.id}
       className="no-select absolute"
       style={{
-        left: `${item.x}%`, top: item.y, width: item.width, height: item.type === 'text' ? 'auto' : item.height,
-        x: '-50%', y: '-50%', rotate: item.rotation, zIndex: item.zIndex, touchAction: selected ? 'none' : 'pan-y',
-        cursor: dragging ? 'grabbing' : 'grab',
+        // positioned with transforms only (no layout work while dragging)
+        left: 0, top: 0, width: item.width, height: item.type === 'text' ? 'auto' : item.height,
+        marginLeft: -item.width / 2, marginTop: -item.height / 2,
+        x: (item.x / 100) * canvasW, y: item.y, rotate: item.rotation, zIndex: item.zIndex,
+        touchAction: selected ? 'none' : 'pan-y', cursor: dragging ? 'grabbing' : 'grab', willChange: 'transform',
       }}
       initial={{ scale: 0.5, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
@@ -115,7 +118,6 @@ export const CanvasItemView = memo(function CanvasItemView({ item, selected, onS
         className="h-full w-full"
         animate={{ scale: dragging ? 1.05 : 1, rotate: dragging ? 2.5 : 0 }}
         transition={{ type: 'spring', stiffness: 500, damping: 26 }}
-        style={{ filter: dragging ? 'drop-shadow(0 16px 16px rgba(20,20,40,.2))' : undefined, willChange: dragging ? 'transform' : undefined }}
       >
         {body}
       </motion.div>
@@ -171,8 +173,8 @@ export function SelectionOverlay({
         aria-hidden={false}
         className="pointer-events-none absolute"
         style={{
-          left: `${item.x}%`, top: item.y, width: item.width, height: item.height,
-          transform: `translate(-50%,-50%) rotate(${item.rotation}deg)`, zIndex: 9500,
+          left: 0, top: 0, width: item.width, height: item.height, marginLeft: -item.width / 2, marginTop: -item.height / 2,
+          transform: `translate(${cx}px, ${item.y}px) rotate(${item.rotation}deg)`, zIndex: 9500, willChange: 'transform',
         }}
       >
         <div className="absolute -inset-1 rounded-[6px]" style={{ border: `1.5px solid ${accent}`, boxShadow: '0 0 0 1px rgba(255,255,255,.9)' }} />

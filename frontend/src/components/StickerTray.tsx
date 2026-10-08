@@ -19,17 +19,29 @@ export function StickerTray({ accent, onPick }: Props) {
   const chips = useRef<Partial<Record<StickerCategory, HTMLElement | null>>>({})
   const lock = useRef(0)
 
+  const root = useRef<HTMLDivElement>(null)
+  const scroller = () => {
+    let el = root.current?.parentElement ?? null
+    while (el && getComputedStyle(el).overflowY !== 'auto') el = el.parentElement
+    return el
+  }
+
+  // follow the scroll position (works at any sheet height, unlike viewport-based observers)
   useEffect(() => {
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (performance.now() < lock.current) return
-        const vis = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
-        if (vis) setActive((vis.target as HTMLElement).dataset.cat as StickerCategory)
-      },
-      { rootMargin: '-15% 0px -75% 0px' },
-    )
-    Object.values(sections.current).forEach((el) => el && io.observe(el))
-    return () => io.disconnect()
+    const sc = scroller()
+    if (!sc) return
+    const onScroll = () => {
+      if (performance.now() < lock.current) return
+      const top = sc.getBoundingClientRect().top + 90
+      let cur: StickerCategory = STICKER_CATEGORIES[0]
+      for (const c of STICKER_CATEGORIES) {
+        const el = sections.current[c]
+        if (el && el.getBoundingClientRect().top <= top) cur = c
+      }
+      setActive(cur)
+    }
+    sc.addEventListener('scroll', onScroll, { passive: true })
+    return () => sc.removeEventListener('scroll', onScroll)
   }, [])
 
   useEffect(() => {
@@ -37,9 +49,13 @@ export function StickerTray({ accent, onPick }: Props) {
   }, [active])
 
   const jump = (c: StickerCategory) => {
+    const sc = scroller()
+    const el = sections.current[c]
     setActive(c)
-    lock.current = performance.now() + 700
-    sections.current[c]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    if (!sc || !el) return
+    lock.current = performance.now() + 600
+    const y = el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - 58
+    sc.scrollTo({ top: Math.max(0, y), behavior: 'smooth' })
   }
 
   const upload = async (f?: File) => {
@@ -52,7 +68,7 @@ export function StickerTray({ accent, onPick }: Props) {
   }
 
   return (
-    <div>
+    <div ref={root}>
       <div className="no-scrollbar sticky top-0 z-10 flex gap-2 overflow-x-auto bg-white px-5 pb-3 pt-1" role="tablist" style={{ touchAction: 'pan-x' }}>
         {STICKER_CATEGORIES.map((c) => (
           <motion.button

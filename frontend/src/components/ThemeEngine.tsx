@@ -1,4 +1,3 @@
-import { motion, useReducedMotion } from 'framer-motion'
 import type { CSSProperties } from 'react'
 import type { CategoryId } from '../types'
 
@@ -97,9 +96,8 @@ export function themeVars(theme: Theme): CSSProperties {
   }
 }
 
-/** Decorative shapes drifting slowly in the background of themed screens. */
+/** Decorative shapes drifting slowly in the background (pure CSS animation, runs on the compositor). */
 export function FloatingShapes({ theme, count = 6 }: { theme: Theme; count?: number }) {
-  const reduce = useReducedMotion()
   const spots = [
     { l: '8%', t: '14%' }, { l: '84%', t: '22%' }, { l: '16%', t: '58%' },
     { l: '78%', t: '66%' }, { l: '46%', t: '86%' }, { l: '60%', t: '8%' },
@@ -107,15 +105,13 @@ export function FloatingShapes({ theme, count = 6 }: { theme: Theme; count?: num
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
       {spots.map((s, i) => (
-        <motion.span
+        <span
           key={i}
-          className="absolute select-none opacity-[0.16]"
-          style={{ left: s.l, top: s.t, fontSize: 28 + (i % 3) * 10 }}
-          animate={reduce ? undefined : { y: [0, -14, 0], rotate: [-6, 6, -6] }}
-          transition={{ duration: 6 + i, repeat: Infinity, ease: 'easeInOut', delay: i * 0.4 }}
+          className="float-shape absolute select-none opacity-[0.16]"
+          style={{ left: s.l, top: s.t, fontSize: 28 + (i % 3) * 10, animationDuration: `${6 + i}s`, animationDelay: `${i * 0.4}s` }}
         >
           {theme.shapes[i % theme.shapes.length]}
-        </motion.span>
+        </span>
       ))}
     </div>
   )

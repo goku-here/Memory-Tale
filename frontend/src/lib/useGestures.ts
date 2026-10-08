@@ -217,7 +217,7 @@ export function useGestures(opts: GestureOptions) {
     },
   }
 
-  const HOLD_MS = 1000
+  const HOLD_MS = 400
 
   /** begin a gesture for an already-down pointer */
   const activate = (pointerId: number, p: Pt, id: string, mode: Mode) => {
@@ -262,7 +262,7 @@ export function useGestures(opts: GestureOptions) {
     if (g.current) return
     if (e.button > 0) return
     const p = { x: e.clientX, y: e.clientY }
-    // Touch: items only pick up after a 1 s press, so plain scrolling over them never selects or moves them.
+    // Touch: items only pick up after a 0.4 s press, so plain scrolling over them never selects or moves them.
     if (e.pointerType === 'touch' && mode === 'drag' && !o.current.isSelected?.(id)) {
       if (hold.current) return
       const pid = e.pointerId
