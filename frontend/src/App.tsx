@@ -1,11 +1,12 @@
 import { AnimatePresence, MotionConfig, useMotionValue, useReducedMotion } from 'framer-motion'
 import confetti from 'canvas-confetti'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Canvas } from './components/Canvas'
 import { CreateMemorySheet, type SheetState } from './components/CreateMemorySheet'
 import { Home } from './components/Home'
 import { OpeningBook } from './components/OpeningBook'
 import { SettingsSheet } from './components/SettingsSheet'
+import { InviteScreen } from './components/InviteScreen'
 import { ShareScreen } from './components/ShareScreen'
 import { useAuth } from './data/useAuth'
 import { getTheme } from './components/ThemeEngine'
@@ -22,11 +23,25 @@ export default function App() {
   const progress = useMotionValue(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const { user } = useAuth()
+  // invite links look like /join/<token>
+  const [joinToken, setJoinToken] = useState<string | null>(() => window.location.pathname.match(/^\/join\/([A-Za-z0-9_-]+)/)?.[1] ?? null)
+  const [pendingOpen, setPendingOpen] = useState<string | null>(null)
   const [shareId, setShareId] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Memory | null>(null)
 
   const byId = useCallback((id?: string | null) => memories.find((m) => m.id === id), [memories])
   const openMemory = openId ? byId(openId) : undefined
+
+  // after joining, open the book as soon as it has synced down to this device
+  useEffect(() => {
+    if (pendingOpen && memories.some((m) => m.id === pendingOpen)) { setOpenId(pendingOpen); setPendingOpen(null) }
+  }, [pendingOpen, memories])
+
+  const closeInvite = (memoryId?: string) => {
+    setJoinToken(null)
+    window.history.replaceState(null, '', '/')
+    if (memoryId) { setPendingOpen(memoryId); toast('You are in! Opening the book…') }
+  }
 
   const startOpen = useCallback((memory: Memory, rect: DOMRect) => {
     setOpenId(memory.id)
@@ -103,6 +118,15 @@ export default function App() {
             onTheme={() => setSheet({ mode: 'theme', id: openMemory.id })}
             onShare={() => setShareId(openMemory.id)}
             onDelete={() => setConfirmDelete(openMemory)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {joinToken && (
+          <InviteScreen
+            key="invite" token={joinToken} knownIds={new Set(memories.map((m) => m.id))}
+            onJoined={(id) => closeInvite(id)} onDismiss={() => closeInvite()}
           />
         )}
       </AnimatePresence>

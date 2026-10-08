@@ -9,7 +9,7 @@
  * Dexie stays the app's primary store (works offline); this module mirrors it to the cloud.
  */
 import {
-  collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, setDoc, where, writeBatch,
+  arrayRemove, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, setDoc, updateDoc, where, writeBatch,
   type Unsubscribe,
 } from 'firebase/firestore'
 import { getDb } from '../lib/firebase'
@@ -145,8 +145,20 @@ export async function pushMemory(uid: string, m: Memory) {
   const d = getDb()
   if (!d) return
   setSyncStatus({ state: 'syncing' })
-  const full: Memory = { ...m, ownerId: m.ownerId ?? uid, memberIds: m.memberIds ?? [uid], updatedAt: m.updatedAt ?? Date.now() }
-  await setDoc(doc(d, 'memories', m.id), clean(full))
+  const ref = doc(d, 'memories', m.id)
+  // never overwrite who is in the book with a possibly stale local copy: details only
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { memberIds, members, ownerId, ...details } = m as Memory & { joinToken?: string }
+  delete (details as { joinToken?: string }).joinToken
+  let exists = false
+  try { exists = (await getDoc(ref)).exists() } catch { /* offline and not cached: treat as new */ }
+  if (exists) {
+    await setDoc(ref, clean({ ...details, updatedAt: m.updatedAt ?? Date.now() }), { merge: true })
+  } else {
+    await setDoc(ref, clean({
+      ...details, ownerId: ownerId ?? uid, memberIds: memberIds ?? [uid], members: members ?? [], updatedAt: m.updatedAt ?? Date.now(),
+    }))
+  }
 }
 
 export async function deleteRemoteMemory(id: string) {
@@ -236,4 +248,67 @@ export async function pushWholeMemory(uid: string, m: Memory) {
   await pushMemory(uid, m)
   const doc = await local.canvases.get(m.id)
   if (doc) await pushCanvas(m.id, doc.items as CanvasItem[])
+}
+
+/* ---------- invites (sharing) ---------- */
+export interface Invite {
+  token: string
+  memoryId: string
+  createdBy: string
+  title: string
+  themeId: Memory['themeId']
+  date: string
+  cover: Memory['cover']
+  ownerName: string
+  ownerPhoto?: string
+}
+interface Who { uid: string; name: string; photo?: string | null }
+
+const rand = (n: number) => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+  const bytes = crypto.getRandomValues(new Uint8Array(n))
+  return [...bytes].map((b) => chars[b % chars.length]).join('')
+}
+
+/** A brand-new, unguessable link every time. The invite doc carries just enough to show a preview. */
+export async function createInvite(who: Who, m: Memory): Promise<string> {
+  const d = getDb()
+  if (!d) throw new Error('Cloud is not configured')
+  await pushWholeMemory(who.uid, m) // the book has to exist in the cloud before anyone can join it
+  const token = rand(24)
+  // keep the preview small: a huge cover photo falls back to its average colour
+  const cover = m.cover.type === 'image' && m.cover.value.length > 380_000
+    ? { type: 'color' as const, value: m.cover.avg ?? '#9DB7D5', tone: m.cover.tone }
+    : m.cover
+  const invite = clean({
+    memoryId: m.id, createdBy: who.uid, createdAt: Date.now(), title: m.title, themeId: m.themeId, date: m.date, cover,
+    ownerName: who.name, ownerPhoto: who.photo ?? undefined,
+  })
+  await setDoc(doc(d, 'invites', token), invite)
+  return `${window.location.origin}/join/${token}`
+}
+
+export async function getInvite(token: string): Promise<Invite | null> {
+  const d = getDb()
+  if (!d) return null
+  const snap = await getDoc(doc(d, 'invites', token))
+  return snap.exists() ? ({ ...(snap.data() as Invite), token }) : null
+}
+
+/** Adds the signed-in user to the book (allowed by the rules because the invite exists). */
+export async function joinMemory(token: string, memoryId: string, who: Who, color: string) {
+  const d = getDb()
+  if (!d) return
+  await updateDoc(doc(d, 'memories', memoryId), {
+    memberIds: arrayUnion(who.uid),
+    members: arrayUnion(clean({ id: who.uid, name: who.name, color, photo: who.photo ?? undefined })),
+    joinToken: token,
+    updatedAt: Date.now(),
+  })
+}
+
+export async function leaveMemory(uid: string, memoryId: string) {
+  const d = getDb()
+  if (!d) return
+  await updateDoc(doc(d, 'memories', memoryId), { memberIds: arrayRemove(uid), updatedAt: Date.now() })
 }

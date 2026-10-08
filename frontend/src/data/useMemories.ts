@@ -4,7 +4,7 @@ import { db } from './db'
 import type { Memory } from '../types'
 import { uid as newId } from '../lib/id'
 import { useAuth } from './useAuth'
-import { deleteRemoteMemory, pushMemory, pushWholeMemory, reportError, setSyncStatus, subscribeMemories } from './sync'
+import { deleteRemoteMemory, leaveMemory, pushMemory, pushWholeMemory, reportError, setSyncStatus, subscribeMemories } from './sync'
 
 export function useMemories() {
   const { user } = useAuth()
@@ -54,8 +54,13 @@ export function useMemories() {
   }, [refresh, push])
 
   const remove = useCallback(async (id: string) => {
+    const m = memRef.current.find((x) => x.id === id)
     await repo.deleteMemory(id)
-    if (uid) void deleteRemoteMemory(id).catch(reportError)
+    if (uid) {
+      // owners delete the book for everyone; invited people just leave it
+      const guest = m?.ownerId && m.ownerId !== uid
+      void (guest ? leaveMemory(uid, id) : deleteRemoteMemory(id)).catch(reportError)
+    }
     await refresh()
   }, [refresh, uid])
 

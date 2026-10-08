@@ -14,12 +14,12 @@ interface AuthState {
   /** true until Firebase has told us whether someone is signed in */
   loading: boolean
   user: Profile | null
-  signIn: () => Promise<void>
+  signIn: () => Promise<Profile | null>
   logOut: () => Promise<void>
 }
 
 const Ctx = createContext<AuthState>({
-  configured: false, loading: false, user: null, signIn: async () => {}, logOut: async () => {},
+  configured: false, loading: false, user: null, signIn: async () => null, logOut: async () => {},
 })
 
 const toProfile = (u: User): Profile => ({
@@ -39,19 +39,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const signIn = useCallback(async () => {
+  const signIn = useCallback(async (): Promise<Profile | null> => {
     const auth = getFirebaseAuth()
     if (!auth) throw new Error('not-configured')
     try {
-      await signInWithPopup(auth, googleProvider())
+      const cred = await signInWithPopup(auth, googleProvider())
+      return toProfile(cred.user)
     } catch (e) {
       const code = (e as { code?: string }).code
       // popups are unreliable in installed PWAs / mobile browsers: fall back to a full-page redirect
       if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
         await signInWithRedirect(auth, googleProvider())
-        return
+        return null
       }
-      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return null
       throw e
     }
   }, [])

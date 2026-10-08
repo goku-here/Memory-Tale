@@ -70,3 +70,9 @@ Signed-in users' photos also upload the untouched original to the private-by-pat
 Setup: create the bucket, set `VITE_SUPABASE_URL` / `VITE_SUPABASE_KEY` in `frontend/.env.local`, and run `backend/supabase.sql`
 in the Supabase SQL Editor. The Frame sheet then shows **Download original quality**.
 Later hardening: put uploads behind a Supabase Edge Function that verifies the Firebase ID token.
+
+## Sharing (invite links)
+
+"Share memory" creates a brand-new link every time (`/join/<token>`). Whoever opens it sees a preview of the book,
+signs in with Google and becomes a member who can view and edit it live. Members can leave a book; only the owner deletes it for everyone.
+After changing `backend/firestore.rules`, publish them again (Firestore → Rules → Publish).

@@ -1,8 +1,9 @@
 rules_version = '2';
 
-// Model:  memories/{memoryId}                  { ownerId, memberIds: [uid], title, cover, ... }
-//         memories/{memoryId}/items/{itemId}   { json, updatedAt }   canvas items
-//         memories/{memoryId}/assets/{hash}    { data }              compressed photos
+// memories/{id}                  { ownerId, memberIds: [uid], members: [..], title, cover, ... }
+// memories/{id}/items/{itemId}   { json, updatedAt }
+// memories/{id}/assets/{hash}    { data }
+// invites/{token}                { memoryId, createdBy, title, cover, ownerName, ... }  public preview, unguessable token
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -12,16 +13,40 @@ service cloud.firestore {
 
     match /memories/{memoryId} {
       allow read: if isMember(resource.data);
+
       allow create: if signedIn()
         && request.resource.data.ownerId == request.auth.uid
         && request.auth.uid in request.resource.data.memberIds;
-      allow update: if isMember(resource.data) && request.resource.data.ownerId == resource.data.ownerId;
+
+      // members edit freely, but can only keep or remove people (never add) and never change the owner
+      allow update: if isMember(resource.data)
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.memberIds.hasOnly(resource.data.memberIds);
+
+      // joining: a signed-in person adds only themselves, proving it with a real invite token
+      allow update: if signedIn()
+        && !(request.auth.uid in resource.data.memberIds)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds', 'members', 'joinToken', 'updatedAt'])
+        && request.resource.data.memberIds.hasAll(resource.data.memberIds)
+        && request.resource.data.memberIds.size() == resource.data.memberIds.size() + 1
+        && request.auth.uid in request.resource.data.memberIds
+        && get(/databases/$(database)/documents/invites/$(request.resource.data.joinToken)).data.memoryId == memoryId;
+
       allow delete: if isOwner(resource.data);
 
       match /{sub}/{docId} {
         allow read, write: if sub in ['items', 'assets']
           && isMember(get(/databases/$(database)/documents/memories/$(memoryId)).data);
       }
+    }
+
+    match /invites/{token} {
+      allow get: if true;       // anyone with the link can see the preview
+      allow list: if false;     // but nobody can browse invites
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && isMember(get(/databases/$(database)/documents/memories/$(request.resource.data.memoryId)).data);
+      allow delete: if signedIn() && resource.data.createdBy == request.auth.uid;
     }
   }
 }

@@ -42,6 +42,8 @@ export function Home({ memories, loading, hiddenId, onAdd, onSettings, onReorder
   const [menu, setMenu] = useState<Memory | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [confirm, setConfirm] = useState<Memory | null>(null)
+  const guest = !!confirm?.ownerId && !!user && confirm.ownerId !== user.uid
+  const shared = (confirm?.memberIds?.length ?? 0) > 1
 
   const openMenu = (m: Memory) => { setMenu(m); setMenuOpen(true) }
 
@@ -248,8 +250,13 @@ export function Home({ memories, loading, hiddenId, onAdd, onSettings, onReorder
 
       <ConfirmDialog
         open={!!confirm}
-        title="Delete this book?"
-        message={`“${confirm?.title ?? ''}” and everything on its canvas will be removed. This can't be undone.`}
+        title={guest ? 'Leave this book?' : 'Delete this book?'}
+        confirmLabel={guest ? 'Leave' : 'Delete'}
+        message={guest
+          ? `“${confirm?.title ?? ''}” will disappear from your shelf. The others keep it.`
+          : shared
+            ? `“${confirm?.title ?? ''}” will be removed for everyone you shared it with too. This can't be undone.`
+            : `“${confirm?.title ?? ''}” and everything on its canvas will be removed. This can't be undone.`}
         onCancel={() => setConfirm(null)}
         onConfirm={() => { if (confirm) onDelete(confirm); setConfirm(null) }}
       />
