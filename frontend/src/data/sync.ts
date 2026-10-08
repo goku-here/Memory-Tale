@@ -270,6 +270,14 @@ const rand = (n: number) => {
   return [...bytes].map((b) => chars[b % chars.length]).join('')
 }
 
+/** Links must open on other people's phones, so local/dev addresses fall back to the live site. */
+function publicBase() {
+  const { hostname, origin } = window.location
+  const isLocal = hostname === 'localhost' || /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname.endsWith('.local')
+  const configured = import.meta.env.VITE_PUBLIC_URL as string | undefined
+  return isLocal ? (configured || 'https://memory-tale-seven.vercel.app').replace(/\/$/, '') : origin
+}
+
 /** A brand-new, unguessable link every time. The invite doc carries just enough to show a preview. */
 export async function createInvite(who: Who, m: Memory): Promise<string> {
   const d = getDb()
@@ -285,7 +293,7 @@ export async function createInvite(who: Who, m: Memory): Promise<string> {
     ownerName: who.name, ownerPhoto: who.photo ?? undefined,
   })
   await setDoc(doc(d, 'invites', token), invite)
-  return `${window.location.origin}/join/${token}`
+  return `${publicBase()}/join/${token}`
 }
 
 export async function getInvite(token: string): Promise<Invite | null> {

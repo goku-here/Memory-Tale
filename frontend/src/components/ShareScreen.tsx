@@ -38,7 +38,10 @@ export function ShareScreen({ memory, onClose }: { memory: Memory; onClose: () =
       }
     } catch (e) {
       reportError(e)
-      toast("Couldn't create the invite link")
+      const code = (e as { code?: string }).code ?? (e as Error).message
+      toast(code === 'permission-denied'
+        ? 'Publish the latest Firestore rules, then try again'
+        : `Couldn't create the link (${code})`)
     } finally {
       setSharing(false)
     }
