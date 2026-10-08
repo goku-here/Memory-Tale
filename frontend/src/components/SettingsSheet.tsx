@@ -3,6 +3,7 @@ import { Loader2, LogOut } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../data/useAuth'
 import { getSyncStatus, onSyncStatus } from '../data/sync'
+import { DriveSettings } from './DriveSettings'
 import { ToolSheet } from './ToolSheet'
 import { toast } from './ui'
 
@@ -37,7 +38,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
   }
 
   return (
-    <ToolSheet open={open} onClose={onClose} title="Settings" snaps={[0.55]} z={65}>
+    <ToolSheet open={open} onClose={onClose} title="Settings" snaps={[0.62, 0.92]} z={65}>
       <div className="space-y-4 px-5 pb-4 pt-1">
         {user ? (
           <div className="flex items-center gap-4 rounded-3xl bg-neutral-50 p-4">
@@ -75,6 +76,8 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
             )}
           </div>
         )}
+
+        {user && <DriveSettings />}
 
         {user && (
           <div className="rounded-2xl bg-neutral-50 px-4 py-3 text-[13.5px]" role="status">

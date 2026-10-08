@@ -5,10 +5,12 @@ import { Canvas } from './components/Canvas'
 import { CreateMemorySheet, type SheetState } from './components/CreateMemorySheet'
 import { Home } from './components/Home'
 import { OpeningBook } from './components/OpeningBook'
+import { DriveChip } from './components/DriveChip'
 import { SettingsSheet } from './components/SettingsSheet'
 import { InviteScreen } from './components/InviteScreen'
 import { ShareScreen } from './components/ShareScreen'
 import { useAuth } from './data/useAuth'
+import { startOriginals, stopOriginals } from './data/originals'
 import { getTheme } from './components/ThemeEngine'
 import { ConfirmDialog, ToastHost, toast } from './components/ui'
 import { useMemories } from './data/useMemories'
@@ -31,6 +33,13 @@ export default function App() {
 
   const byId = useCallback((id?: string | null) => memories.find((m) => m.id === id), [memories])
   const openMemory = openId ? byId(openId) : undefined
+
+  // save originals to Google Drive in the background (and resume after a restart)
+  useEffect(() => {
+    if (!user) return
+    startOriginals(user.uid)
+    return stopOriginals
+  }, [user])
 
   // after joining, open the book as soon as it has synced down to this device
   useEffect(() => {
@@ -159,6 +168,7 @@ export default function App() {
           setConfirmDelete(null)
         }}
       />
+      <DriveChip top={openId ? 'calc(var(--safe-top) + 128px)' : 'calc(var(--safe-top) + 84px)'} />
       <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <ToastHost />
     </MotionConfig>

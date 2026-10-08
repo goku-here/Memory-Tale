@@ -1,20 +1,21 @@
 import { animate, motion, useMotionValue, useTransform } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { downloadOriginal } from '../lib/supabase'
+import type { PhotoProps } from '../types'
 import { resolveRef } from '../lib/assets'
 
 export interface ViewerImage {
   key: string
   src: string
   thumb?: string
-  /** storage path of the full-quality original, if there is one */
-  original?: string
+  /** the photo this image belongs to (used to find its original) */
+  photo?: PhotoProps
   caption?: string
 }
 
 interface Props {
   memoryId: string
+  getOriginal: (photo: PhotoProps) => Promise<Blob | null>
   images: ViewerImage[]
   start: number
   onClose: () => void
@@ -30,7 +31,7 @@ const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.
  * Pinch / wheel / double-tap to zoom, drag to pan when zoomed, swipe sideways for the next photo,
  * swipe down (or tap the dark area, or press Esc) to close.
  */
-export function Lightbox({ memoryId, images, start, onClose }: Props) {
+export function Lightbox({ memoryId, getOriginal, images, start, onClose }: Props) {
   const [i, setI] = useState(Math.min(start, images.length - 1))
   const [dir, setDir] = useState(0)
   const [zoomed, setZoomed] = useState(false)
@@ -60,17 +61,20 @@ export function Lightbox({ memoryId, images, start, onClose }: Props) {
   const [full, setFull] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   useEffect(() => {
-    const path = cur.original
-    setFull(path ? originals.current.get(path) ?? null : null)
-    if (!path || originals.current.has(path)) { setLoading(false); return }
+    const p = cur.photo
+    const key = cur.key
+    const has = !!(p && (p.originalId || p.original))
+    setFull(originals.current.get(key) ?? null)
+    if (!p || !has || originals.current.has(key)) { setLoading(false); return }
     let alive = true
     setLoading(true)
-    void downloadOriginal(path).then((b) => {
-      if (b) originals.current.set(path, URL.createObjectURL(b))
-      if (alive) { setFull(originals.current.get(path) ?? null); setLoading(false) }
-    })
+    void getOriginal(p).then((b) => {
+      if (b) originals.current.set(key, URL.createObjectURL(b))
+      if (alive) { setFull(originals.current.get(key) ?? null); setLoading(false) }
+    }).catch(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [cur.original])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cur.key])
   useEffect(() => () => { originals.current.forEach((u) => URL.revokeObjectURL(u)) }, [])
 
   /* ---- zoom helpers ---- */

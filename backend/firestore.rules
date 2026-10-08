@@ -3,6 +3,7 @@ rules_version = '2';
 // memories/{id}                  { ownerId, memberIds: [uid], members: [..], title, cover, ... }
 // memories/{id}/items/{itemId}   { json, updatedAt }
 // memories/{id}/assets/{hash}    { data }
+// memories/{id}/originals/{photoId} { uploaderUid, name, mime, size, copies: { uid: { fileId } } }
 // invites/{token}                { memoryId, createdBy, title, cover, ownerName, ... }  public preview, unguessable token
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -35,7 +36,7 @@ service cloud.firestore {
       allow delete: if isOwner(resource.data);
 
       match /{sub}/{docId} {
-        allow read, write: if sub in ['items', 'assets']
+        allow read, write: if sub in ['items', 'assets', 'originals']
           && isMember(get(/databases/$(database)/documents/memories/$(memoryId)).data);
       }
     }

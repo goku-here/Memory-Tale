@@ -1,17 +1,20 @@
 import { AnimatePresence, motion, useMotionValue, useTransform, type MotionValue } from 'framer-motion'
-import { ArrowLeft, Check, Loader2, MoreHorizontal, Palette, PenLine, Redo2, Share2, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, Check, Download, Loader2, MoreHorizontal, Palette, PenLine, Redo2, Share2, Trash2, Undo2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../data/useAuth'
 import { useCanvas } from '../data/useCanvas'
 import { uid } from '../lib/id'
 import { compressImage } from '../lib/image'
-import { downloadOriginal, uploadOriginal } from '../lib/supabase'
+import { uploadOriginal } from '../lib/supabase'
+import { connectDrive, driveConfigured, isConnected } from '../lib/drive'
+import { loadOriginalBlob, missingCopies, prefs, queueOriginal, replicateBook } from '../data/originals'
+import { downloadBookZip } from '../lib/zipBook'
 import { AssetCtx } from '../lib/assets'
 import { bookEase, clipAt } from '../lib/bookTransition'
 import { clamp, cloneItem, frameHeight, nextZ, rnd } from '../lib/items'
 import { placeInOrder } from '../lib/layout'
 import { useGestures } from '../lib/useGestures'
-import type { BubbleProps, CanvasItem, FrameId, ItemPatch, MapProps, Stroke, StickerProps, TextProps } from '../types'
+import type { PhotoProps, BubbleProps, CanvasItem, FrameId, ItemPatch, MapProps, Stroke, StickerProps, TextProps } from '../types'
 import { formatDate } from './BookCard'
 import { BottomToolbar, type ToolId } from './BottomToolbar'
 import { CanvasItemView, SelectionOverlay } from './CanvasItem'
@@ -26,6 +29,7 @@ import { FloatingShapes, getTheme, themeVars } from './ThemeEngine'
 import { ToolSheet } from './ToolSheet'
 import { BubbleEditor } from './Bubble'
 import { Lightbox, type ViewerImage } from './Lightbox'
+import { ToolSheet as Sheet } from './ToolSheet'
 import { LocationTool } from './LocationTool'
 import { THREAD_COLORS, ThreadsSvg, threadMid } from './Threads'
 import { IconButton, toast } from './ui'
@@ -88,7 +92,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   const lastPointer = useRef<string>('mouse')
   const suppressClick = useRef(false)
   const viewTimer = useRef(0)
-  const [busy, setBusy] = useState<{ done: number; total: number } | null>(null)
+  const [busy, setBusy] = useState<{ done: number; total: number; label?: string } | null>(null)
+  const [drivePrompt, setDrivePrompt] = useState<{ count: number; bytes: number } | null>(null)
   const [connectFrom, setConnectFrom] = useState<string | null>(null)
   const slotInput = useRef<HTMLInputElement>(null)
   const slotTarget = useRef<{ id: string; index: number } | null>(null)
@@ -189,7 +194,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     const images: (ViewerImage & { y: number; x: number })[] = []
     for (const it of itemsRef.current) {
       if (it.type === 'photo') {
-        images.push({ key: it.id, src: it.props.src, thumb: it.props.thumb, original: it.props.original, caption: it.props.frame === 'polaroid' ? it.props.caption : undefined, y: it.y, x: it.x })
+        images.push({ key: it.id, src: it.props.src, thumb: it.props.thumb, photo: it.props, caption: it.props.frame === 'polaroid' ? it.props.caption : undefined, y: it.y, x: it.x })
       } else if (it.type === 'clothesline') {
         it.props.photos.forEach((src, n) => { if (src) images.push({ key: `${it.id}#${n}`, src, y: it.y, x: it.x - 30 + n * 30 }) })
       }
@@ -272,6 +277,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       setBusy({ done: list.length, total: list.length })
       const w = Math.round(clamp(canvasW * (imgs.length === 1 ? 0.52 : 0.4), 140, 230))
       const ids = imgs.map(() => uid())
+      const driveOn = !!user && isConnected() && prefs.backup()
+      const pids = ids.map(() => uid())
       const sizes = imgs.map((img) => ({ width: w, height: frameHeight('polaroid', w, img.width / img.height), rotation: Math.round(rnd(-2, 2) * 10) / 10 }))
       // start under the header, at the top of what is visible, then flow downward in selection order
       const r = surface.current!.getBoundingClientRect()
@@ -282,7 +289,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
         return [...cur, ...imgs.map((img, i) => ({
           id: ids[i], type: 'photo' as const, zIndex: z++, width: sizes[i].width, height: sizes[i].height, rotation: sizes[i].rotation,
           x: spots[i].x, y: spots[i].y,
-          props: { src: img.dataUrl, thumb: img.thumb, aspect: img.width / img.height, frame: 'polaroid' as FrameId, radius: 4, caption: '' },
+          props: { src: img.dataUrl, thumb: img.thumb, aspect: img.width / img.height, frame: 'polaroid' as FrameId, radius: 4, caption: '', originalId: driveOn ? pids[i] : undefined },
         }))]
       })
       setSelectedId(ids[0])
@@ -297,13 +304,17 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       }
       setBusy(null)
       // keep the untouched originals in the cloud, one by one, in the background
-      if (user) {
+      if (driveOn) {
+        for (let i = 0; i < list.length; i++) void queueOriginal(list[i], memory.id, pids[i])
+      } else if (user && !driveConfigured) {
         void (async () => {
           for (let i = 0; i < list.length; i++) {
             const path = await uploadOriginal(list[i], `${user.uid}/${memory.id}`)
             if (path) patch(ids[i], { props: { original: path } })
           }
         })()
+      } else if (user && driveConfigured && !isConnected()) {
+        toast('Tip: connect Google Drive in Settings to keep your original photos')
       }
     } catch {
       setBusy(null)
@@ -311,15 +322,28 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     }
   }
 
-  const saveOriginal = async (path: string) => {
-    toast('Downloading original…')
-    const blob = await downloadOriginal(path)
-    if (!blob) return toast("Couldn't fetch the original")
+  const saveOriginal = async (photo: PhotoProps) => {
+    toast('Fetching the original…')
+    const blob = await loadOriginalBlob(memory.id, photo, user?.uid)
+    if (!blob) return toast("Couldn't find the original. Connect Google Drive or ask the person who added it.")
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = path.split('/').pop() ?? 'photo.jpg'
+    a.download = `photo.${(blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg')}`
     a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 4000)
+  }
+
+  /** every photo of this book as ZIP file(s), full quality where we can get it */
+  const downloadBook = async () => {
+    const photos = itemsRef.current.filter((i) => i.type === 'photo')
+    if (!photos.length) return toast('No photos in this book yet')
+    setBusy({ done: 0, total: photos.length, label: 'Gathering your photos…' })
+    try {
+      const r = await downloadBookZip(memory.title, memory.id, itemsRef.current, (p) => loadOriginalBlob(memory.id, p, user?.uid), (p) => setBusy({ done: p.done, total: p.total, label: 'Gathering your photos…' }))
+      toast(r.fallback ? `Saved ${r.photos} photos (${r.fallback} without an original)` : `Saved ${r.photos} photos in full quality`)
+    } catch {
+      toast("Couldn't build the download")
+    } finally { setBusy(null) }
   }
 
   const replacePhoto = async (file?: File) => {
@@ -329,7 +353,11 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       const img = await compressImage(file)
       const aspect = img.width / img.height
       patch(target.id, { height: frameHeight(target.props.frame, target.width, aspect), props: { src: img.dataUrl, thumb: img.thumb, aspect, original: undefined } }, true)
-      if (user) void uploadOriginal(file, `${user.uid}/${memory.id}`).then((path) => { if (path) patch(target.id, { props: { original: path } }) })
+      if (user && isConnected() && prefs.backup()) {
+        const pid = uid()
+        patch(target.id, { props: { originalId: pid, original: undefined } })
+        void queueOriginal(file, memory.id, pid)
+      } else if (user && !driveConfigured) void uploadOriginal(file, `${user.uid}/${memory.id}`).then((path) => { if (path) patch(target.id, { props: { original: path } }) })
     } catch {
       toast("Couldn't read that photo")
     }
@@ -521,6 +549,32 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
 
   const run = (fn: () => void) => () => { setMenu(false); fn() }
 
+  /* ---------- originals: copy shared books' originals to my Drive (or ask first) ---------- */
+  useEffect(() => {
+    if (!user || !driveConfigured) return
+    let alive = true
+    void (async () => {
+      const pref = prefs.copyBook(memory.id)
+      const wanted = pref === true || (pref === null && prefs.copyShared())
+      if (isConnected() && wanted) { void replicateBook(memory.id, user.uid, { repair: true }); return }
+      if (pref !== null || prefs.asked(memory.id)) return
+      const m = await missingCopies(memory.id, user.uid).catch(() => null)
+      if (alive && m && m.count > 0) setDrivePrompt({ count: m.count, bytes: m.bytes })
+    })()
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memory.id, user?.uid])
+
+  const answerPrompt = async (yes: boolean) => {
+    prefs.setAsked(memory.id)
+    setDrivePrompt(null)
+    if (!yes || !user) return
+    const ok = isConnected() || (await connectDrive(user.email))
+    if (!ok) return toast("Google Drive wasn't connected")
+    prefs.setCopyBook(memory.id, true)
+    void replicateBook(memory.id, user.uid, { repair: true })
+  }
+
   /* ---------- edit text of notes / dividers / sticker captions ---------- */
   const onEditText = useCallback((id: string, text: string) => {
     live((list) => list.map((i) => {
@@ -586,6 +640,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
                         <MenuItem icon={<PenLine size={18} />} label="Edit book" onClick={run(onEdit)} />
                         <MenuItem icon={<Palette size={18} />} label="Change theme" onClick={run(onTheme)} />
                         <MenuItem icon={<Share2 size={18} />} label="Share" onClick={run(onShare)} />
+                        <MenuItem icon={<Download size={18} />} label="Download book" onClick={run(() => void downloadBook())} />
                         <MenuItem danger icon={<Trash2 size={18} />} label="Delete" onClick={run(onDelete)} />
                       </motion.div>
                     </>
@@ -717,7 +772,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
               initial={{ scale: 0.9, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95 }}
             >
               <Loader2 size={30} className="animate-spin" style={{ color: accent }} />
-              <div className="text-[15px] font-extrabold">Adding {busy.total === 1 ? 'photo' : `photos`}…</div>
+              <div className="text-[15px] font-extrabold">{busy.label ?? (busy.total === 1 ? 'Adding photo…' : 'Adding photos…')}</div>
               {busy.total > 1 && (
                 <>
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100">
@@ -735,8 +790,25 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
 
       <input ref={replaceInput} type="file" accept="image/*" hidden onChange={(e) => { void replacePhoto(e.target.files?.[0]); e.target.value = '' }} />
 
+      <ToolSheet open={!!drivePrompt} onClose={() => void answerPrompt(false)} title="Keep the originals?" snaps={[0.5]} z={80}>
+        {drivePrompt && (
+          <div className="space-y-4 px-6 pb-4 text-center">
+            <div className="text-[44px]">☁️</div>
+            <p className="m-0 text-[15px] leading-relaxed text-neutral-600">
+              This book has <b>{drivePrompt.count}</b> full-quality {drivePrompt.count === 1 ? 'photo' : 'photos'}
+              {drivePrompt.bytes > 0 && <> (about {Math.max(1, Math.round(drivePrompt.bytes / 1048576))} MB)</>}.
+              Want a copy of each in <b>your own Google Drive</b>? You can open the book right now either way. They save quietly in the background.
+            </p>
+            <button type="button" onClick={() => void answerPrompt(true)}
+              className="h-13 min-h-12 w-full rounded-full border-0 bg-[#17171a] text-[15px] font-semibold text-white">Save to my Drive</button>
+            <button type="button" onClick={() => void answerPrompt(false)}
+              className="h-11 w-full rounded-full border-0 bg-transparent text-[14.5px] font-bold text-neutral-500">Not now</button>
+          </div>
+        )}
+      </ToolSheet>
+
       <AnimatePresence>
-        {viewer && <Lightbox key="viewer" memoryId={memory.id} images={viewer.images} start={viewer.start} onClose={() => setViewer(null)} />}
+        {viewer && <Lightbox key="viewer" memoryId={memory.id} getOriginal={(p) => loadOriginalBlob(memory.id, p, user?.uid)} images={viewer.images} start={viewer.start} onClose={() => setViewer(null)} />}
       </AnimatePresence>
 
       <BottomToolbar visible={!sheet && !editingId} accent={accent} onTool={onTool} />
@@ -753,7 +825,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
             onRadius={(radius) => patch(photoItem.id, { props: { radius } })}
             onCaption={(caption) => patch(photoItem.id, { props: { caption } })}
             onReplace={() => replaceInput.current?.click()}
-            onOriginal={photoItem.props.original ? () => void saveOriginal(photoItem.props.original!) : undefined}
+            onOriginal={photoItem.props.original || photoItem.props.originalId ? () => void saveOriginal(photoItem.props) : undefined}
           />
         )}
       </ToolSheet>
