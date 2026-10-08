@@ -8,7 +8,11 @@ import { defineConfig } from 'vite'
 // (needed for the Web Share API, clipboard, camera and service workers).
 const https = process.env.HTTPS === '1'
 
+// shown in Settings so it is obvious which version a phone is running
+const BUILD = new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC'
+
 export default defineConfig({
+  define: { __BUILD__: JSON.stringify(BUILD) },
   server: { host: true, port: 5173 },
   preview: { host: true, port: 4173 },
   plugins: [
@@ -17,6 +21,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: false, // registered from main.tsx so we can reload as soon as an update is ready
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'Memory Tale',
@@ -34,6 +39,9 @@ export default defineConfig({
         ],
       },
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         runtimeCaching: [
           {

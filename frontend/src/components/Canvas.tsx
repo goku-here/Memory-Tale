@@ -57,7 +57,7 @@ function MenuItem({ icon, label, onClick, danger }: { icon: ReactNode; label: st
 
 const HEADER_H = 116
 /** phones open photos with a tap; the expand button is only for mouse users */
-const HAS_MOUSE = typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches
+const hasMouse = () => typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches && !window.matchMedia('(pointer: coarse)').matches
 
 export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, reveal }: CanvasProps) {
   const theme = getTheme(memory.themeId)
@@ -84,6 +84,9 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   const [captionFocus, setCaptionFocus] = useState(false)
   const [editMapId, setEditMapId] = useState<string | null>(null)
   const [viewer, setViewer] = useState<{ images: ViewerImage[]; start: number } | null>(null)
+  const lastPointer = useRef<string>('mouse')
+  const suppressClick = useRef(false)
+  const viewTimer = useRef(0)
   const [busy, setBusy] = useState<{ done: number; total: number } | null>(null)
   const [connectFrom, setConnectFrom] = useState<string | null>(null)
   const slotInput = useRef<HTMLInputElement>(null)
@@ -145,7 +148,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   const { startItem: rawStart, startHandle } = useGestures({
     surfaceRef: surface, scrollerRef: scroller, itemsRef, heightRef, live, begin, end,
     onSelect: setSelectedId, onDragging: setDraggingId,
-    onTap: (id) => viewItem(id),
+    onHold: () => { suppressClick.current = true },
     isSelected: (id) => selectedIdRef.current === id,
     topInset: HEADER_H + 40, bottomInset: 130,
     onDoubleTap: (id) => {
@@ -155,6 +158,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       else if (it.type === 'text') openText()
       else if (it.type === 'note' || it.type === 'divider') { begin(); setEditingId(id) }
       else if (it.type === 'bubble') openBubble()
+      window.clearTimeout(viewTimer.current)
     },
   })
 
@@ -194,6 +198,16 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     const it = itemsRef.current.find((i) => i.id === id)
     if (it?.type === 'photo') openViewer(id)
   }
+  /** phones: a tap opens a photo (the click event, so nothing can race with it) */
+  const onItemClick = useCallback((id: string) => {
+    if (lastPointer.current !== 'touch' || suppressClick.current) return
+    const it = itemsRef.current.find((i) => i.id === id)
+    if (it?.type !== 'photo') return
+    window.clearTimeout(viewTimer.current)
+    // on an already-selected photo wait briefly: a double-tap means "edit frame" instead
+    viewTimer.current = window.setTimeout(() => openViewer(id), selectedIdRef.current === id ? 320 : 0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const startItemRef = useRef(startItem)
   startItemRef.current = startItem
   // stable identities keep the memoised items from re-rendering on every drag frame
@@ -446,7 +460,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     onConnect: () => { setConnectFrom(selected.id); toast('Tap another item to tie the thread') },
     onForward: () => reorder(1),
     onBackward: () => reorder(-1),
-    onView: selected.type === 'photo' && HAS_MOUSE ? () => viewItem(selected.id) : undefined,
+    onView: selected.type === 'photo' && hasMouse() ? () => viewItem(selected.id) : undefined,
     onFrame: selected.type === 'photo' ? () => openFrame() : undefined,
     onReplace: selected.type === 'photo' ? () => replaceInput.current?.click() : undefined,
     onColor: selected.type === 'note' ? (color: string) => patch(selected.id, { props: { color } }, true) : undefined,
@@ -523,6 +537,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   return (
     <motion.div
       className="fixed inset-0 z-40"
+      onPointerDownCapture={(e) => { lastPointer.current = e.pointerType; suppressClick.current = false }}
       style={{ ...themeVars(theme), background: theme.canvasBg, pointerEvents: reveal ? 'none' : undefined, clipPath: clip }}
       initial={{ opacity: reveal ? 1 : 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.06 } }}
       transition={{ duration: 0.22 }}
@@ -617,6 +632,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
                   selected={selectedId === it.id}
                   onSlot={onSlot}
                   onViewSlot={onViewSlot}
+                  onItemClick={onItemClick}
                   dragging={draggingId === it.id}
                   editing={editingId === it.id}
                   onPointerDown={startItemStable}

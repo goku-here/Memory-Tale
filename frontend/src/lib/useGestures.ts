@@ -33,6 +33,8 @@ export interface GestureOptions {
   onSelect: (id: string) => void
   onDragging: (id: string | null) => void
   onDoubleTap?: (id: string) => void
+  /** an item was picked up by a long press (the click that follows the release must be ignored) */
+  onHold?: () => void
   /** a quick touch tap on an item that was not picked up (no hold) */
   onTap?: (id: string) => void
   /** already-selected items can be dragged straight away on touch */
@@ -289,6 +291,7 @@ export function useGestures(opts: GestureOptions) {
           const pos = { x: hold.current?.x ?? p.x, y: hold.current?.y ?? p.y }
           cancelHold()
           navigator.vibrate?.(18)
+          o.current.onHold?.()
           activate(pid, pos, id, 'drag', true, true)
         }, HOLD_MS),
       }

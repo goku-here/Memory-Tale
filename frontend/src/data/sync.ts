@@ -261,6 +261,8 @@ export interface Invite {
   cover: Memory['cover']
   ownerName: string
   ownerPhoto?: string
+  /** the real accounts in the book when the link was made (shown on the cover) */
+  members?: Memory['members']
 }
 interface Who { uid: string; name: string; photo?: string | null }
 
@@ -288,9 +290,15 @@ export async function createInvite(who: Who, m: Memory): Promise<string> {
   const cover = m.cover.type === 'image' && m.cover.value.length > 380_000
     ? { type: 'color' as const, value: m.cover.avg ?? '#9DB7D5', tone: m.cover.tone }
     : m.cover
+  // books made before signing in carry a placeholder "You" avatar: swap it for the real account
+  const color = m.members?.[0]?.color ?? '#17171a'
+  const real = (m.members ?? []).filter((x) => x.id !== 'me' && x.name !== 'You')
+  if (!real.some((x) => x.id === who.uid)) real.unshift({ id: who.uid, name: who.name, color, photo: who.photo ?? undefined })
+  const members = real.slice(0, 6)
+  try { await updateDoc(doc(d, 'memories', m.id), clean({ members, updatedAt: Date.now() })) } catch { /* guests can't rewrite the list; the invite still carries it */ }
   const invite = clean({
     memoryId: m.id, createdBy: who.uid, createdAt: Date.now(), title: m.title, themeId: m.themeId, date: m.date, cover,
-    ownerName: who.name, ownerPhoto: who.photo ?? undefined,
+    ownerName: who.name, ownerPhoto: who.photo ?? undefined, members,
   })
   await setDoc(doc(d, 'invites', token), invite)
   return `${publicBase()}/join/${token}`

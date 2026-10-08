@@ -16,6 +16,7 @@ interface ItemProps {
   selected: boolean
   onSlot: (id: string, index: number) => void
   onViewSlot: (id: string, index: number) => void
+  onItemClick: (id: string) => void
   dragging: boolean
   editing: boolean
   onPointerDown: (e: RPE, id: string) => void
@@ -92,7 +93,7 @@ export function ItemBody({
 }
 
 /** One item on the canvas. Positioned by centre (x in %, y in px). */
-export const CanvasItemView = memo(function CanvasItemView({ item, canvasW, selected, onSlot, onViewSlot, dragging, editing, onPointerDown, onMeasure, onEditText, onEditDone }: ItemProps) {
+export const CanvasItemView = memo(function CanvasItemView({ item, canvasW, selected, onSlot, onViewSlot, onItemClick, dragging, editing, onPointerDown, onMeasure, onEditText, onEditDone }: ItemProps) {
   const body = (
     <ItemBody item={item} editing={editing} selected={selected} onSlot={(i) => onSlot(item.id, i)} onView={(i) => onViewSlot(item.id, i)} onMeasure={onMeasure} onEditText={onEditText} onEditDone={onEditDone} />
   )
@@ -113,6 +114,7 @@ export const CanvasItemView = memo(function CanvasItemView({ item, canvasW, sele
       exit={{ scale: 0.6, opacity: 0, transition: { duration: 0.18 } }}
       transition={{ type: 'spring', stiffness: 420, damping: 22 }}
       onPointerDown={(e) => { if (!editing) onPointerDown(e, item.id) }}
+      onClick={() => onItemClick(item.id)}
       onContextMenu={(e) => e.preventDefault()}
     >
       <motion.div

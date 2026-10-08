@@ -105,7 +105,7 @@ export function InviteScreen({ token, knownIds, onJoined, onDismiss }: Props) {
 
   const first = (invite.ownerName || 'Someone').split(' ')[0]
   const busy = signing || joining
-  const book = { title: invite.title, themeId: invite.themeId, cover: invite.cover, date: invite.date }
+  const book = { title: invite.title, themeId: invite.themeId, cover: invite.cover, date: invite.date, members: invite.members }
 
   return (
     <ShareLayout

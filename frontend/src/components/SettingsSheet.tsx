@@ -95,7 +95,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
             <LogOut size={18} /> Sign out
           </motion.button>
         )}
-        <p className="m-0 text-center text-[12px] text-neutral-400">Memory Tale v1</p>
+        <p className="m-0 text-center text-[12px] text-neutral-400">Memory Tale · build {__BUILD__}</p>
       </div>
     </ToolSheet>
   )
