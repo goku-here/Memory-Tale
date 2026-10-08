@@ -95,7 +95,7 @@ async function uploadAssets(memoryId: string, urls: string[]) {
   }
 }
 
-async function loadAsset(memoryId: string, id: string): Promise<string | null> {
+export async function loadAssetData(memoryId: string, id: string): Promise<string | null> {
   const cached = await local.assets.get(id)
   if (cached) { idCache.set(cached.data, id); return cached.data }
   const d = getDb()
@@ -110,12 +110,12 @@ async function loadAsset(memoryId: string, id: string): Promise<string | null> {
   return data
 }
 
-async function resolveItem(memoryId: string, json: string): Promise<CanvasItem> {
-  const item = JSON.parse(json) as CanvasItem
+/** Replaces `asset:` references with real images (used for exports). */
+export async function resolveItemAssets(memoryId: string, item: CanvasItem): Promise<CanvasItem> {
   const refs = new Set<string>()
   swapAssets(item, (v) => { if (v.startsWith(REF)) refs.add(v.slice(REF.length)); return v })
   const map = new Map<string, string>()
-  await Promise.all([...refs].map(async (id) => { const data = await loadAsset(memoryId, id); if (data) map.set(id, data) }))
+  await Promise.all([...refs].map(async (id) => { const data = await loadAssetData(memoryId, id); if (data) map.set(id, data) }))
   return swapAssets(item, (v) => (v.startsWith(REF) ? map.get(v.slice(REF.length)) ?? '' : v))
 }
 
@@ -197,17 +197,24 @@ export async function pushCanvas(memoryId: string, items: CanvasItem[]) {
     ...changed.map((c) => ({ id: c.item.id, json: c.json as string | null })),
     ...gone.map((id) => ({ id, json: null })),
   ]
-  for (let i = 0; i < ops.length; i += 400) {
-    const b = writeBatch(d)
-    for (const op of ops.slice(i, i + 400)) {
-      const ref = doc(d, 'memories', memoryId, 'items', op.id)
-      if (op.json === null) b.delete(ref)
-      else b.set(ref, { json: op.json, updatedAt: Date.now() })
-    }
-    await b.commit()
-  }
+  // remember what we are sending *before* committing, so the local echo of our own write is recognised and ignored
+  const prev = new Map<string, string | undefined>([...changed.map((c) => c.item.id), ...gone].map((id) => [id, k.get(id)]))
   for (const c of changed) k.set(c.item.id, c.json)
   for (const id of gone) k.delete(id)
+  try {
+    for (let i = 0; i < ops.length; i += 400) {
+      const b = writeBatch(d)
+      for (const op of ops.slice(i, i + 400)) {
+        const ref = doc(d, 'memories', memoryId, 'items', op.id)
+        if (op.json === null) b.delete(ref)
+        else b.set(ref, { json: op.json, updatedAt: Date.now() })
+      }
+      await b.commit()
+    }
+  } catch (e) {
+    prev.forEach((v, id) => (v === undefined ? k.delete(id) : k.set(id, v))) // allow a retry on the next save
+    throw e
+  }
   setSyncStatus({ state: 'synced' })
 }
 
@@ -235,7 +242,8 @@ export function subscribeCanvas(
       }
       if (!upserts.length && !removed.length) return
       try {
-        const items = await Promise.all(upserts.map((u) => resolveItem(memoryId, u.json)))
+        // items keep their `asset:` references; the images load lazily when they come near the screen
+        const items = upserts.map((u) => JSON.parse(u.json) as CanvasItem)
         onChange(items, removed, isFirst, Math.max(0, ...upserts.map((u) => u.at)))
       } catch (e) { reportError(e) }
     },

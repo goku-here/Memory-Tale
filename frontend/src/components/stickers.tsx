@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { StickerProps } from '../types'
 import { PushPinArt } from './PushPin'
+import { AssetImg } from '../lib/assets'
 import { PACK_SVGS } from './stickerPacks'
 
 export type StickerCategory =
@@ -180,7 +181,7 @@ export function StickerArt({ sticker, width, preview }: { sticker: StickerProps;
       )}
       {sticker.kind === 'svg' && SVG_STICKERS[sticker.value]?.art}
       {sticker.kind === 'image' && (
-        <img src={sticker.value} alt="" draggable={false} className="pointer-events-none h-full w-full select-none object-contain" />
+        <AssetImg src={sticker.value} fit="contain" />
       )}
     </div>
   )

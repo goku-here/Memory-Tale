@@ -18,12 +18,32 @@ export function readAsDataURL(file: Blob): Promise<string> {
   })
 }
 
-/** Downscale + re-encode a picked file in the browser. */
+/** Encode a canvas as WebP when the browser supports it (Safari silently falls back to PNG), else JPEG. */
+function encode(c: HTMLCanvasElement, quality: number, type?: string) {
+  if (type) return c.toDataURL(type, quality)
+  const webp = c.toDataURL('image/webp', quality)
+  return webp.startsWith('data:image/webp') ? webp : c.toDataURL('image/jpeg', quality)
+}
+
+/** ~30 px wide blurred stand-in (a few hundred bytes) shown while the real photo loads. */
+function makeThumb(img: CanvasImageSource, w: number, h: number) {
+  const k = 32 / Math.max(w, h)
+  const c = document.createElement('canvas')
+  c.width = Math.max(2, Math.round(w * k))
+  c.height = Math.max(2, Math.round(h * k))
+  c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
+  return c.toDataURL('image/jpeg', 0.5)
+}
+
+/**
+ * Downscale + re-encode a picked file in the browser.
+ * Default is the small "shared copy": 1200 px WebP. Also returns a tiny blurred thumbnail.
+ */
 export async function compressImage(
   file: Blob,
   opts: { maxSize?: number; quality?: number; type?: string } = {},
-): Promise<{ dataUrl: string; width: number; height: number }> {
-  const { maxSize = 1600, quality = 0.8, type = 'image/jpeg' } = opts
+): Promise<{ dataUrl: string; width: number; height: number; thumb: string }> {
+  const { maxSize = 1200, quality = 0.78, type } = opts
   const url = URL.createObjectURL(file)
   try {
     const img = await loadImage(url)
@@ -34,7 +54,7 @@ export async function compressImage(
     c.width = w
     c.height = h
     c.getContext('2d')!.drawImage(img, 0, 0, w, h)
-    return { dataUrl: c.toDataURL(type, quality), width: w, height: h }
+    return { dataUrl: encode(c, quality, type), width: w, height: h, thumb: makeThumb(c, w, h) }
   } finally {
     URL.revokeObjectURL(url)
   }

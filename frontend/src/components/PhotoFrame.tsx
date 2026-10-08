@@ -1,6 +1,7 @@
 import { useId, type CSSProperties } from 'react'
 import type { FrameId, PhotoProps } from '../types'
 import { clamp, frameHeight } from '../lib/items'
+import { AssetImg } from '../lib/assets'
 
 export const FRAMES: { id: FrameId; label: string }[] = [
   { id: 'polaroid', label: 'Polaroid' },
@@ -20,12 +21,8 @@ const HEART = "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/
 
 const SOFT = '0 1px 2px rgba(40,30,30,.14), 0 8px 18px rgba(40,30,30,.16)'
 
-const imgStyle: CSSProperties = {
-  display: 'block', width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', userSelect: 'none',
-}
-
-function Img({ src, style }: { src: string; style?: CSSProperties }) {
-  return <img src={src} alt="" draggable={false} style={{ ...imgStyle, ...style }} />
+function Img({ src, thumb, style }: { src: string; thumb?: string; style?: CSSProperties }) {
+  return <AssetImg src={src} thumb={thumb} style={style} />
 }
 
 /** Perforated stamp edge, drawn as an SVG so the holes are real transparency. */
@@ -67,7 +64,7 @@ export function PhotoFrame({ photo, width }: { photo: PhotoProps; width: number 
       return (
         <div style={{ ...wrap, background: '#fff', borderRadius: r, boxShadow: SOFT }}>
           <div className="absolute overflow-hidden" style={{ left: '5.5cqw', top: '5.5cqw', width: '89cqw', height: `${89 / a}cqw`, borderRadius: Math.max(0, r * 0.4), background: '#eee' }}>
-            <Img src={src} />
+            <Img src={src} thumb={photo.thumb} />
           </div>
           <div
             className="absolute inset-x-0 flex items-center justify-center overflow-hidden px-[6cqw] text-center"
@@ -80,19 +77,19 @@ export function PhotoFrame({ photo, width }: { photo: PhotoProps; width: number 
     case 'rounded':
       return (
         <div style={{ ...wrap, background: '#fff', borderRadius: r, padding: '2.2cqw', boxShadow: SOFT }}>
-          <Img src={src} style={{ borderRadius: Math.max(0, r - width * 0.02) }} />
+          <Img src={src} thumb={photo.thumb} style={{ borderRadius: Math.max(0, r - width * 0.02) }} />
         </div>
       )
     case 'none':
       return (
         <div style={{ ...wrap, borderRadius: r, overflow: 'hidden', boxShadow: '0 1px 2px rgba(40,30,30,.12), 0 6px 14px rgba(40,30,30,.14)' }}>
-          <Img src={src} />
+          <Img src={src} thumb={photo.thumb} />
         </div>
       )
     case 'circle':
       return (
         <div style={{ ...wrap, background: '#fff', borderRadius: '50%', padding: '3.5cqw', boxShadow: SOFT }}>
-          <Img src={src} style={{ borderRadius: '50%' }} />
+          <Img src={src} thumb={photo.thumb} style={{ borderRadius: '50%' }} />
         </div>
       )
     case 'heart':
@@ -100,14 +97,14 @@ export function PhotoFrame({ photo, width }: { photo: PhotoProps; width: number 
         <div style={{ ...wrap, filter: 'drop-shadow(0 1px 2px rgba(40,30,30,.18)) drop-shadow(0 8px 12px rgba(40,30,30,.18))' }}>
           <div style={{ position: 'absolute', inset: 0, background: '#fff', WebkitMaskImage: HEART, maskImage: HEART, WebkitMaskSize: '100% 100%', maskSize: '100% 100%' }} />
           <div style={{ position: 'absolute', inset: '4cqw 4cqw 4cqw 4cqw', WebkitMaskImage: HEART, maskImage: HEART, WebkitMaskSize: '100% 100%', maskSize: '100% 100%' }}>
-            <Img src={src} />
+            <Img src={src} thumb={photo.thumb} />
           </div>
         </div>
       )
     case 'arch':
       return (
         <div style={{ ...wrap, background: '#fff', padding: '3.5cqw', borderRadius: '50cqw 50cqw 4cqw 4cqw', boxShadow: SOFT }}>
-          <Img src={src} style={{ borderRadius: '47cqw 47cqw 1cqw 1cqw' }} />
+          <Img src={src} thumb={photo.thumb} style={{ borderRadius: '47cqw 47cqw 1cqw 1cqw' }} />
         </div>
       )
     case 'film':
@@ -123,7 +120,7 @@ export function PhotoFrame({ photo, width }: { photo: PhotoProps; width: number 
             />
           ))}
           <div className="absolute overflow-hidden" style={{ left: '10cqw', right: '10cqw', top: '5cqw', bottom: '5cqw', borderRadius: 2 }}>
-            <Img src={src} />
+            <Img src={src} thumb={photo.thumb} />
           </div>
         </div>
       )
@@ -132,7 +129,7 @@ export function PhotoFrame({ photo, width }: { photo: PhotoProps; width: number 
         <div style={{ ...wrap, filter: 'drop-shadow(0 1px 2px rgba(40,30,30,.2)) drop-shadow(0 7px 10px rgba(40,30,30,.16))' }}>
           <StampBg w={width} h={h} />
           <div className="absolute overflow-hidden" style={{ left: '7cqw', right: '7cqw', top: '7cqw', bottom: '7cqw' }}>
-            <Img src={src} />
+            <Img src={src} thumb={photo.thumb} />
           </div>
         </div>
       )

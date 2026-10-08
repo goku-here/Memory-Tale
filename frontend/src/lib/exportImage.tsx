@@ -5,6 +5,7 @@ import { formatDate } from '../components/BookCard'
 import { getTheme } from '../components/ThemeEngine'
 import { ThreadsSvg } from '../components/Threads'
 import { repo } from '../data/repo'
+import { resolveItemAssets } from '../data/sync'
 import type { CanvasItem, Memory } from '../types'
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -60,7 +61,7 @@ function ExportView({ memory, items, width }: { memory: Memory; items: CanvasIte
 /** Renders the memory's canvas off-screen and returns it as one long PNG. */
 export async function exportMemoryPng(memory: Memory): Promise<Blob> {
   const doc = await repo.loadCanvas(memory.id)
-  const items = (doc?.items as CanvasItem[]) ?? []
+  const items = await Promise.all(((doc?.items as CanvasItem[]) ?? []).map((i) => resolveItemAssets(memory.id, i)))
   const width = Math.round(doc?.width ?? 390)
 
   const host = document.createElement('div')

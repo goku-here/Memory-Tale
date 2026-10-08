@@ -6,6 +6,7 @@ import { useCanvas } from '../data/useCanvas'
 import { uid } from '../lib/id'
 import { compressImage } from '../lib/image'
 import { downloadOriginal, uploadOriginal } from '../lib/supabase'
+import { AssetCtx } from '../lib/assets'
 import { bookEase, clipAt } from '../lib/bookTransition'
 import { clamp, cloneItem, frameHeight, nextZ, rnd } from '../lib/items'
 import { placeInOrder } from '../lib/layout'
@@ -96,6 +97,9 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   const sheetH = Math.max(0, ...Object.values(sheetHs))
 
   selectedIdRef.current = selectedId
+  const [scrollRoot, setScrollRoot] = useState<Element | null>(null)
+  useEffect(() => { setScrollRoot(scroller.current) }, [])
+  const assetCtx = useMemo(() => ({ memoryId: memory.id, root: scrollRoot }), [memory.id, scrollRoot])
   const selected = useMemo(() => items.find((i) => i.id === selectedId && i.type !== 'thread'), [items, selectedId])
   const selectedThread = useMemo(() => items.find((i): i is Extract<CanvasItem, { type: 'thread' }> => i.id === selectedId && i.type === 'thread'), [items, selectedId])
   const visibleItems = useMemo(() => items.filter((i) => i.type !== 'thread'), [items])
@@ -185,7 +189,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     const images: (ViewerImage & { y: number; x: number })[] = []
     for (const it of itemsRef.current) {
       if (it.type === 'photo') {
-        images.push({ key: it.id, src: it.props.src, original: it.props.original, caption: it.props.frame === 'polaroid' ? it.props.caption : undefined, y: it.y, x: it.x })
+        images.push({ key: it.id, src: it.props.src, thumb: it.props.thumb, original: it.props.original, caption: it.props.frame === 'polaroid' ? it.props.caption : undefined, y: it.y, x: it.x })
       } else if (it.type === 'clothesline') {
         it.props.photos.forEach((src, n) => { if (src) images.push({ key: `${it.id}#${n}`, src, y: it.y, x: it.x - 30 + n * 30 }) })
       }
@@ -263,7 +267,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       const imgs: Awaited<ReturnType<typeof compressImage>>[] = []
       for (let i = 0; i < list.length; i++) {
         setBusy({ done: i, total: list.length })
-        imgs.push(await compressImage(list[i], { maxSize: 1400, quality: 0.8 }))
+        imgs.push(await compressImage(list[i]))
       }
       setBusy({ done: list.length, total: list.length })
       const w = Math.round(clamp(canvasW * (imgs.length === 1 ? 0.52 : 0.4), 140, 230))
@@ -278,7 +282,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
         return [...cur, ...imgs.map((img, i) => ({
           id: ids[i], type: 'photo' as const, zIndex: z++, width: sizes[i].width, height: sizes[i].height, rotation: sizes[i].rotation,
           x: spots[i].x, y: spots[i].y,
-          props: { src: img.dataUrl, aspect: img.width / img.height, frame: 'polaroid' as FrameId, radius: 4, caption: '' },
+          props: { src: img.dataUrl, thumb: img.thumb, aspect: img.width / img.height, frame: 'polaroid' as FrameId, radius: 4, caption: '' },
         }))]
       })
       setSelectedId(ids[0])
@@ -322,9 +326,9 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     const target = itemsRef.current.find((i) => i.id === selectedId)
     if (!file || target?.type !== 'photo') return
     try {
-      const img = await compressImage(file, { maxSize: 1400, quality: 0.8 })
+      const img = await compressImage(file)
       const aspect = img.width / img.height
-      patch(target.id, { height: frameHeight(target.props.frame, target.width, aspect), props: { src: img.dataUrl, aspect, original: undefined } }, true)
+      patch(target.id, { height: frameHeight(target.props.frame, target.width, aspect), props: { src: img.dataUrl, thumb: img.thumb, aspect, original: undefined } }, true)
       if (user) void uploadOriginal(file, `${user.uid}/${memory.id}`).then((path) => { if (path) patch(target.id, { props: { original: path } }) })
     } catch {
       toast("Couldn't read that photo")
@@ -535,6 +539,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   const photoItem = selected?.type === 'photo' ? selected : undefined
 
   return (
+    <AssetCtx.Provider value={assetCtx}>
     <motion.div
       className="fixed inset-0 z-40"
       onPointerDownCapture={(e) => { lastPointer.current = e.pointerType; suppressClick.current = false }}
@@ -731,7 +736,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       <input ref={replaceInput} type="file" accept="image/*" hidden onChange={(e) => { void replacePhoto(e.target.files?.[0]); e.target.value = '' }} />
 
       <AnimatePresence>
-        {viewer && <Lightbox key="viewer" images={viewer.images} start={viewer.start} onClose={() => setViewer(null)} />}
+        {viewer && <Lightbox key="viewer" memoryId={memory.id} images={viewer.images} start={viewer.start} onClose={() => setViewer(null)} />}
       </AnimatePresence>
 
       <BottomToolbar visible={!sheet && !editingId} accent={accent} onTool={onTool} />
@@ -802,5 +807,6 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
         />
       </ToolSheet>
     </motion.div>
+    </AssetCtx.Provider>
   )
 }

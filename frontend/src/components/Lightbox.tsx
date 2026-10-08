@@ -2,16 +2,19 @@ import { animate, motion, useMotionValue, useTransform } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { downloadOriginal } from '../lib/supabase'
+import { resolveRef } from '../lib/assets'
 
 export interface ViewerImage {
   key: string
   src: string
+  thumb?: string
   /** storage path of the full-quality original, if there is one */
   original?: string
   caption?: string
 }
 
 interface Props {
+  memoryId: string
   images: ViewerImage[]
   start: number
   onClose: () => void
@@ -27,10 +30,11 @@ const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.
  * Pinch / wheel / double-tap to zoom, drag to pan when zoomed, swipe sideways for the next photo,
  * swipe down (or tap the dark area, or press Esc) to close.
  */
-export function Lightbox({ images, start, onClose }: Props) {
+export function Lightbox({ memoryId, images, start, onClose }: Props) {
   const [i, setI] = useState(Math.min(start, images.length - 1))
   const [dir, setDir] = useState(0)
   const [zoomed, setZoomed] = useState(false)
+  const [shown, setShown] = useState<string | null>(null)
   const cur = images[i]
 
   const scale = useMotionValue(1)
@@ -42,6 +46,14 @@ export function Lightbox({ images, start, onClose }: Props) {
   const openedAt = useRef(performance.now())
   /** touches in the first moments belong to the tap that opened the viewer */
   const settling = () => performance.now() - openedAt.current < 450
+
+  // the synced copy may still be an `asset:` reference: resolve it, showing the blurred preview meanwhile
+  useEffect(() => {
+    let alive = true
+    setShown(null)
+    void resolveRef(memoryId, cur.src).then((d) => { if (alive && d) setShown(d) })
+    return () => { alive = false }
+  }, [memoryId, cur.src])
 
   /* ---- full-quality original replaces the synced copy when it arrives ---- */
   const originals = useRef(new Map<string, string>())
@@ -236,9 +248,9 @@ export function Lightbox({ images, start, onClose }: Props) {
         >
           <motion.img
             ref={imgRef}
-            src={full ?? cur.src} alt={cur.caption || `Photo ${i + 1}`} draggable={false}
+            src={full ?? shown ?? cur.thumb ?? ''} alt={cur.caption || `Photo ${i + 1}`} draggable={false}
             className="max-h-[86vh] max-w-full rounded-lg object-contain shadow-2xl"
-            style={{ scale, x, y, cursor: zoomed ? 'grab' : 'zoom-in', transformOrigin: 'center' }}
+            style={{ scale, x, y, cursor: zoomed ? 'grab' : 'zoom-in', transformOrigin: 'center', filter: full || shown ? undefined : 'blur(10px)', minWidth: 120, minHeight: 120 }}
           />
           {cur.caption && !zoomed && (
             <figcaption className="mt-3 text-center text-white/80" style={{ fontFamily: "'Caveat', cursive", fontSize: 20 }}>{cur.caption}</figcaption>

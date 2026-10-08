@@ -58,6 +58,10 @@ export interface PhotoProps {
   caption: string
   /** storage path of the full-quality original (Supabase `originals` bucket) */
   original?: string
+  /** id of the original's record (originals live in members' Google Drives) */
+  originalId?: string
+  /** tiny blurred preview (data URL) shown while the photo loads */
+  thumb?: string
 }
 export interface StickerProps {
   kind: 'emoji' | 'svg' | 'image'

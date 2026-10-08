@@ -1,4 +1,5 @@
 import { Plus } from 'lucide-react'
+import { AssetImg } from '../lib/assets'
 import { useRef } from 'react'
 import type { ClotheslineProps } from '../types'
 
@@ -42,7 +43,7 @@ export function ClotheslineBody({
             >
               <div className="relative grid w-full place-items-center overflow-hidden" style={{ aspectRatio: '1', background: '#ececef' }}>
                 {src ? (
-                  <img src={src} alt="" draggable={false} className="pointer-events-none h-full w-full select-none object-cover" />
+                  <AssetImg src={src} />
                 ) : (
                   <span className="grid place-items-center rounded-full text-neutral-400" style={{ width: '9cqw', height: '9cqw', border: '.5cqw dashed #b5b5bd' }}>
                     <Plus style={{ width: '5cqw', height: '5cqw' }} strokeWidth={3} />
