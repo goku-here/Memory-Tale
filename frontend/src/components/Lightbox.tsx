@@ -39,6 +39,9 @@ export function Lightbox({ images, start, onClose }: Props) {
   const dim = useMotionValue(0.92)
   const bg = useTransform(dim, (v) => `rgba(0,0,0,${v})`)
   const imgRef = useRef<HTMLImageElement>(null)
+  const openedAt = useRef(performance.now())
+  /** touches in the first moments belong to the tap that opened the viewer */
+  const settling = () => performance.now() - openedAt.current < 450
 
   /* ---- full-quality original replaces the synced copy when it arrives ---- */
   const originals = useRef(new Map<string, string>())
@@ -124,7 +127,7 @@ export function Lightbox({ images, start, onClose }: Props) {
   }
 
   const onDown = (e: React.PointerEvent) => {
-    if ((e.target as HTMLElement).closest('button')) return
+    if (settling() || (e.target as HTMLElement).closest('button')) return
     e.currentTarget.setPointerCapture(e.pointerId)
     ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     const st = g.current
@@ -169,6 +172,7 @@ export function Lightbox({ images, start, onClose }: Props) {
 
   const onUp = (e: React.PointerEvent) => {
     if (!ptrs.current.has(e.pointerId)) return
+    if (settling()) { ptrs.current.delete(e.pointerId); g.current.mode = 'none'; return }
     ptrs.current.delete(e.pointerId)
     const st = g.current
     if (st.mode === 'pinch') {
@@ -243,7 +247,7 @@ export function Lightbox({ images, start, onClose }: Props) {
       </div>
 
       <button
-        type="button" aria-label="Close" onClick={onClose}
+        type="button" aria-label="Close" onClick={() => { if (!settling()) onClose() }}
         className="absolute right-4 grid h-11 w-11 place-items-center rounded-full border-0 bg-white/15 text-white backdrop-blur active:scale-95"
         style={{ top: 'calc(var(--safe-top) + 14px)' }}
       >

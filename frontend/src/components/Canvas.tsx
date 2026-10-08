@@ -56,6 +56,8 @@ function MenuItem({ icon, label, onClick, danger }: { icon: ReactNode; label: st
 }
 
 const HEADER_H = 116
+/** phones open photos with a tap; the expand button is only for mouse users */
+const HAS_MOUSE = typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches
 
 export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, reveal }: CanvasProps) {
   const theme = getTheme(memory.themeId)
@@ -444,7 +446,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     onConnect: () => { setConnectFrom(selected.id); toast('Tap another item to tie the thread') },
     onForward: () => reorder(1),
     onBackward: () => reorder(-1),
-    onView: selected.type === 'photo' ? () => viewItem(selected.id) : undefined,
+    onView: selected.type === 'photo' && HAS_MOUSE ? () => viewItem(selected.id) : undefined,
     onFrame: selected.type === 'photo' ? () => openFrame() : undefined,
     onReplace: selected.type === 'photo' ? () => replaceInput.current?.click() : undefined,
     onColor: selected.type === 'note' ? (color: string) => patch(selected.id, { props: { color } }, true) : undefined,
