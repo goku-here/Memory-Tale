@@ -3,13 +3,17 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './data/useAuth'
+import { PrivacyPage, TermsPage } from './components/LegalPages'
 import { registerSW } from 'virtual:pwa-register'
 
+const path = window.location.pathname.replace(/\/+$/, '')
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
+    {path === '/privacy' ? <PrivacyPage /> : path === '/terms' ? <TermsPage /> : (
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    )}
   </StrictMode>,
 )
 
