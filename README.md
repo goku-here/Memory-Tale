@@ -76,3 +76,21 @@ Later hardening: put uploads behind a Supabase Edge Function that verifies the F
 "Share memory" creates a brand-new link every time (`/join/<token>`). Whoever opens it sees a preview of the book,
 signs in with Google and becomes a member who can view and edit it live. Members can leave a book; only the owner deletes it for everyone.
 After changing `backend/firestore.rules`, publish them again (Firestore → Rules → Publish).
+
+## Originals on Google Drive
+
+Photos are shown from a small shared copy (about 1200 px WebP in Firestore, with a tiny blurred preview that loads first and
+real images fetched only near the screen). The full-quality original is saved to the uploader's own Google Drive ("Memory Tale" folder,
+`drive.file` permission) through a queue that survives closing the app. Each photo has a record at `memories/{id}/originals/{photoId}`
+listing who holds a copy; members can keep their own copy (Settings, or the prompt when opening a shared book), deleted copies are repaired
+from another member's, and **Download book** in the book menu builds ZIP file(s) of the originals.
+
+Setup (Google Cloud Console, project `memory-tale`):
+1. APIs & Services -> Library -> enable **Google Drive API**.
+2. OAuth consent screen: external, add scope `.../auth/drive.file`, add test users while in Testing.
+3. Credentials -> the auto-created **Web client** -> add authorized JavaScript origins (`http://localhost:5173`, your Vercel URL). Copy the client ID.
+4. Credentials -> **API key**, restricted to the Drive API and your site addresses.
+5. Put `VITE_GOOGLE_CLIENT_ID` and `VITE_GOOGLE_API_KEY` in `frontend/.env.local` and in Vercel's environment variables.
+6. Publish `backend/firestore.rules` again (adds the `originals` records).
+
+For local testing without Google, set `VITE_DRIVE_MOCK=1` in `.env.local` (Settings shows TEST MODE).
