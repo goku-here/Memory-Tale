@@ -20,6 +20,11 @@ export function useMemories() {
   }, [])
 
   useEffect(() => { void refresh() }, [refresh])
+  useEffect(() => {
+    const on = () => { void refresh() }
+    window.addEventListener('mt-local-changed', on)
+    return () => window.removeEventListener('mt-local-changed', on)
+  }, [refresh])
 
   /* ---- cloud: pull changes, upload existing local books on first sign-in ---- */
   useEffect(() => {

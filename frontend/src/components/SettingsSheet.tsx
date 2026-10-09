@@ -6,7 +6,7 @@ import { renameEverywhere } from '../data/people'
 import { getSyncStatus, onSyncStatus } from '../data/sync'
 import { DriveSettings } from './DriveSettings'
 import { ToolSheet } from './ToolSheet'
-import { toast } from './ui'
+import { ConfirmDialog, toast } from './ui'
 import { tour } from '../lib/tour'
 
 function GoogleG() {
@@ -23,6 +23,7 @@ function GoogleG() {
 export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { configured, loading, user, signIn, logOut, rename } = useAuth()
   const [editing, setEditing] = useState(false)
+  const [confirmOut, setConfirmOut] = useState(false)
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const saveName = async () => {
@@ -133,7 +134,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
 
         {user && (
           <motion.button
-            type="button" whileTap={{ scale: 0.96 }} onClick={() => void logOut()}
+            type="button" whileTap={{ scale: 0.96 }} onClick={() => setConfirmOut(true)}
             className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full border-0 bg-neutral-100 text-[15px] font-semibold text-[#d6455d]"
           >
             <LogOut size={18} /> Sign out
@@ -144,6 +145,11 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
           <a href="/privacy" className="text-neutral-500">Privacy</a> · <a href="/terms" className="text-neutral-500">Terms</a> · <a href="/licenses" className="text-neutral-500">Licenses</a>
         </p>
       </div>
+      <ConfirmDialog
+        open={confirmOut} title="Sign out?" confirmLabel="Sign out"
+        message="Your books are safe in the cloud. They will be removed from this device and come back when you sign in again."
+        onCancel={() => setConfirmOut(false)} onConfirm={() => { setConfirmOut(false); onClose(); void logOut() }}
+      />
     </ToolSheet>
   )
 }

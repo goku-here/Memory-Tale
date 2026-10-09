@@ -1,5 +1,6 @@
 import { onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut, updateProfile, type User } from 'firebase/auth'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { adoptAccount, wipeLocalAccount } from './account'
 import { firebaseConfigured, getFirebaseAuth, googleProvider } from '../lib/firebase'
 
 export interface Profile {
@@ -36,8 +37,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const auth = getFirebaseAuth()
     if (!auth) return
     return onAuthStateChanged(auth, (u) => {
-      setUser(u ? toProfile(u) : null)
-      setLoading(false)
+      // switching accounts: clear the other account's books before this one is shown
+      void (u ? adoptAccount(u.uid).catch(() => {}) : Promise.resolve()).then(() => {
+        setUser(u ? toProfile(u) : null)
+        setLoading(false)
+      })
     })
   }, [])
 
@@ -61,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logOut = useCallback(async () => {
     const auth = getFirebaseAuth()
-    if (auth) await signOut(auth)
+    if (auth) { await signOut(auth); await wipeLocalAccount() }
   }, [])
 
   const rename = useCallback(async (name: string) => {
