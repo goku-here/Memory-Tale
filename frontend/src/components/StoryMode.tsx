@@ -125,6 +125,20 @@ export function downloadBlob(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000)
 }
 
+/** A half-size copy for the preview: the browser's own 6x downscale of the full image makes thin strokes look faint. */
+async function thumbnail(blob: Blob): Promise<Blob> {
+  try {
+    const bmp = await createImageBitmap(blob)
+    const c = document.createElement('canvas')
+    c.width = 540
+    c.height = 960
+    const ctx = c.getContext('2d')!
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(bmp, 0, 0, 540, 960)
+    return await new Promise<Blob>((res) => c.toBlob((b) => res(b ?? blob), 'image/png'))
+  } catch { return blob }
+}
+
 interface PreviewProps {
   open: boolean
   onClose: () => void
@@ -150,7 +164,7 @@ export function StoryPreview({ open, onClose, memory, accent, getItems, frameY, 
     setState(null)
     setErr(false)
     exportStoryPng(memory, getItems(), { frameY, canvasW, dots, mark })
-      .then((blob) => { if (!alive) return; made = URL.createObjectURL(blob); setState({ blob, url: made }) })
+      .then(async (blob) => { const small = await thumbnail(blob); if (!alive) return; made = URL.createObjectURL(small); setState({ blob, url: made }) })
       .catch(() => { if (alive) setErr(true) })
     return () => { alive = false; if (made) URL.revokeObjectURL(made) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -178,7 +192,7 @@ export function StoryPreview({ open, onClose, memory, accent, getItems, frameY, 
   return (
     <ToolSheet open={open} onClose={onClose} title="Story preview" snaps={[0.92]} z={85}>
       <div className="space-y-3 px-6 pb-5">
-        <div className="mx-auto grid place-items-center overflow-hidden rounded-2xl bg-neutral-100" style={{ aspectRatio: '9 / 16', height: 'min(46vh, 420px)' }}>
+        <div className="mx-auto grid place-items-center overflow-hidden rounded-2xl bg-neutral-100" style={{ aspectRatio: '9 / 16', height: 'min(52vh, 480px)' }}>
           {state ? <img src={state.url} alt="Your story" className="h-full w-full object-contain" />
             : err ? (
               <div className="px-4 text-center text-[13.5px] font-semibold text-neutral-500">
