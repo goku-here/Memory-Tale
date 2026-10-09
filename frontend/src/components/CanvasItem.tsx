@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { BringToFront, Check, Copy, Frame, Maximize2, MapPin, Palette, Pencil, Replace, RotateCw, SendToBack, Spline, Trash2 } from 'lucide-react'
+import { BringToFront, Check, Copy, Frame, Maximize2, MapPin, Palette, Pencil, RotateCw, SendToBack, Spline, Trash2 } from 'lucide-react'
 import { memo, useLayoutEffect, useRef, useState, type PointerEvent as RPE } from 'react'
 import type { CanvasItem } from '../types'
 import { BubbleBody } from './Bubble'
@@ -138,7 +138,6 @@ export interface SelectionActions {
   onBackward: () => void
   onEdit?: () => void
   onFrame?: () => void
-  onReplace?: () => void
   onConnect?: () => void
   onView?: () => void
   onColor?: (color: string) => void
@@ -163,7 +162,7 @@ export function SelectionOverlay({
   const rad = (item.rotation * Math.PI) / 180
   const hh = (Math.abs(item.width * Math.sin(rad)) + Math.abs(item.height * Math.cos(rad))) / 2
   const [colorsOpen, setColorsOpen] = useState(false)
-  const nButtons = 4 + (actions.onEdit ? 1 : 0) + (actions.onFrame ? 1 : 0) + (actions.onReplace ? 1 : 0) + (actions.onConnect ? 1 : 0) + (actions.onView ? 1 : 0) + (actions.onColor ? 1 : 0)
+  const nButtons = 4 + (actions.onEdit ? 1 : 0) + (actions.onFrame ? 1 : 0) + (actions.onConnect ? 1 : 0) + (actions.onView ? 1 : 0) + (actions.onColor ? 1 : 0)
   const tbW = nButtons * 44 + 16
   const above = item.y - hh - 62
   const placeAbove = above > topLimit
@@ -224,7 +223,6 @@ export function SelectionOverlay({
         >
           {actions.onView && <TB label="View full size" onClick={actions.onView}><Maximize2 size={18} /></TB>}
           {actions.onFrame && <TB label="Frame" onClick={actions.onFrame}><Frame size={19} /></TB>}
-          {actions.onReplace && <TB label="Change photo" onClick={actions.onReplace}><Replace size={19} /></TB>}
           {actions.onColor && <TB label="Note colour" onClick={() => setColorsOpen((v) => !v)}><Palette size={19} /></TB>}
           {actions.onEdit && <TB label="Edit" onClick={actions.onEdit}><Pencil size={18} /></TB>}
           {actions.onConnect && <TB label="Tie with thread" onClick={actions.onConnect}><Spline size={19} /></TB>}

@@ -500,7 +500,6 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     onBackward: () => reorder(-1),
     onView: selected.type === 'photo' && hasMouse() ? () => viewItem(selected.id) : undefined,
     onFrame: selected.type === 'photo' ? () => openFrame() : undefined,
-    onReplace: selected.type === 'photo' ? () => replaceInput.current?.click() : undefined,
     onColor: selected.type === 'note' ? (color: string) => patch(selected.id, { props: { color } }, true) : undefined,
     onEdit:
       selected.type === 'map' ? () => { setEditMapId(selected.id); setSheet('location') }
