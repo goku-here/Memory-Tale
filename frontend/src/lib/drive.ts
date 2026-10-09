@@ -177,3 +177,12 @@ export async function myFileExists(fileId: string): Promise<boolean | null> {
     return !(await r.json()).trashed
   } catch { return null }
 }
+
+/** Permanently delete one of my files (404 = already gone, which is fine). */
+export async function deleteFromDrive(fileId: string) {
+  if (driveMock) { await db.mockDrive.delete(fileId); return }
+  const t = await getToken(false)
+  if (!t) throw new DriveError(401, 'Drive is not connected')
+  const r = await fetch(`${API}/files/${fileId}`, { method: 'DELETE', headers: auth(t) })
+  if (!r.ok && r.status !== 404) throw new DriveError(r.status, `Drive ${r.status}`)
+}

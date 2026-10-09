@@ -7,7 +7,8 @@ import { uid } from '../lib/id'
 import { compressImage } from '../lib/image'
 import { uploadOriginal } from '../lib/supabase'
 import { connectDrive, driveConfigured, isConnected } from '../lib/drive'
-import { loadOriginalBlob, missingCopies, prefs, queueOriginal, replicateBook } from '../data/originals'
+import { discardOriginal, loadOriginalBlob, markForDiscard, missingCopies, prefs, purgeFlagged, queueOriginal, replicateBook, runPendingDiscards, unmarkDiscard } from '../data/originals'
+import { reportError } from '../data/sync'
 import { downloadBookZip } from '../lib/zipBook'
 import { AssetCtx } from '../lib/assets'
 import { bookEase, clipAt } from '../lib/bookTransition'
@@ -548,6 +549,40 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   }, [selected, sheet, viewer])
 
   const run = (fn: () => void) => () => { setMenu(false); fn() }
+
+  /* ---------- a deleted/replaced photo takes its stored original with it ---------- */
+  const prevPhotos = useRef(new Map<string, string | undefined>())
+  const discardTimers = useRef(new Map<string, number>())
+  const usedOriginal = useCallback((oid: string) => itemsRef.current.some((i) => i.type === 'photo' && i.props.originalId === oid), [itemsRef])
+
+  useEffect(() => {
+    if (!cv.loaded) return
+    const cur = new Map<string, string | undefined>()
+    for (const it of items) if (it.type === 'photo') cur.set(it.id, it.props.originalId)
+    prevPhotos.current.forEach((oid, id) => {
+      if (!oid || (cur.has(id) && cur.get(id) === oid)) return
+      markForDiscard(memory.id, oid)
+      window.clearTimeout(discardTimers.current.get(oid))
+      // a minute of grace so Undo can bring it back
+      discardTimers.current.set(oid, window.setTimeout(() => {
+        discardTimers.current.delete(oid)
+        if (!user || usedOriginal(oid)) { unmarkDiscard(memory.id, oid); return }
+        void discardOriginal(memory.id, oid, user.uid).catch(reportError).finally(() => unmarkDiscard(memory.id, oid))
+      }, 60_000))
+    })
+    // restored (Undo): cancel the clean-up
+    cur.forEach((oid) => { if (oid && discardTimers.current.has(oid)) { window.clearTimeout(discardTimers.current.get(oid)); discardTimers.current.delete(oid); unmarkDiscard(memory.id, oid) } })
+    prevPhotos.current = cur
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, cv.loaded])
+
+  // on open: finish clean-ups that were interrupted, and delete my copies of originals other members removed
+  useEffect(() => {
+    if (!user || !cv.loaded) return
+    void runPendingDiscards(memory.id, user.uid, usedOriginal).catch(reportError)
+    void purgeFlagged(memory.id, user.uid).catch(reportError)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cv.loaded, user?.uid, memory.id])
 
   /* ---------- originals: copy shared books' originals to my Drive (or ask first) ---------- */
   useEffect(() => {

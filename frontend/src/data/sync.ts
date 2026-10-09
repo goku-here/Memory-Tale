@@ -164,7 +164,7 @@ export async function pushMemory(uid: string, m: Memory) {
 export async function deleteRemoteMemory(id: string) {
   const d = getDb()
   if (!d) return
-  for (const sub of ['items', 'assets']) {
+  for (const sub of ['items', 'assets', 'originals']) {
     const docs = await getDocs(collection(d, 'memories', id, sub))
     for (let i = 0; i < docs.docs.length; i += 400) {
       const b = writeBatch(d)
@@ -185,12 +185,17 @@ export async function pushCanvas(memoryId: string, items: CanvasItem[]) {
   if (!d) return
   const k = knownFor(memoryId)
   const changed: { item: CanvasItem; json: string }[] = []
+  const refsIn = (json?: string) => new Set(json ? json.match(/asset:[A-Za-z0-9]+/g) ?? [] : [])
   for (const item of items) {
     const json = toJson(item)
     if (k.get(item.id) !== json) changed.push({ item, json })
   }
   const gone = [...k.keys()].filter((id) => !items.some((i) => i.id === id))
   if (!changed.length && !gone.length) return
+  // shared copies that this change stops using (photo deleted or replaced): candidates for clean-up
+  const stale = new Set<string>()
+  for (const c of changed) { const now = refsIn(c.json); refsIn(k.get(c.item.id)).forEach((r) => { if (!now.has(r)) stale.add(r) }) }
+  for (const id of gone) refsIn(k.get(id)).forEach((r) => stale.add(r))
   setSyncStatus({ state: 'syncing' })
   await uploadAssets(memoryId, changed.flatMap((c) => dataUrlsOf(c.item)))
   const ops = [
@@ -216,6 +221,26 @@ export async function pushCanvas(memoryId: string, items: CanvasItem[]) {
     throw e
   }
   setSyncStatus({ state: 'synced' })
+  if (stale.size) scheduleAssetCleanup(memoryId, [...stale])
+}
+
+/** which books have received their first snapshot (clean-up must never run on a half-loaded picture of a book) */
+const loadedBooks = new Set<string>()
+
+/** After a grace period (so Undo still works), delete shared copies that no item refers to any more. */
+function scheduleAssetCleanup(memoryId: string, refs: string[]) {
+  window.setTimeout(async () => {
+    const d = getDb()
+    if (!d || !loadedBooks.has(memoryId)) return
+    const used = [...knownFor(memoryId).values()].join('\n')
+    for (const ref of refs) {
+      if (used.includes(ref)) continue
+      const id = ref.slice(REF.length)
+      try { await deleteDoc(doc(d, 'memories', memoryId, 'assets', id)) } catch (e) { reportError(e); continue }
+      uploaded.delete(`${memoryId}/${id}`)
+      await local.assets.delete(id).catch(() => {})
+    }
+  }, 60_000)
 }
 
 export function subscribeCanvas(
@@ -231,6 +256,7 @@ export function subscribeCanvas(
     async (snap) => {
       const isFirst = first
       first = false
+      loadedBooks.add(memoryId)
       const upserts: { json: string; at: number }[] = []
       const removed: string[] = []
       for (const c of snap.docChanges()) {

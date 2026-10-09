@@ -7,9 +7,9 @@
  * Every member can keep their own copy ("replicate"); the record lists who holds which file, so a
  * deleted copy can be restored from someone else's.
  */
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore'
+import { collection, deleteDoc, deleteField, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore'
 import { getDb } from '../lib/firebase'
-import { DriveError, downloadOwn, downloadShared, isConnected, myFileExists, shareByLink, uploadToDrive, getToken } from '../lib/drive'
+import { DriveError, deleteFromDrive, downloadOwn, downloadShared, isConnected, myFileExists, shareByLink, uploadToDrive, getToken } from '../lib/drive'
 import { downloadOriginal } from '../lib/supabase'
 import type { CanvasItem, PhotoProps } from '../types'
 import { uid as newId } from '../lib/id'
@@ -289,4 +289,52 @@ export async function migrateLegacyOriginals(uid: string, onProgress?: (done: nu
     onProgress?.(++n, jobs.length)
   }
   return { moved: n, total: jobs.length }
+}
+
+/* ---------- removing a photo removes its original too ---------- */
+const PENDING = (m: string) => `mt-discard:${m}`
+const readPending = (m: string): string[] => { try { return JSON.parse(localStorage.getItem(PENDING(m)) || '[]') } catch { return [] } }
+const writePending = (m: string, ids: string[]) => localStorage.setItem(PENDING(m), JSON.stringify([...new Set(ids)]))
+/** remember (across restarts) that this photo's original should be discarded unless it comes back */
+export function markForDiscard(memoryId: string, originalId: string) { writePending(memoryId, [...readPending(memoryId), originalId]) }
+export function unmarkDiscard(memoryId: string, originalId: string) { writePending(memoryId, readPending(memoryId).filter((x) => x !== originalId)) }
+export const pendingDiscards = (memoryId: string) => readPending(memoryId)
+
+/**
+ * The photo is gone from the canvas: delete my Drive copy, any upload still queued, and my entry in its record.
+ * If other members still hold copies the record is flagged, so their apps delete theirs the next time they open the book.
+ */
+export async function discardOriginal(memoryId: string, originalId: string, uid: string) {
+  await db.uploads.delete(originalId)
+  const d = getDb()
+  if (!d) return
+  const ref = doc(d, 'memories', memoryId, 'originals', originalId)
+  const rec = await getRecord(memoryId, originalId)
+  if (!rec) return
+  const mine = rec.copies[uid]
+  let mineGone = !mine
+  if (mine && isConnected()) {
+    try { await deleteFromDrive(mine.fileId); mineGone = true } catch (e) { if (e instanceof DriveError && e.status === 401) setStatus({ needsReconnect: true }); else reportError(e) }
+  }
+  const remaining = Object.keys(rec.copies).filter((u) => !(u === uid && mineGone))
+  if (!remaining.length) await deleteDoc(ref)
+  else await updateDoc(ref, { deleted: true, ...(mineGone && mine ? { [`copies.${uid}`]: deleteField() } : {}) })
+}
+
+/** Records other members flagged as deleted: remove my copy, and the record once nobody holds one. */
+export async function purgeFlagged(memoryId: string, uid: string) {
+  const c = col(memoryId)
+  if (!c || !isConnected()) return
+  const flagged = (await getDocs(query(c, where('deleted', '==', true)))).docs.map((x) => ({ ...(x.data() as OriginalRecord), id: x.id }))
+  for (const r of flagged) {
+    try { await discardOriginal(memoryId, r.id, uid) } catch (e) { reportError(e) }
+  }
+}
+
+/** Run discards that were scheduled earlier (e.g. the app was closed during the undo window). */
+export async function runPendingDiscards(memoryId: string, uid: string, stillUsed: (originalId: string) => boolean) {
+  for (const oid of readPending(memoryId)) {
+    if (!stillUsed(oid)) await discardOriginal(memoryId, oid, uid).catch(reportError)
+    unmarkDiscard(memoryId, oid)
+  }
 }
