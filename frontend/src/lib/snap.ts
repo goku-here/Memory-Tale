@@ -1,7 +1,7 @@
 import type { CanvasItem } from '../types'
 
 /** how close (px) an edge or centre must come to another item's before it snaps */
-export const SNAP = 7
+export const SNAP = 4
 
 export interface Guides {
   v: { x: number; y1: number; y2: number }[]
