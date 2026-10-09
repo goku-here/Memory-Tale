@@ -3,12 +3,19 @@ import type { StickerProps } from '../types'
 import { PushPinArt } from './PushPin'
 import { AssetImg } from '../lib/assets'
 import { PACK_SVGS } from './stickerPacks'
+import { BEAN_DRESSUP, BEAN_FEELINGS, BEAN_FUN, BEAN_SVGS } from './beanPack'
 
 export type StickerCategory =
-  | 'Love' | 'Comic' | 'Doodles' | 'Paper' | 'Words' | 'Travel' | 'Food' | 'Party' | 'Mood' | 'Nature' | 'Animals' | 'Decor'
-export const STICKER_CATEGORIES: StickerCategory[] = [
-  'Love', 'Comic', 'Doodles', 'Paper', 'Words', 'Travel', 'Food', 'Party', 'Mood', 'Nature', 'Animals', 'Decor',
-]
+  | 'Feelings' | 'Fun' | 'Dress-up'
+  | 'Love' | 'Mood' | 'Party' | 'Food' | 'Travel' | 'Nature' | 'Animals'
+  | 'Comic' | 'Words' | 'Doodles' | 'Paper' | 'Decor'
+
+/** How the sticker sheet is organised: characters, emoji, and sticker packs. */
+export const STICKER_GROUPS = [
+  { id: 'characters', label: 'Characters', categories: ['Feelings', 'Fun', 'Dress-up'] },
+  { id: 'emoji', label: 'Emoji', categories: ['Love', 'Mood', 'Party', 'Food', 'Travel', 'Nature', 'Animals'] },
+  { id: 'packs', label: 'Packs', categories: ['Comic', 'Words', 'Doodles', 'Paper', 'Decor'] },
+] as const satisfies readonly { id: string; label: string; categories: readonly StickerCategory[] }[]
 
 /** Hand-drawn style SVG stickers. `ratio` is width / height. */
 export const SVG_STICKERS: Record<string, { label: string; ratio: number; art: ReactNode }> = {
@@ -135,7 +142,7 @@ export const SVG_STICKERS: Record<string, { label: string; ratio: number; art: R
   },
 }
 
-Object.assign(SVG_STICKERS, PACK_SVGS)
+Object.assign(SVG_STICKERS, PACK_SVGS, BEAN_SVGS)
 
 export interface StickerDef extends StickerProps { label?: string }
 
@@ -144,6 +151,9 @@ const emojis = (s: string): StickerDef[] => [...new Intl.Segmenter('en', { granu
 const svgs = (...ids: string[]): StickerDef[] => ids.map((id) => ({ kind: 'svg' as const, value: id, label: SVG_STICKERS[id].label }))
 
 export const STICKERS: Record<StickerCategory, StickerDef[]> = {
+  Feelings: svgs(...BEAN_FEELINGS),
+  Fun: svgs(...BEAN_FUN),
+  'Dress-up': svgs(...BEAN_DRESSUP),
   Love: emojis('❤️💖💘💌💍🌹😍🥰💋💏🫶💞💕💝🧸'),
   Comic: [
     ...svgs('c-bump', 'c-peek', 'c-boom', 'c-pow', 'c-wow', 'c-gasp', 'c-sigh', 'c-mwah', 'c-gulp', 'c-zzz', 'c-shock', 'c-what'),
@@ -181,7 +191,7 @@ export function StickerArt({ sticker, width, preview }: { sticker: StickerProps;
       )}
       {sticker.kind === 'svg' && SVG_STICKERS[sticker.value]?.art}
       {sticker.kind === 'image' && (
-        <AssetImg src={sticker.value} fit="contain" />
+        <AssetImg src={sticker.value} fit="contain" bare />
       )}
     </div>
   )

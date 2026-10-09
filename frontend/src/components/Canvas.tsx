@@ -140,15 +140,15 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   }, [commit, live])
 
   /** centre of the part of the canvas that is currently visible (above any open sheet) */
-  const viewCenter = useCallback(() => {
+  const viewCenter = useCallback((ignoreSheet = false) => {
     const r = surface.current!.getBoundingClientRect()
     const top = HEADER_H + 20
-    const bottom = window.innerHeight - Math.max(sheetH, 110)
+    const bottom = window.innerHeight - (ignoreSheet ? 110 : Math.max(sheetH, 110))
     return { x: 50, y: Math.max(160, (top + bottom) / 2 - r.top) }
   }, [sheetH])
 
-  const addItem = useCallback((make: (z: number, c: { x: number; y: number }) => CanvasItem, opts: { record?: boolean } = {}) => {
-    const c = viewCenter()
+  const addItem = useCallback((make: (z: number, c: { x: number; y: number }) => CanvasItem, opts: { record?: boolean; ignoreSheet?: boolean } = {}) => {
+    const c = viewCenter(opts.ignoreSheet)
     const id = uid()
     const fn = (list: CanvasItem[]) => [...list, { ...make(nextZ(list), c), id }]
     opts.record === false ? live(fn) : commit(fn)
@@ -373,7 +373,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     addItem((z, c) => ({
       id: '', type: 'sticker', zIndex: z, x: c.x + rnd(-14, 14), y: c.y + rnd(-30, 30),
       width: w, height: w / ratio, rotation: Math.round(rnd(-12, 12)), props: s,
-    }))
+    }), { ignoreSheet: true })
+    setSheet(null) // close the tray so the new sticker is visible
   }
 
   const addText = () => {

@@ -41,6 +41,8 @@ interface Props {
   /** tiny blurred preview shown instantly while the real image loads */
   thumb?: string
   fit?: 'cover' | 'contain'
+  /** transparent artwork (stickers): never paint a placeholder box behind it */
+  bare?: boolean
   style?: CSSProperties
   alt?: string
 }
@@ -49,7 +51,7 @@ interface Props {
  * Image that understands `asset:<id>` references: shows the blurred preview straight away and
  * downloads the real picture only when it is near the screen. Plain data URLs render directly.
  */
-export function AssetImg({ src, thumb, fit = 'cover', style, alt = '' }: Props) {
+export function AssetImg({ src, thumb, fit = 'cover', bare, style, alt = '' }: Props) {
   const { memoryId, root } = useContext(AssetCtx)
   const needs = isRef(src)
   const [data, setData] = useState<string | null>(() => (needs ? mem.get(src.slice(REF.length)) ?? null : src))
@@ -68,7 +70,7 @@ export function AssetImg({ src, thumb, fit = 'cover', style, alt = '' }: Props) 
 
   const layer: CSSProperties = { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: fit, pointerEvents: 'none', userSelect: 'none' }
   return (
-    <span ref={boxRef} style={{ display: 'block', position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: thumb ? undefined : '#e9e9ee', ...style }}>
+    <span ref={boxRef} style={{ display: 'block', position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: bare || thumb || ready ? 'transparent' : '#e9e9ee', ...style }}>
       {thumb && !(data && ready) && (
         <img src={thumb} alt="" draggable={false} aria-hidden style={{ ...layer, filter: 'blur(10px)', transform: 'scale(1.15)' }} />
       )}
