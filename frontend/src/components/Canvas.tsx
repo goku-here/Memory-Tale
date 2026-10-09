@@ -15,6 +15,7 @@ import { bookEase, clipAt } from '../lib/bookTransition'
 import { clamp, cloneItem, frameHeight, nextZ, rnd } from '../lib/items'
 import { placeInOrder } from '../lib/layout'
 import { useGestures } from '../lib/useGestures'
+import type { Guides } from '../lib/snap'
 import { frameHeightFor } from '../lib/exportStory'
 import type { PhotoProps, BubbleProps, CanvasItem, FrameId, ItemPatch, MapProps, Stroke, StickerProps, TextProps } from '../types'
 import { formatDate } from './BookCard'
@@ -84,6 +85,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
 
   const [menu, setMenu] = useState(false)
   const [story, setStory] = useState(false)
+  const [guides, setGuides] = useState<Guides | null>(null)
   const [storyPreview, setStoryPreview] = useState(false)
   const [storyY, setStoryYState] = useState(0)
   const storyYRef = useRef(0)
@@ -167,7 +169,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
 
   const { startItem: rawStart, startHandle } = useGestures({
     surfaceRef: surface, scrollerRef: scroller, itemsRef, heightRef, live, begin, end,
-    onSelect: setSelectedId, onDragging: setDraggingId,
+    onSelect: setSelectedId, onDragging: setDraggingId, onGuides: setGuides,
     onHold: () => { suppressClick.current = true },
     isSelected: (id) => selectedIdRef.current === id,
     topInset: HEADER_H + 40, bottomInset: 130,
@@ -787,6 +789,12 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
             </AnimatePresence>
 
             <ThreadsSvg items={items} canvasW={canvasW} selectedId={selectedId} onSelect={setSelectedId} />
+            {guides && (
+              <svg className="pointer-events-none absolute inset-0 h-full w-full" style={{ zIndex: 8600, overflow: 'visible' }} aria-hidden>
+                {guides.v.map((l) => <line key={`v${l.x}`} x1={l.x} x2={l.x} y1={l.y1} y2={l.y2} stroke="#ff3d81" strokeWidth={1.25} strokeDasharray="5 4" />)}
+                {guides.h.map((l) => <line key={`h${l.y}`} x1={l.x1} x2={l.x2} y1={l.y} y2={l.y} stroke="#ff3d81" strokeWidth={1.25} strokeDasharray="5 4" />)}
+              </svg>
+            )}
             {story && (
               <StoryOverlay surfaceRef={surface} scrollerRef={scroller} canvasW={canvasW} surfaceH={height} y={storyY} onY={setStoryY} items={items} accent={accent} headerH={HEADER_H} />
             )}

@@ -4,6 +4,7 @@ import { clamp, frameHeight } from '../lib/items'
 import { AssetImg } from '../lib/assets'
 
 export const FRAMES: { id: FrameId; label: string }[] = [
+  { id: 'none', label: 'No frame' },
   { id: 'polaroid', label: 'Polaroid' },
   { id: 'rounded', label: 'Rounded' },
   { id: 'circle', label: 'Circle' },
@@ -11,7 +12,6 @@ export const FRAMES: { id: FrameId; label: string }[] = [
   { id: 'arch', label: 'Arch' },
   { id: 'film', label: 'Film strip' },
   { id: 'stamp', label: 'Stamp' },
-  { id: 'none', label: 'No frame' },
 ]
 
 /** frames whose outline honours the corner-radius slider */

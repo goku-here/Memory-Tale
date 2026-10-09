@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, type PointerEvent as RPointerEvent, type RefObject } from 'react'
 import type { CanvasItem, ItemPatch } from '../types'
 import { clamp } from './items'
+import { snapDrag, type Guides } from './snap'
 
 type Mode = 'drag' | 'pinch' | 'resize' | 'rotate'
 interface Pt { x: number; y: number }
@@ -32,6 +33,8 @@ export interface GestureOptions {
   end: () => void
   onSelect: (id: string) => void
   onDragging: (id: string | null) => void
+  /** alignment lines while an item is dragged near other items (null when done) */
+  onGuides?: (g: Guides | null) => void
   onDoubleTap?: (id: string) => void
   /** an item was picked up by a long press (the click that follows the release must be ignored) */
   onHold?: () => void
@@ -114,7 +117,10 @@ export function useGestures(opts: GestureOptions) {
       const sc = (o.current.scrollerRef.current?.scrollTop ?? 0) - b.scrollTop
       const nx = b.cx + (pts[0].x - b.p.x)
       const ny = b.cy + (pts[0].y - b.p.y) + sc
-      write(st.id, { x: clamp((nx / W) * 100, 0, 100), y: clamp(ny, 0, o.current.heightRef.current) })
+      const item = o.current.itemsRef.current.find((i) => i.id === st.id)
+      const sn = item && st.moved ? snapDrag(item, nx, ny, W, o.current.itemsRef.current) : null
+      o.current.onGuides?.(sn && (sn.guides.v.length || sn.guides.h.length) ? sn.guides : null)
+      write(st.id, { x: clamp(((sn?.x ?? nx) / W) * 100, 0, 100), y: clamp(sn?.y ?? ny, 0, o.current.heightRef.current) })
       return
     }
 
@@ -182,6 +188,7 @@ export function useGestures(opts: GestureOptions) {
     window.removeEventListener('touchmove', fns.current.touch)
     g.current = null
     o.current.onDragging(null)
+    o.current.onGuides?.(null)
     o.current.end()
     if (st && !st.held && !st.moved && st.mode === 'drag' && performance.now() - st.t0 < 450) {
       const now = performance.now()
