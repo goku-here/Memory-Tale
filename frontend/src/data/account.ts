@@ -30,8 +30,7 @@ export async function adoptAccount(uid: string) {
         await db.canvases.delete(m.id)
       }
     }
-    await db.uploads.clear()
-    disconnectDrive()
+    if (last) { await db.uploads.clear(); disconnectDrive() } // a known different person: their Drive link is not mine
     window.dispatchEvent(new Event('mt-local-changed'))
   }
   localStorage.setItem(LAST, uid)
