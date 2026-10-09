@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Image as ImageIcon, Images, MapPin, MessageCircle, MoreHorizontal, Smile, StickyNote, Type, Flag } from 'lucide-react'
+import { Camera, Image as ImageIcon, Images, MapPin, MessageCircle, MoreHorizontal, Smile, StickyNote, Type, Flag } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 
-export type ToolId = 'sticker' | 'draw' | 'text' | 'photo' | 'note' | 'location' | 'divider' | 'bubble' | 'line'
+export type ToolId = 'sticker' | 'draw' | 'text' | 'photo' | 'camera' | 'note' | 'location' | 'divider' | 'bubble' | 'line'
 
 interface Props {
   visible: boolean
@@ -26,7 +26,8 @@ function Btn({ label, active, onClick, children }: { label: string; active?: boo
 
 export function BottomToolbar({ visible, onTool }: Props) {
   const [more, setMore] = useState(false)
-  const pick = (t: ToolId) => { setMore(false); onTool(t) }
+  const [photoMenu, setPhotoMenu] = useState(false)
+  const pick = (t: ToolId) => { setMore(false); setPhotoMenu(false); onTool(t) }
   return (
     <AnimatePresence>
       {visible && (
@@ -37,9 +38,30 @@ export function BottomToolbar({ visible, onTool }: Props) {
           initial={{ y: 90, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 90, opacity: 0 }}
           transition={{ type: 'spring', stiffness: 380, damping: 30 }}
         >
-          {more && <div className="pointer-events-auto fixed inset-0" onPointerDown={() => setMore(false)} />}
+          {(more || photoMenu) && <div className="pointer-events-auto fixed inset-0" onPointerDown={() => { setMore(false); setPhotoMenu(false) }} />}
           <div className="relative">
             <AnimatePresence>
+              {photoMenu && (
+                <motion.div
+                  role="menu" aria-label="Add a photo"
+                  className="pointer-events-auto absolute bottom-[68px] right-12 w-56 origin-bottom rounded-3xl bg-white p-1.5"
+                  style={{ boxShadow: '0 14px 40px rgba(20,24,40,.22), 0 0 0 1px rgba(20,24,40,.04)' }}
+                  initial={{ opacity: 0, scale: 0.8, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.85, y: 6 }}
+                  transition={{ type: 'spring', stiffness: 480, damping: 30 }}
+                >
+                  {([
+                    ['camera', 'Take a photo', <Camera size={19} key="c" />],
+                    ['photo', 'Choose from gallery', <ImageIcon size={19} key="g" />],
+                  ] as [ToolId, string, ReactNode][]).map(([id, label, icon]) => (
+                    <motion.button
+                      key={id} type="button" role="menuitem" whileTap={{ scale: 0.96 }} onClick={() => pick(id)}
+                      className="flex min-h-12 w-full items-center gap-3 rounded-2xl border-0 bg-transparent px-3 text-left text-[15px] font-semibold text-[#17171a]"
+                    >
+                      {icon}{label}
+                    </motion.button>
+                  ))}
+                </motion.div>
+              )}
               {more && (
                 <motion.div
                   role="menu"
@@ -76,9 +98,9 @@ export function BottomToolbar({ visible, onTool }: Props) {
                   <path d="M3 21c2.2-2.2 3.6 1.2 6 0s3.6-2.6 5.4-1.2 3.2.4 4.6-.8" />
                 </svg></Btn>
               <Btn label="Text" onClick={() => pick('text')}><Type size={23} strokeWidth={1.9} /></Btn>
-              <Btn label="Photo" onClick={() => pick('photo')}><ImageIcon size={23} strokeWidth={1.9} /></Btn>
+              <Btn label="Photo" active={photoMenu} onClick={() => { setMore(false); setPhotoMenu((v) => !v) }}><ImageIcon size={23} strokeWidth={1.9} /></Btn>
               <span className="mx-1 h-7 w-px bg-neutral-200" aria-hidden />
-              <Btn label="More" active={more} onClick={() => setMore((v) => !v)}><MoreHorizontal size={23} strokeWidth={1.9} /></Btn>
+              <Btn label="More" active={more} onClick={() => { setPhotoMenu(false); setMore((v) => !v) }}><MoreHorizontal size={23} strokeWidth={1.9} /></Btn>
             </div>
           </div>
         </motion.div>

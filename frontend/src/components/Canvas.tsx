@@ -29,6 +29,7 @@ import { TextEditor } from './TextEditor'
 import { FloatingShapes, getTheme, themeVars } from './ThemeEngine'
 import { ToolSheet } from './ToolSheet'
 import { BubbleEditor } from './Bubble'
+import { CameraCapture } from './CameraCapture'
 import { Lightbox, type ViewerImage } from './Lightbox'
 import { ToolSheet as Sheet } from './ToolSheet'
 import { LocationTool } from './LocationTool'
@@ -93,6 +94,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   const lastPointer = useRef<string>('mouse')
   const suppressClick = useRef(false)
   const viewTimer = useRef(0)
+  const [cameraOpen, setCameraOpen] = useState(false)
+  const cameraInput = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState<{ done: number; total: number; label?: string } | null>(null)
   const [drivePrompt, setDrivePrompt] = useState<{ count: number; bytes: number } | null>(null)
   const [connectFrom, setConnectFrom] = useState<string | null>(null)
@@ -265,7 +268,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
 
   /* ---------- adding things ---------- */
 
-  const addPhotos = async (files: FileList | null) => {
+  const addPhotos = async (files: FileList | File[] | null) => {
     if (!files?.length) return
     const list = [...files]
     try {
@@ -456,6 +459,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     setSelectedId(null)
     switch (t) {
       case 'photo': fileInput.current?.click(); break
+      case 'camera': setCameraOpen(true); break
       case 'sticker': setSheet('sticker'); break
       case 'text': addText(); break
       case 'draw': setStrokes([]); setPen((p) => ({ ...p })); setSheet('draw'); break
@@ -540,13 +544,13 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName
-      if (e.key !== ' ' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON' || sheet || viewer) return
+      if (e.key !== ' ' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON' || sheet || viewer || cameraOpen) return
       if (selected?.type === 'photo') { e.preventDefault(); viewItem(selected.id) }
     }
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, sheet, viewer])
+  }, [selected, sheet, viewer, cameraOpen])
 
   const run = (fn: () => void) => () => { setMenu(false); fn() }
 
@@ -822,6 +826,19 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       </AnimatePresence>
 
       <input ref={slotInput} type="file" accept="image/*" multiple hidden onChange={(e) => { void fillSlots(e.target.files); e.target.value = '' }} />
+
+      <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { void addPhotos(e.target.files); e.target.value = '' }} />
+
+      <AnimatePresence>
+        {cameraOpen && (
+          <CameraCapture
+            key="camera"
+            onClose={() => setCameraOpen(false)}
+            onDone={(files) => { setCameraOpen(false); void addPhotos(files) }}
+            onFallback={() => { setCameraOpen(false); window.setTimeout(() => cameraInput.current?.click(), 150) }}
+          />
+        )}
+      </AnimatePresence>
 
       <input ref={replaceInput} type="file" accept="image/*" hidden onChange={(e) => { void replacePhoto(e.target.files?.[0]); e.target.value = '' }} />
 
