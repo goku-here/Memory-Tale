@@ -732,13 +732,13 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
               {story ? (
                 <div className="flex items-center gap-1.5">
                   <motion.button
-                    type="button" aria-label="Close story mode" onClick={leaveStory} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 460, damping: 28 }}
-                    className="grid h-10 w-10 place-items-center rounded-full border-0 bg-white text-[#17171a] shadow-[0_2px_8px_rgba(20,24,40,.15)]"
-                  ><X size={18} /></motion.button>
-                  <motion.button
                     type="button" onClick={() => setStoryPreview(true)} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 460, damping: 28 }}
                     className="flex h-10 items-center gap-1.5 rounded-full border-0 bg-[#17171a] px-4 text-[14px] font-bold text-white"
                   ><Clapperboard size={16} /> Done</motion.button>
+                  <motion.button
+                    type="button" aria-label="Close story mode" onClick={leaveStory} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 460, damping: 28 }}
+                    className="grid h-10 w-10 place-items-center rounded-full border-0 bg-white text-[#17171a] shadow-[0_2px_8px_rgba(20,24,40,.15)]"
+                  ><X size={18} /></motion.button>
                 </div>
               ) : (
                 <motion.p className="m-0 text-center text-[14px] font-semibold text-neutral-400" style={{ opacity: subOpacity }}>
