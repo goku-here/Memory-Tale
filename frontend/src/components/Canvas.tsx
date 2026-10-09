@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useMotionValue, useTransform, type MotionValue } from 'framer-motion'
-import { ArrowLeft, Check, Download, Loader2, MoreHorizontal, Palette, PenLine, Redo2, Share2, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, Check, Clapperboard, Download, Loader2, MoreHorizontal, Palette, PenLine, Redo2, Share2, Trash2, Undo2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../data/useAuth'
 import { useCanvas } from '../data/useCanvas'
@@ -15,6 +15,7 @@ import { bookEase, clipAt } from '../lib/bookTransition'
 import { clamp, cloneItem, frameHeight, nextZ, rnd } from '../lib/items'
 import { placeInOrder } from '../lib/layout'
 import { useGestures } from '../lib/useGestures'
+import { frameHeightFor, SAFE_TOP } from '../lib/exportStory'
 import type { PhotoProps, BubbleProps, CanvasItem, FrameId, ItemPatch, MapProps, Stroke, StickerProps, TextProps } from '../types'
 import { formatDate } from './BookCard'
 import { BottomToolbar, type ToolId } from './BottomToolbar'
@@ -33,6 +34,7 @@ import { CameraCapture } from './CameraCapture'
 import { Lightbox, type ViewerImage } from './Lightbox'
 import { ToolSheet as Sheet } from './ToolSheet'
 import { LocationTool } from './LocationTool'
+import { copyText, StoryBar, StoryOverlay, StoryPreview, storyCaption } from './StoryMode'
 import { THREAD_COLORS, ThreadsSvg, threadMid } from './Threads'
 import { IconButton, toast } from './ui'
 import type { Memory } from '../types'
@@ -81,6 +83,11 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   heightRef.current = height
 
   const [menu, setMenu] = useState(false)
+  const [story, setStory] = useState(false)
+  const [storyPreview, setStoryPreview] = useState(false)
+  const [storyY, setStoryYState] = useState(0)
+  const storyYRef = useRef(0)
+  const setStoryY = useCallback((y: number) => { storyYRef.current = y; setStoryYState(y) }, [])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const selectedIdRef = useRef<string | null>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
@@ -456,6 +463,40 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     }))
   }
 
+  /* ---------- story mode: a 9:16 frame over the canvas ---------- */
+  const storyKey = `mt-story-y:${memory.id}`
+  const enterStory = () => {
+    const sc = scroller.current
+    const sf = surface.current
+    if (!sc || !sf) return
+    let y: number | null = null
+    try { const v = localStorage.getItem(storyKey); if (v !== null) y = Math.max(0, +v || 0) } catch { /* ignore */ }
+    // first time: start at what is on screen now
+    if (y === null) y = Math.max(0, HEADER_H + 10 - sf.getBoundingClientRect().top)
+    setStoryY(y)
+    setSelectedId(null)
+    setStory(true)
+    sc.scrollTo({ top: Math.max(0, sf.offsetTop + y - HEADER_H - 10), behavior: 'smooth' })
+    try { if (!localStorage.getItem('mt-story-hint')) { localStorage.setItem('mt-story-hint', '1'); toast('Keep titles and faces out of the shaded zones.') } } catch { /* ignore */ }
+  }
+  const leaveStory = () => { setStory(false); setStoryPreview(false) }
+  useEffect(() => { if (story) try { localStorage.setItem(storyKey, String(Math.round(storyY))) } catch { /* ignore */ } }, [story, storyY, storyKey])
+  useEffect(() => {
+    if (!story) return
+    const need = Math.ceil((storyY + frameHeightFor(canvasW) + 300) / 100) * 100
+    if (need > heightRef.current) setHeight(need)
+  }, [story, storyY, canvasW, setHeight])
+  const addTaleName = () => {
+    const fh = frameHeightFor(canvasW)
+    const h = 56
+    addItem((z) => ({
+      id: '', type: 'text', zIndex: z, x: 50, y: storyYRef.current + fh * SAFE_TOP + h / 2 + 10, width: Math.round(canvasW * 0.8), height: h, rotation: 0,
+      props: { text: memory.title, font: theme.font, size: 38, color: theme.palette[0], align: 'center' },
+    }))
+  }
+  const storyCap = storyCaption(memory, formatDate(memory.date))
+  const copyCaption = async () => toast((await copyText(storyCap)) ? 'Caption copied' : "Couldn't copy the caption")
+
   const onTool = (t: ToolId) => {
     setSelectedId(null)
     switch (t) {
@@ -469,6 +510,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       case 'location': setSheet('location'); break
       case 'bubble': addBubble(); break
       case 'line': addLine(); break
+      case 'story': enterStory(); break
     }
   }
 
@@ -698,9 +740,16 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
                   <Redo2 size={20} />
                 </button>
               </div>
-              <motion.p className="m-0 text-center text-[14px] font-semibold text-neutral-400" style={{ opacity: subOpacity }}>
-                {photoCount} {photoCount === 1 ? 'Photo' : 'Photos'} <span className="mx-1">•</span> {formatDate(memory.date)}
-              </motion.p>
+              {story ? (
+                <motion.button
+                  type="button" onClick={leaveStory} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 460, damping: 28 }}
+                  className="flex h-10 items-center gap-1.5 rounded-full border-0 bg-[#17171a] px-4 text-[14px] font-bold text-white"
+                ><Clapperboard size={16} /> Done</motion.button>
+              ) : (
+                <motion.p className="m-0 text-center text-[14px] font-semibold text-neutral-400" style={{ opacity: subOpacity }}>
+                  {photoCount} {photoCount === 1 ? 'Photo' : 'Photos'} <span className="mx-1">•</span> {formatDate(memory.date)}
+                </motion.p>
+              )}
               <div className="flex items-center justify-end gap-1 pr-1 text-[12px] font-bold text-neutral-400" role="status" aria-live="polite">
                 {cv.status === 'saving' ? <><Loader2 size={13} className="animate-spin" /> Saving</> : <><Check size={13} strokeWidth={3} /> Saved</>}
               </div>
@@ -743,6 +792,9 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
             </AnimatePresence>
 
             <ThreadsSvg items={items} canvasW={canvasW} selectedId={selectedId} onSelect={setSelectedId} />
+            {story && (
+              <StoryOverlay surfaceRef={surface} scrollerRef={scroller} canvasW={canvasW} surfaceH={height} y={storyY} onY={setStoryY} items={items} accent={accent} headerH={HEADER_H} />
+            )}
             {selectedThread && !drawing && (() => {
               const m = threadMid(items, selectedThread, canvasW)
               if (!m) return null
@@ -863,7 +915,9 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
         {viewer && <Lightbox key="viewer" memoryId={memory.id} getOriginal={(p) => loadOriginalBlob(memory.id, p, user?.uid)} images={viewer.images} start={viewer.start} onClose={() => setViewer(null)} />}
       </AnimatePresence>
 
-      <BottomToolbar visible={!sheet && !editingId} accent={accent} onTool={onTool} />
+      <BottomToolbar visible={!sheet && !editingId && !story} accent={accent} onTool={onTool} />
+      <StoryBar visible={story && !sheet && !editingId && !storyPreview} onName={addTaleName} onCaption={() => void copyCaption()} onDownload={() => setStoryPreview(true)} onShare={() => setStoryPreview(true)} />
+      <StoryPreview open={storyPreview} onClose={() => setStoryPreview(false)} memory={memory} caption={storyCap} accent={accent} getItems={() => itemsRef.current} frameY={storyY} canvasW={canvasW} />
 
       {/* ---- tool sheets ---- */}
       <ToolSheet
