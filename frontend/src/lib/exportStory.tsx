@@ -80,6 +80,44 @@ async function fontsReady(node: HTMLElement) {
   await document.fonts?.ready
 }
 
+/* ---- fonts: html-to-image draws inside an SVG image that cannot see the page's fonts, so they must be
+   embedded as data URLs. Doing it ourselves (instead of letting the library fetch the stylesheet) is
+   what keeps typefaces and weights identical on phones. ---- */
+let fontCss: string | null = null
+const fontFiles = new Map<string, string>()
+const toDataUrl = async (url: string) => {
+  const blob = await (await fetch(url)).blob()
+  return await new Promise<string>((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result as string); fr.onerror = rej; fr.readAsDataURL(blob) })
+}
+
+/** @font-face rules (latin subsets, files inlined) for every font the node uses */
+export async function embeddedFontCSS(node: HTMLElement): Promise<string | undefined> {
+  try {
+    const link = document.querySelector<HTMLLinkElement>('link[href*="fonts.googleapis.com/css2"]')
+    if (!link) return undefined
+    const used = new Set<string>()
+    const scan = (el: Element) => getComputedStyle(el).fontFamily.split(',').forEach((f) => used.add(f.trim().replace(/^['"]|['"]$/g, '')))
+    scan(node)
+    node.querySelectorAll('*').forEach(scan)
+    fontCss ??= await (await fetch(link.href)).text()
+    const keep = (fontCss.match(/@font-face\s*{[^}]*}/g) ?? []).filter((b) => {
+      const fam = /font-family:\s*['"]?([^;'"]+)/.exec(b)?.[1]?.trim()
+      if (!fam || !used.has(fam)) return false
+      const range = /unicode-range:\s*([^;]+)/.exec(b)?.[1]
+      return !range || /U\+0000-00FF|U\+0100/.test(range)
+    })
+    if (!keep.length) return undefined
+    const out = await Promise.all(keep.map(async (b) => {
+      const url = /url\((https:[^)]+)\)/.exec(b)?.[1]
+      if (!url) return b
+      let d = fontFiles.get(url)
+      if (!d) { d = await toDataUrl(url); fontFiles.set(url, d) }
+      return b.replace(url, d)
+    }))
+    return out.join('\n')
+  } catch { return undefined }
+}
+
 /** scale whatever html-to-image produced to exactly 1080 x 1920 */
 async function normalise(blob: Blob): Promise<Blob> {
   const url = URL.createObjectURL(blob)
@@ -121,7 +159,8 @@ export async function exportStoryPng(memory: Memory, current: CanvasItem[], o: S
     await imagesReady(node)
     await wait(items.some((i) => i.type === 'map') ? 2200 : 350)
     await imagesReady(node)
-    const opts = { pixelRatio: STORY_W / o.canvasW, cacheBust: true, backgroundColor: getTheme(memory.themeId).canvasBg }
+    const fontEmbedCSS = await embeddedFontCSS(node)
+    const opts = { pixelRatio: STORY_W / o.canvasW, cacheBust: true, backgroundColor: getTheme(memory.themeId).canvasBg, ...(fontEmbedCSS ? { fontEmbedCSS } : {}) }
     // iOS Safari often paints the first pass blank or without images: render once and throw it away
     if (isIOS() || isSafari()) { await toBlob(node, opts).catch(() => null); await wait(120) }
     const blob = await toBlob(node, opts)

@@ -1,4 +1,5 @@
 import { toBlob } from 'html-to-image'
+import { embeddedFontCSS } from './exportStory'
 import { createRoot } from 'react-dom/client'
 import { ItemBody } from '../components/CanvasItem'
 import { formatDate } from '../components/BookCard'
@@ -77,7 +78,8 @@ export async function exportMemoryPng(memory: Memory): Promise<Blob> {
     const node = host.firstElementChild as HTMLElement
     const h = node.offsetHeight
     const pixelRatio = Math.max(1, Math.min(2.5, 12000 / h))
-    const blob = await toBlob(node, { pixelRatio, cacheBust: true, backgroundColor: getTheme(memory.themeId).canvasBg })
+    const fontEmbedCSS = await embeddedFontCSS(node)
+    const blob = await toBlob(node, { pixelRatio, cacheBust: true, backgroundColor: getTheme(memory.themeId).canvasBg, ...(fontEmbedCSS ? { fontEmbedCSS } : {}) })
     if (!blob) throw new Error('Export failed')
     return blob
   } finally {
