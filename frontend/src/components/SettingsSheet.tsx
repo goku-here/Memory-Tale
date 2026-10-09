@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion'
-import { Loader2, LogOut, Sparkles } from 'lucide-react'
+import { Check, Loader2, LogOut, Pencil, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../data/useAuth'
+import { renameEverywhere } from '../data/people'
 import { getSyncStatus, onSyncStatus } from '../data/sync'
 import { DriveSettings } from './DriveSettings'
 import { ToolSheet } from './ToolSheet'
@@ -20,7 +21,22 @@ function GoogleG() {
 }
 
 export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { configured, loading, user, signIn, logOut } = useAuth()
+  const { configured, loading, user, signIn, logOut, rename } = useAuth()
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+  const saveName = async () => {
+    const name = draft.trim().replace(/\s+/g, ' ')
+    if (!user || !name || saving) return
+    if (name === user.name) { setEditing(false); return }
+    setSaving(true)
+    try {
+      await rename(name)
+      await renameEverywhere(user.uid, name.slice(0, 40))
+      toast('Name updated')
+      setEditing(false)
+    } catch { toast("Couldn't change your name") } finally { setSaving(false) }
+  }
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [sync, setSync] = useState(getSyncStatus())
@@ -48,8 +64,25 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
             ) : (
               <span className="grid h-14 w-14 place-items-center rounded-full bg-[#17171a] text-xl font-bold text-white">{user.name.slice(0, 1).toUpperCase()}</span>
             )}
-            <div className="min-w-0">
-              <div className="truncate text-[17px] font-extrabold">{user.name}</div>
+            <div className="min-w-0 flex-1">
+              {editing ? (
+                <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); void saveName() }}>
+                  <input
+                    autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={40} aria-label="Your name" enterKeyHint="done"
+                    className="h-11 min-w-0 flex-1 rounded-xl border-0 bg-white px-3 text-[16px] font-bold text-[#17171a] outline-none ring-1 ring-neutral-200 focus:ring-2 focus:ring-[#17171a]"
+                  />
+                  <button type="submit" aria-label="Save name" disabled={saving || !draft.trim()} className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-0 bg-[#17171a] text-white disabled:opacity-40">
+                    {saving ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} strokeWidth={3} />}
+                  </button>
+                </form>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <div className="truncate text-[17px] font-extrabold">{user.name}</div>
+                  <button type="button" aria-label="Change your name" onClick={() => { setDraft(user.name); setEditing(true) }} className="grid h-9 w-9 shrink-0 place-items-center rounded-full border-0 bg-transparent text-neutral-400">
+                    <Pencil size={16} />
+                  </button>
+                </div>
+              )}
               <div className="truncate text-[13px] text-neutral-500">{user.email}</div>
             </div>
           </div>

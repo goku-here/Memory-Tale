@@ -5,7 +5,7 @@
  *   removals/{uid}_{memoryId}   a notice for the removed person: who removed them, and which Drive files are
  *                               their copies of the book's photos (only their own app can delete those)
  */
-import { collection, deleteDoc, deleteField, doc, getDoc, onSnapshot, query, setDoc, updateDoc, where, arrayRemove, arrayUnion } from 'firebase/firestore'
+import { collection, deleteDoc, deleteField, doc, getDoc, getDocs, onSnapshot, query, setDoc, updateDoc, where, arrayRemove, arrayUnion } from 'firebase/firestore'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getDb } from '../lib/firebase'
 import { deleteFromDrive, isConnected } from '../lib/drive'
@@ -63,6 +63,21 @@ export async function removeMember(owner: { uid: string; name: string; photo: st
   await updateDoc(ref, clean({ memberIds: arrayRemove(targetUid), banned: arrayUnion(targetUid), members, updatedAt: Date.now() }))
 }
 
+/** My new name on every book I am in (cloud and this device), so other members see it too. */
+export async function renameEverywhere(uid: string, name: string) {
+  for (const m of await db.memories.toArray()) {
+    if (m.members?.some((x) => x.id === uid)) await db.memories.update(m.id, { members: m.members.map((x) => (x.id === uid ? { ...x, name } : x)) })
+  }
+  const d = getDb()
+  if (!d) return
+  const mine = await getDocs(query(collection(d, 'memories'), where('memberIds', 'array-contains', uid)))
+  await Promise.allSettled(mine.docs.map((x) => {
+    const members = ((x.data().members ?? []) as Member[])
+    if (!members.some((m) => m.id === uid)) return Promise.resolve()
+    return updateDoc(x.ref, clean({ members: members.map((m) => (m.id === uid ? { ...m, name } : m)) }))
+  }))
+}
+
 /* ---------- the removed person's side ---------- */
 const PURGE = 'mt-drive-purge'
 const readPurge = (): string[] => { try { return JSON.parse(localStorage.getItem(PURGE) || '[]') } catch { return [] } }
@@ -111,7 +126,7 @@ export function useRemovals() {
         }
       }
       setNotices(list.map((n) => ({ ...n, pending: Math.max(0, handled.current.get(n.id) ?? 0) })))
-    }, reportError)
+    }, (e) => console.warn('[removals]', e)) // stays quiet until the newest rules are published
   }, [uid])
 
   const dismiss = useCallback(async (id: string) => {

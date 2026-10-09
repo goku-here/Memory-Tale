@@ -1,4 +1,4 @@
-import { onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut, type User } from 'firebase/auth'
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut, updateProfile, type User } from 'firebase/auth'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { firebaseConfigured, getFirebaseAuth, googleProvider } from '../lib/firebase'
 
@@ -16,10 +16,12 @@ interface AuthState {
   user: Profile | null
   signIn: () => Promise<Profile | null>
   logOut: () => Promise<void>
+  /** change the name shown on books and invites */
+  rename: (name: string) => Promise<void>
 }
 
 const Ctx = createContext<AuthState>({
-  configured: false, loading: false, user: null, signIn: async () => null, logOut: async () => {},
+  configured: false, loading: false, user: null, signIn: async () => null, logOut: async () => {}, rename: async () => {},
 })
 
 const toProfile = (u: User): Profile => ({
@@ -62,9 +64,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (auth) await signOut(auth)
   }, [])
 
+  const rename = useCallback(async (name: string) => {
+    const auth = getFirebaseAuth()
+    const clean = name.trim().replace(/\s+/g, ' ').slice(0, 40)
+    if (!auth?.currentUser || !clean) return
+    await updateProfile(auth.currentUser, { displayName: clean })
+    setUser((u) => (u ? { ...u, name: clean } : u))
+  }, [])
+
   const value = useMemo<AuthState>(
-    () => ({ configured: firebaseConfigured, loading, user, signIn, logOut }),
-    [loading, user, signIn, logOut],
+    () => ({ configured: firebaseConfigured, loading, user, signIn, logOut, rename }),
+    [loading, user, signIn, logOut, rename],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
