@@ -19,6 +19,15 @@
     <title>Memory Tale</title>
   </head>
   <body>
+    <!-- shared smooth sticker outline (used by the cut-out editor preview) -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+      <filter id="mt-outline" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+        <feGaussianBlur in="SourceAlpha" stdDeviation="2.4" result="b" />
+        <feComponentTransfer in="b" result="m"><feFuncA type="linear" slope="26" intercept="-1.05" /></feComponentTransfer>
+        <feFlood flood-color="#ffffff" result="w" /><feComposite in="w" in2="m" operator="in" result="ring" />
+        <feMerge><feMergeNode in="ring" /><feMergeNode in="SourceGraphic" /></feMerge>
+      </filter>
+    </svg>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

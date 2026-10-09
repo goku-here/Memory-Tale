@@ -1,7 +1,7 @@
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import type { StickerProps } from '../types'
 import { PushPinArt } from './PushPin'
-import { AssetImg } from '../lib/assets'
+import { AssetImg, useAssetSrc } from '../lib/assets'
 import { PACK_SVGS } from './stickerPacks'
 import { BEAN_DRESSUP, BEAN_FEELINGS, BEAN_FUN, BEAN_SVGS } from './beanPack'
 
@@ -175,24 +175,66 @@ export function stickerRatio(p: StickerProps) {
   return p.kind === 'svg' ? SVG_STICKERS[p.value]?.ratio ?? 1 : p.kind === 'image' ? p.ratio ?? 1 : 1
 }
 
-/** White die-cut outline + soft shadow, built from stacked drop-shadows. */
-export function dieCut(width: number) {
-  const t = Math.max(2, Math.min(5, width * 0.032))
-  const d = t * 0.72
-  const dirs: [number, number][] = [[t, 0], [-t, 0], [0, t], [0, -t], [d, d], [-d, -d]]
-  return dirs.map(([x, y]) => `drop-shadow(${x}px ${y}px 0 #fff)`).join(' ') + ' drop-shadow(0 3px 5px rgba(30,25,40,.3))'
+/**
+ * Smooth white die-cut outline + soft shadow.
+ * The shape's alpha is blurred and then thresholded, which grows it evenly in every direction with rounded
+ * corners (stacked offset shadows leave gaps on spikes and curves). Units are the sticker's own 100-wide
+ * coordinate space, so the outline scales with the sticker and is part of the artwork (it exports correctly).
+ */
+function OutlineFilter({ id, t = 3 }: { id: string; t?: number }) {
+  const s = t / 1.5
+  return (
+    <filter id={id} x="-18%" y="-18%" width="136%" height="136%" colorInterpolationFilters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation={s} result="b" />
+      <feComponentTransfer in="b" result="m">
+        <feFuncA type="linear" slope="26" intercept="-1.05" />
+      </feComponentTransfer>
+      <feFlood floodColor="#ffffff" result="w" />
+      <feComposite in="w" in2="m" operator="in" result="ring" />
+      <feGaussianBlur in="m" stdDeviation="2.1" result="sb" />
+      <feOffset in="sb" dy="2.4" result="so" />
+      <feFlood floodColor="#1e1928" floodOpacity="0.3" result="sc" />
+      <feComposite in="sc" in2="so" operator="in" result="shadow" />
+      <feMerge>
+        <feMergeNode in="shadow" />
+        <feMergeNode in="ring" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  )
 }
 
-export function StickerArt({ sticker, width, preview }: { sticker: StickerProps; width: number; preview?: boolean }) {
+function OutlinedSticker({ sticker }: { sticker: StickerProps }) {
+  const id = `ol${useId().replace(/:/g, '')}`
+  const ratio = stickerRatio(sticker)
+  const H = 100 / ratio
+  const img = useAssetSrc(sticker.kind === 'image' ? sticker.value : '')
   return (
-    <div className="h-full w-full" style={{ containerType: 'inline-size', filter: preview ? 'drop-shadow(0 1px 2px rgba(30,25,40,.3))' : dieCut(width) }}>
+    <svg viewBox={`0 0 100 ${H}`} width="100%" height="100%" style={{ overflow: 'visible', display: 'block' }} aria-hidden>
+      <defs><OutlineFilter id={id} /></defs>
+      <g filter={`url(#${id})`}>
+        {sticker.kind === 'emoji' && (
+          <text x="50" y={H / 2 + 2} textAnchor="middle" dominantBaseline="central" fontSize="70" style={{ fontFamily: "'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif" }}>
+            {sticker.value}
+          </text>
+        )}
+        {sticker.kind === 'svg' && SVG_STICKERS[sticker.value] && <svg x="0" y="0" width="100" height={H}>{SVG_STICKERS[sticker.value].art}</svg>}
+        {sticker.kind === 'image' && img && <image href={img} x="0" y="0" width="100" height={H} preserveAspectRatio="xMidYMid meet" />}
+      </g>
+    </svg>
+  )
+}
+
+/** In the tray (`preview`) stickers are plain with a light shadow; on the canvas they get the smooth outline. */
+export function StickerArt({ sticker, preview }: { sticker: StickerProps; width?: number; preview?: boolean }) {
+  if (!preview) return <div className="h-full w-full"><OutlinedSticker sticker={sticker} /></div>
+  return (
+    <div className="h-full w-full" style={{ containerType: 'inline-size', filter: 'drop-shadow(0 1px 2px rgba(30,25,40,.3))' }}>
       {sticker.kind === 'emoji' && (
         <div className="grid h-full w-full place-items-center leading-none" style={{ fontSize: '74cqw' }}>{sticker.value}</div>
       )}
       {sticker.kind === 'svg' && SVG_STICKERS[sticker.value]?.art}
-      {sticker.kind === 'image' && (
-        <AssetImg src={sticker.value} fit="contain" bare />
-      )}
+      {sticker.kind === 'image' && <AssetImg src={sticker.value} fit="contain" bare />}
     </div>
   )
 }

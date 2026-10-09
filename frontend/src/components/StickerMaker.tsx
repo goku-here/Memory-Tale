@@ -2,7 +2,6 @@ import { motion } from 'framer-motion'
 import { Check, Eraser, Loader2, Paintbrush, Undo2, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { composite, cutout, exportSticker, type CutoutResult } from '../lib/cutout'
-import { dieCut } from './stickers'
 
 interface Props {
   file: File
@@ -141,7 +140,7 @@ export function StickerMaker({ file, onClose, onSave }: Props) {
           <canvas
             ref={view}
             className="block max-h-[62vh] max-w-full touch-none select-none"
-            style={{ cursor: 'crosshair', background: 'transparent', filter: outline ? dieCut(260) : undefined }}
+            style={{ cursor: 'crosshair', background: 'transparent', filter: outline ? 'url(#mt-outline)' : undefined }}
             onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
           />
         </div>

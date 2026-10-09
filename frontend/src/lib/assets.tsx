@@ -83,3 +83,19 @@ export function AssetImg({ src, thumb, fit = 'cover', bare, style, alt = '' }: P
     </span>
   )
 }
+
+/** Resolves an image reference (data URL or `asset:` id) to a data URL; null while loading or when empty. */
+export function useAssetSrc(src: string): string | null {
+  const { memoryId } = useContext(AssetCtx)
+  const [data, setData] = useState<string | null>(() => (!src ? null : isRef(src) ? mem.get(src.slice(REF.length)) ?? null : src))
+  useEffect(() => {
+    if (!src) { setData(null); return }
+    if (!isRef(src)) { setData(src); return }
+    const hit = mem.get(src.slice(REF.length))
+    if (hit) { setData(hit); return }
+    let alive = true
+    void resolveRef(memoryId, src).then((d) => { if (alive && d) setData(d) })
+    return () => { alive = false }
+  }, [src, memoryId])
+  return data
+}

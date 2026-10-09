@@ -28,5 +28,7 @@ export function pushPinSvg(color: string, width = 60, extra = '') {
 }
 
 export function PushPinArt({ color = '#E5342F' }: { color?: string }) {
-  return <div className="h-full w-full" dangerouslySetInnerHTML={{ __html: pushPinSvg(color, 60, 'width:100%;height:100%') }} />
+  // the generated markup is a full <svg>; keep only its contents so it can nest inside another svg
+  const inner = pushPinSvg(color, 60).replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '')
+  return <svg viewBox="0 0 60 80" width="100%" height="100%" style={{ overflow: 'visible' }} dangerouslySetInnerHTML={{ __html: inner }} />
 }
