@@ -8,6 +8,8 @@ interface Props {
   visible: boolean
   accent: string
   onTool: (t: ToolId) => void
+  /** story mode is already on: hide its menu entry */
+  inStory?: boolean
 }
 
 function Btn({ label, active, onClick, children }: { label: string; active?: boolean; onClick: () => void; children: ReactNode }) {
@@ -24,7 +26,7 @@ function Btn({ label, active, onClick, children }: { label: string; active?: boo
   )
 }
 
-export function BottomToolbar({ visible, onTool }: Props) {
+export function BottomToolbar({ visible, onTool, inStory }: Props) {
   const [more, setMore] = useState(false)
   const [photoMenu, setPhotoMenu] = useState(false)
   const pick = (t: ToolId) => { setMore(false); setPhotoMenu(false); onTool(t) }
@@ -77,7 +79,7 @@ export function BottomToolbar({ visible, onTool }: Props) {
                     ['location', 'Location', <MapPin size={19} key="l" />],
                     ['divider', 'Stop divider', <Flag size={19} key="d" />],
                     ['story', 'Story mode', <RectangleVertical size={19} key="s" />],
-                  ] as [ToolId, string, ReactNode][]).map(([id, label, icon]) => (
+                  ] as [ToolId, string, ReactNode][]).filter(([id]) => !(inStory && id === 'story')).map(([id, label, icon]) => (
                     <motion.button
                       key={id} type="button" role="menuitem" whileTap={{ scale: 0.96 }} onClick={() => pick(id)}
                       className="flex min-h-12 w-full items-center gap-3 rounded-2xl border-0 bg-transparent px-3 text-left text-[15px] font-semibold text-[#17171a]"

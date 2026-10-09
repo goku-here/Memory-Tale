@@ -510,7 +510,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       case 'location': setSheet('location'); break
       case 'bubble': addBubble(); break
       case 'line': addLine(); break
-      case 'story': enterStory(); break
+      case 'story': if (!story) enterStory(); break
     }
   }
 
@@ -915,8 +915,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
         {viewer && <Lightbox key="viewer" memoryId={memory.id} getOriginal={(p) => loadOriginalBlob(memory.id, p, user?.uid)} images={viewer.images} start={viewer.start} onClose={() => setViewer(null)} />}
       </AnimatePresence>
 
-      <BottomToolbar visible={!sheet && !editingId && !story} accent={accent} onTool={onTool} />
-      <StoryBar visible={story && !sheet && !editingId && !storyPreview} onName={addTaleName} onCaption={() => void copyCaption()} onDownload={() => setStoryPreview(true)} onShare={() => setStoryPreview(true)} />
+      <BottomToolbar visible={!sheet && !editingId} inStory={story} accent={accent} onTool={onTool} />
+      <StoryBar visible={story && !sheet && !editingId && !storyPreview} onName={addTaleName} onCaption={() => void copyCaption()} onShare={() => setStoryPreview(true)} />
       <StoryPreview open={storyPreview} onClose={() => setStoryPreview(false)} memory={memory} caption={storyCap} accent={accent} getItems={() => itemsRef.current} frameY={storyY} canvasW={canvasW} />
 
       {/* ---- tool sheets ---- */}

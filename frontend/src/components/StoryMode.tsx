@@ -119,7 +119,7 @@ function BarBtn({ label, icon, onClick, primary }: { label: string; icon: ReactN
   return (
     <motion.button
       type="button" whileTap={{ scale: 0.92 }} onClick={onClick} aria-label={label}
-      className="flex h-14 min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-full border-0 px-3 text-[11px] font-bold"
+      className="flex h-12 min-w-[72px] flex-col items-center justify-center gap-0.5 rounded-full border-0 px-3 text-[11px] font-bold"
       style={primary ? { background: '#17171a', color: '#fff' } : { background: 'transparent', color: '#17171a' }}
     >
       {icon}{label}
@@ -127,18 +127,17 @@ function BarBtn({ label, icon, onClick, primary }: { label: string; icon: ReactN
   )
 }
 
-export function StoryBar({ visible, onName, onShare, onDownload, onCaption }: { visible: boolean; onName: () => void; onShare: () => void; onDownload: () => void; onCaption: () => void }) {
+export function StoryBar({ visible, onName, onShare, onCaption }: { visible: boolean; onName: () => void; onShare: () => void; onCaption: () => void }) {
   const calm = useReducedMotion()
   if (!visible) return null
   return (
     <motion.div
-      data-ui className="pointer-events-none fixed inset-x-0 z-40 flex justify-center" style={{ bottom: 'calc(var(--safe-bottom) + 16px)' }}
+      data-ui className="pointer-events-none fixed inset-x-0 z-40 flex justify-center" style={{ bottom: 'calc(var(--safe-bottom) + 100px)' }}
       initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={calm ? { duration: 0 } : { type: 'spring', stiffness: 380, damping: 30 }}
     >
       <div className="pointer-events-auto flex items-center gap-0.5 rounded-full bg-white p-1.5" style={{ boxShadow: '0 10px 34px rgba(20,24,40,.2), 0 0 0 1px rgba(20,24,40,.04)' }}>
         <BarBtn label="Tale name" icon={<Type size={20} />} onClick={onName} />
         <BarBtn label="Caption" icon={<Copy size={20} />} onClick={onCaption} />
-        <BarBtn label="Download" icon={<Download size={20} />} onClick={onDownload} />
         <BarBtn label="Share" icon={<Share2 size={20} />} onClick={onShare} primary />
       </div>
     </motion.div>
