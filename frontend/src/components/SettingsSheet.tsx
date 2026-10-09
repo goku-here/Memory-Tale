@@ -98,7 +98,10 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
             <LogOut size={18} /> Sign out
           </motion.button>
         )}
-        <p className="m-0 text-center text-[12px] text-neutral-400">Memory Tale · build {__BUILD__}</p>
+        <p className="m-0 text-center text-[12px] text-neutral-400">
+          Memory Tale · build {__BUILD__}<br />
+          <a href="/privacy" className="text-neutral-500">Privacy</a> · <a href="/terms" className="text-neutral-500">Terms</a> · <a href="/licenses" className="text-neutral-500">Licenses</a>
+        </p>
       </div>
     </ToolSheet>
   )

@@ -67,3 +67,58 @@ export function TermsPage() {
     </Page>
   )
 }
+
+const LIBS: [string, string, string, string][] = [
+  ['React and React DOM', '19', 'MIT', 'https://react.dev'],
+  ['Framer Motion', '14', 'MIT', 'https://github.com/motiondivision/motion'],
+  ['Dexie', '4', 'Apache-2.0', 'https://dexie.org'],
+  ['Firebase JavaScript SDK', '12', 'Apache-2.0', 'https://firebase.google.com'],
+  ['Supabase JavaScript client', '2', 'MIT', 'https://github.com/supabase/supabase-js'],
+  ['ONNX Runtime Web', '1.30', 'MIT', 'https://github.com/microsoft/onnxruntime'],
+  ['Leaflet', '1.9', 'BSD-2-Clause', 'https://leafletjs.com'],
+  ['html-to-image', '1.11', 'MIT', 'https://github.com/bubkoo/html-to-image'],
+  ['fflate', '0.8', 'MIT', 'https://github.com/101arrowz/fflate'],
+  ['Lucide icons', '1', 'ISC', 'https://lucide.dev'],
+  ['canvas-confetti', '1.9', 'ISC', 'https://github.com/catdad/canvas-confetti'],
+]
+
+export function LicensesPage() {
+  return (
+    <Page title="Open-source notices">
+      <p>Memory Tale is built with the open-source software and data below. Thank you to everyone who makes and shares it.</p>
+
+      <H>Background removal (cut-out stickers)</H>
+      <p>
+        <b>U²-Net</b> (&quot;u2netp&quot;) by Xuebin Qin, Zichen Zhang, Chenyang Huang, Masood Dehghan, Osmar R. Zaiane and Martin Jagersand, from the paper
+        &quot;U²-Net: Going Deeper with Nested U-Structure for Salient Object Detection&quot; (Pattern Recognition, 2020).
+        Licensed under the <b>Apache License 2.0</b>. The ONNX file is the unmodified export distributed by the <b>rembg</b> project (MIT License, © 2020 Daniel Gatis).
+        It runs on your device through <b>ONNX Runtime Web</b> (MIT, © Microsoft Corporation). Your photo is not uploaded anywhere.
+      </p>
+      <p className="text-[14px]">
+        <a href="/models/LICENSE-U-2-Net.txt">Apache 2.0 licence text</a> · <a href="/models/NOTICE.txt">Model notice</a> · <a href="https://github.com/xuebinqin/U-2-Net">Source</a>
+      </p>
+
+      <H>Libraries</H>
+      <ul className="m-0 list-none space-y-2 p-0">
+        {LIBS.map(([name, v, lic, url]) => (
+          <li key={name} className="flex flex-wrap items-baseline justify-between gap-x-3 border-b border-neutral-200 pb-2">
+            <a href={url} className="font-bold">{name} <span className="font-normal text-neutral-500">v{v}</span></a>
+            <span className="text-[13.5px] text-neutral-600">{lic}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[14px] text-neutral-600">Each library&apos;s full licence text is available from the link beside it.</p>
+
+      <H>Maps and places</H>
+      <p>Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, available under the Open Database Licence (ODbL). Place search uses the Nominatim service and routes use the OSRM project&apos;s public server.</p>
+
+      <H>Fonts</H>
+      <p>Text fonts are served by Google Fonts under the SIL Open Font License or the Apache License 2.0: Manrope, Playfair Display, Dancing Script, Pacifico, Caveat, Permanent Marker, Bangers, Bebas Neue, Poppins, Special Elite, Comic Neue, Patrick Hand, Luckiest Guy and Gochi Hand.</p>
+
+      <H>Emoji</H>
+      <p>Emoji stickers use your device&apos;s own emoji font. Other stickers, frames, bubbles and icons are original artwork made for this app.</p>
+
+      <p className="pt-4 text-[13px] text-neutral-500">Questions about these notices: <a href={`mailto:${CONTACT}`}>{CONTACT}</a></p>
+    </Page>
+  )
+}

@@ -32,6 +32,8 @@ class KeepsakeDB extends Dexie {
   uploads!: Table<UploadJob, string>
   /** stand-in for Google Drive while developing (VITE_DRIVE_MOCK=1) */
   mockDrive!: Table<{ id: string; blob: Blob; shared: boolean }, string>
+  /** stickers the person made from their own photos (this device) */
+  myStickers!: Table<{ id: string; dataUrl: string; ratio: number; createdAt: number }, string>
   constructor() {
     super('keepsake')
     this.version(1).stores({
@@ -41,6 +43,9 @@ class KeepsakeDB extends Dexie {
     this.version(2).stores({ memories: 'id, createdAt', canvases: 'memoryId', assets: 'id' })
     this.version(3).stores({
       memories: 'id, createdAt', canvases: 'memoryId', assets: 'id', uploads: 'id, memoryId', mockDrive: 'id',
+    })
+    this.version(5).stores({
+      memories: 'id, createdAt', canvases: 'memoryId', assets: 'id', uploads: 'id, memoryId, createdAt', mockDrive: 'id', myStickers: 'id, createdAt',
     })
     this.version(4).stores({
       memories: 'id, createdAt', canvases: 'memoryId', assets: 'id', uploads: 'id, memoryId, createdAt', mockDrive: 'id',

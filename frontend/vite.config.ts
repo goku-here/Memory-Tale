@@ -45,6 +45,12 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         runtimeCaching: [
           {
+            // the cut-out model and its runtime: large, never change, keep them for offline use
+            urlPattern: /\/(models|ort)\/.*/i,
+            handler: 'CacheFirst',
+            options: { cacheName: 'cutout-model', expiration: { maxEntries: 8 }, cacheableResponse: { statuses: [200] } },
+          },
+          {
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
             handler: 'CacheFirst',
             options: { cacheName: 'fonts', expiration: { maxEntries: 40, maxAgeSeconds: 60 * 60 * 24 * 365 } },

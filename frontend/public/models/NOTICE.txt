@@ -1,0 +1,14 @@
+u2netp.onnx
+-----------
+Model:   U^2-Net ("u2netp", the small variant)
+Authors: Xuebin Qin, Zichen Zhang, Chenyang Huang, Masood Dehghan, Osmar R. Zaiane, Martin Jagersand
+Paper:   "U^2-Net: Going Deeper with Nested U-Structure for Salient Object Detection", Pattern Recognition, 2020
+Source:  https://github.com/xuebinqin/U-2-Net
+License: Apache License 2.0 (full text in LICENSE-U-2-Net.txt)
+
+The ONNX export used here is the unmodified file distributed by the rembg project
+(https://github.com/danielgatis/rembg, MIT License, Copyright (c) 2020 Daniel Gatis).
+The model weights have not been changed.
+
+It runs entirely in the user's browser through ONNX Runtime Web (MIT License,
+Copyright (c) Microsoft Corporation). No images are uploaded anywhere.

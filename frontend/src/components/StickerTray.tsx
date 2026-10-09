@@ -1,8 +1,14 @@
 import { motion } from 'framer-motion'
 import { ImagePlus } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { StickerProps } from '../types'
 import { compressImage } from '../lib/image'
+import { db } from '../data/db'
+import { uid } from '../lib/id'
+import { StickerMaker } from './StickerMaker'
+import { AnimatePresence } from 'framer-motion'
+import { Scissors, X } from 'lucide-react'
 import { STICKER_CATEGORIES, STICKERS, StickerArt, stickerRatio, type StickerCategory } from './stickers'
 
 interface Props {
@@ -15,6 +21,11 @@ export function StickerTray({ accent, onPick }: Props) {
   const [active, setActive] = useState<StickerCategory>('Love')
   const [busy, setBusy] = useState(false)
   const file = useRef<HTMLInputElement>(null)
+  const makeInput = useRef<HTMLInputElement>(null)
+  const [making, setMaking] = useState<File | null>(null)
+  const [mine, setMine] = useState<{ id: string; dataUrl: string; ratio: number }[]>([])
+  const loadMine = useCallback(async () => setMine((await db.myStickers.orderBy('createdAt').reverse().toArray()).map(({ id, dataUrl, ratio }) => ({ id, dataUrl, ratio }))), [])
+  useEffect(() => { void loadMine() }, [loadMine])
   const sections = useRef<Partial<Record<StickerCategory, HTMLElement | null>>>({})
   const chips = useRef<Partial<Record<StickerCategory, HTMLElement | null>>>({})
   const lock = useRef(0)
@@ -82,16 +93,63 @@ export function StickerTray({ accent, onPick }: Props) {
         ))}
       </div>
 
-      <div className="px-5 pt-1">
+      <div className="flex gap-2 px-5 pt-1">
+        <motion.button
+          type="button" whileTap={{ scale: 0.97 }} onClick={() => makeInput.current?.click()}
+          className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl border-0 text-[14.5px] font-bold text-white"
+          style={{ background: accent }}
+        >
+          <Scissors size={18} /> Cut out from photo
+        </motion.button>
         <motion.button
           type="button" whileTap={{ scale: 0.97 }} onClick={() => file.current?.click()} disabled={busy}
-          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed bg-transparent text-[15px] font-bold"
+          className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-dashed bg-transparent text-[14.5px] font-bold"
           style={{ borderColor: accent, color: accent }}
         >
-          <ImagePlus size={19} /> {busy ? 'Preparing…' : 'Add my own sticker'}
+          <ImagePlus size={18} /> {busy ? 'Preparing…' : 'Add a PNG'}
         </motion.button>
         <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = '' }} />
+        <input ref={makeInput} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) setMaking(f); e.target.value = '' }} />
       </div>
+
+      {mine.length > 0 && (
+        <section className="px-4 pt-5" style={{ scrollMarginTop: 60 }}>
+          <h3 className="m-0 mb-1 px-1 text-[13px] font-extrabold uppercase tracking-wider text-neutral-400">My stickers</h3>
+          <div className="grid grid-cols-4 gap-1">
+            {mine.map((s) => (
+              <div key={s.id} className="relative">
+                <motion.button
+                  type="button" aria-label="Add my sticker" whileTap={{ scale: 0.88 }} onClick={() => onPick({ kind: 'image', value: s.dataUrl, ratio: s.ratio })}
+                  className="grid aspect-square w-full place-items-center rounded-2xl border-0 bg-transparent p-2"
+                >
+                  <div style={{ width: s.ratio >= 1 ? '100%' : `${s.ratio * 100}%`, aspectRatio: `${s.ratio}` }}>
+                    <StickerArt sticker={{ kind: 'image', value: s.dataUrl, ratio: s.ratio }} width={60} preview />
+                  </div>
+                </motion.button>
+                <button type="button" aria-label="Delete my sticker" onClick={() => { void db.myStickers.delete(s.id).then(loadMine) }}
+                  className="absolute right-0 top-0 grid h-7 w-7 place-items-center rounded-full border-0 bg-black/55 text-white"><X size={14} /></button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* rendered on <body>: the sheet is transformed, which would shrink "full screen" to the sheet's area */}
+      {createPortal(
+      <AnimatePresence>
+        {making && (
+          <StickerMaker
+            key="maker" file={making} onClose={() => setMaking(null)}
+            onSave={(dataUrl, ratio) => {
+              setMaking(null)
+              void db.myStickers.put({ id: uid(), dataUrl, ratio, createdAt: Date.now() }).then(loadMine)
+              onPick({ kind: 'image', value: dataUrl, ratio })
+            }}
+          />
+        )}
+      </AnimatePresence>,
+      document.body,
+      )}
 
       {STICKER_CATEGORIES.map((c) => (
         <section

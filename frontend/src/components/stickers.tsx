@@ -162,7 +162,7 @@ export const STICKERS: Record<StickerCategory, StickerDef[]> = {
 }
 
 export function stickerRatio(p: StickerProps) {
-  return p.kind === 'svg' ? SVG_STICKERS[p.value]?.ratio ?? 1 : 1
+  return p.kind === 'svg' ? SVG_STICKERS[p.value]?.ratio ?? 1 : p.kind === 'image' ? p.ratio ?? 1 : 1
 }
 
 /** White die-cut outline + soft shadow, built from stacked drop-shadows. */

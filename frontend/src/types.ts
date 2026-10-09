@@ -67,6 +67,8 @@ export interface StickerProps {
   kind: 'emoji' | 'svg' | 'image'
   /** emoji character, svg sticker id, or image data URL */
   value: string
+  /** width / height of an image sticker */
+  ratio?: number
 }
 export interface TextProps {
   text: string
