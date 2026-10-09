@@ -14,6 +14,8 @@ import { startOriginals, stopOriginals } from './data/originals'
 import { getTheme } from './components/ThemeEngine'
 import { ConfirmDialog, ToastHost, toast } from './components/ui'
 import { useMemories } from './data/useMemories'
+import { purgePendingDriveCopies, useRemovals } from './data/people'
+import { RemovedScreen } from './components/RemovedScreen'
 import type { Memory } from './types'
 
 export default function App() {
@@ -25,6 +27,7 @@ export default function App() {
   const progress = useMotionValue(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const { user } = useAuth()
+  const { notices, dismiss } = useRemovals()
   // invite links look like /join/<token>
   const [joinToken, setJoinToken] = useState<string | null>(() => window.location.pathname.match(/^\/join\/([A-Za-z0-9_-]+)/)?.[1] ?? null)
   const [pendingOpen, setPendingOpen] = useState<string | null>(null)
@@ -33,11 +36,14 @@ export default function App() {
 
   const byId = useCallback((id?: string | null) => memories.find((m) => m.id === id), [memories])
   const openMemory = openId ? byId(openId) : undefined
+  // a book that disappears while it is open (removed by its owner) closes
+  useEffect(() => { if (openId && !loading && !memories.some((m) => m.id === openId) && !opening) setOpenId(null) }, [openId, loading, memories, opening])
 
   // save originals to Google Drive in the background (and resume after a restart)
   useEffect(() => {
     if (!user) return
     startOriginals(user.uid)
+    void purgePendingDriveCopies()
     return stopOriginals
   }, [user])
 
@@ -183,6 +189,9 @@ export default function App() {
       />
       <DriveChip top={openId ? 'calc(var(--safe-top) + 128px)' : 'calc(var(--safe-top) + 84px)'} />
       <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <AnimatePresence>
+        {notices[0] && <RemovedScreen key={notices[0].id} notice={notices[0]} index={0} total={notices.length} pending={notices[0].pending} onContinue={() => void dismiss(notices[0].id)} />}
+      </AnimatePresence>
       <ToastHost />
     </MotionConfig>
   )

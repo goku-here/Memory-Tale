@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useMotionValue, useTransform, type MotionValue } from 'framer-motion'
-import { ArrowLeft, Check, Clapperboard, Download, Loader2, MoreHorizontal, Palette, PenLine, Redo2, Share2, Trash2, Undo2, X } from 'lucide-react'
+import { ArrowLeft, Check, Clapperboard, Download, Loader2, MoreHorizontal, Palette, PenLine, Redo2, Share2, Trash2, Undo2, Users, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../data/useAuth'
 import { useCanvas } from '../data/useCanvas'
@@ -35,6 +35,7 @@ import { CameraCapture } from './CameraCapture'
 import { Lightbox, type ViewerImage } from './Lightbox'
 import { ToolSheet as Sheet } from './ToolSheet'
 import { LocationTool } from './LocationTool'
+import { PeopleSheet } from './PeopleSheet'
 import { StoryOverlay, StoryPreview } from './StoryMode'
 import { THREAD_COLORS, ThreadsSvg, threadMid } from './Threads'
 import { IconButton, toast } from './ui'
@@ -85,6 +86,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
 
   const [menu, setMenu] = useState(false)
   const [story, setStory] = useState(false)
+  const [peopleOpen, setPeopleOpen] = useState(false)
   const [guides, setGuides] = useState<Guides | null>(null)
   const [storyPreview, setStoryPreview] = useState(false)
   const [storyY, setStoryYState] = useState(0)
@@ -712,6 +714,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
                         <MenuItem icon={<PenLine size={18} />} label="Edit book" onClick={run(onEdit)} />
                         <MenuItem icon={<Palette size={18} />} label="Change theme" onClick={run(onTheme)} />
                         <MenuItem icon={<Share2 size={18} />} label="Share" onClick={run(onShare)} />
+                        {user && <MenuItem icon={<Users size={18} />} label="People" onClick={run(() => setPeopleOpen(true))} />}
                         <MenuItem icon={<Download size={18} />} label="Download book" onClick={run(() => void downloadBook())} />
                         <MenuItem danger icon={<Trash2 size={18} />} label="Delete" onClick={run(onDelete)} />
                       </motion.div>
@@ -919,6 +922,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       </AnimatePresence>
 
       <BottomToolbar visible={!sheet && !editingId} inStory={story} accent={accent} onTool={onTool} />
+      {user && <PeopleSheet open={peopleOpen} onClose={() => setPeopleOpen(false)} memory={memory} />}
       <StoryPreview open={storyPreview} onClose={() => setStoryPreview(false)} memory={memory} accent={accent} getItems={() => itemsRef.current} frameY={storyY} canvasW={canvasW} />
 
       {/* ---- tool sheets ---- */}

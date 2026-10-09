@@ -55,7 +55,9 @@ export function InviteScreen({ token, knownIds, onJoined, onDismiss }: Props) {
       onJoined(invite.memoryId)
     } catch (e) {
       reportError(e)
-      setError("We couldn't open it just yet. Please try once more, or ask for a fresh link.")
+      setError((e as { code?: string }).code === 'permission-denied'
+        ? "You can't join this memory. The owner may have removed you from it."
+        : "We couldn't open it just yet. Please try once more, or ask for a fresh link.")
       setJoining(false)
     }
   }

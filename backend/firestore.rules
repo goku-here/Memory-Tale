@@ -4,6 +4,7 @@ rules_version = '2';
 // memories/{id}/items/{itemId}   { json, updatedAt }
 // memories/{id}/assets/{hash}    { data }
 // memories/{id}/originals/{photoId} { uploaderUid, name, mime, size, copies: { uid: { fileId } } }
+// removals/{uid}_{memoryId}     { uid, memoryId, title, ownerName, fileIds: [driveFileId] }  notice for a removed person
 // invites/{token}                { memoryId, createdBy, title, cover, ownerName, ... }  public preview, unguessable token
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -19,14 +20,21 @@ service cloud.firestore {
         && request.resource.data.ownerId == request.auth.uid
         && request.auth.uid in request.resource.data.memberIds;
 
-      // members edit freely, but can only keep or remove people (never add) and never change the owner
+      // members edit freely and never change the owner. Only the owner can remove other people (or ban them);
+      // everyone else may only leave (remove themselves).
       allow update: if isMember(resource.data)
         && request.resource.data.ownerId == resource.data.ownerId
-        && request.resource.data.memberIds.hasOnly(resource.data.memberIds);
+        && request.resource.data.memberIds.hasOnly(resource.data.memberIds)
+        && (isOwner(resource.data)
+            || (request.resource.data.get('banned', []) == resource.data.get('banned', [])
+                && (request.resource.data.memberIds.hasAll(resource.data.memberIds)
+                    || (request.resource.data.memberIds.size() == resource.data.memberIds.size() - 1
+                        && !(request.auth.uid in request.resource.data.memberIds)))));
 
       // joining: a signed-in person adds only themselves, proving it with a real invite token
       allow update: if signedIn()
         && !(request.auth.uid in resource.data.memberIds)
+        && !(request.auth.uid in resource.data.get('banned', []))
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds', 'members', 'joinToken', 'updatedAt'])
         && request.resource.data.memberIds.hasAll(resource.data.memberIds)
         && request.resource.data.memberIds.size() == resource.data.memberIds.size() + 1
@@ -39,6 +47,14 @@ service cloud.firestore {
         allow read, write: if sub in ['items', 'assets', 'originals']
           && isMember(get(/databases/$(database)/documents/memories/$(memoryId)).data);
       }
+    }
+
+    // a notice for someone who was removed from a book: only the book's owner writes it, only that person reads/clears it
+    match /removals/{id} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create: if signedIn()
+        && isOwner(get(/databases/$(database)/documents/memories/$(request.resource.data.memoryId)).data);
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
 
     match /invites/{token} {

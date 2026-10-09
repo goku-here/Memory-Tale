@@ -29,6 +29,12 @@ export function useMemories() {
         for (const { type, memory } of changes) {
           if (type === 'removed') { await repo.deleteMemory(memory.id); continue }
           const mine = await db.memories.get(memory.id)
+          // who is in the book is decided in the cloud: always take it over, even when my copy is newer
+          const crew = { ownerId: memory.ownerId, memberIds: memory.memberIds, members: memory.members }
+          delete (memory as { banned?: unknown }).banned
+          if (mine && ((mine.ownerId ?? '') !== (crew.ownerId ?? '') || JSON.stringify(mine.memberIds) !== JSON.stringify(crew.memberIds) || JSON.stringify(mine.members) !== JSON.stringify(crew.members))) {
+            await db.memories.update(memory.id, crew)
+          }
           if (!mine && !first) {
             // a book that was just shared with me: put it first on my shelf
             const orders = (await db.memories.toArray()).map((m) => m.order ?? 0)
