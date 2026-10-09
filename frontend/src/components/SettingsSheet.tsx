@@ -1,11 +1,12 @@
 import { motion } from 'framer-motion'
-import { Loader2, LogOut } from 'lucide-react'
+import { Loader2, LogOut, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../data/useAuth'
 import { getSyncStatus, onSyncStatus } from '../data/sync'
 import { DriveSettings } from './DriveSettings'
 import { ToolSheet } from './ToolSheet'
 import { toast } from './ui'
+import { tour } from '../lib/tour'
 
 function GoogleG() {
   return (
@@ -89,6 +90,13 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
             {sync.state === 'synced' && <p className="m-0 mt-1 leading-snug text-neutral-500">Your books are backed up and available on every device you sign in on.</p>}
           </div>
         )}
+
+        <motion.button
+          type="button" whileTap={{ scale: 0.96 }} onClick={() => { onClose(); window.setTimeout(() => tour.start(), 350) }}
+          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full border-0 bg-neutral-100 text-[15px] font-semibold text-[#17171a]"
+        >
+          <Sparkles size={18} /> Replay the tour
+        </motion.button>
 
         {user && (
           <motion.button

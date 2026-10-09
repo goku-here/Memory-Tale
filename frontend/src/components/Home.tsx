@@ -227,7 +227,7 @@ export function Home({ memories, loading, hiddenId, onAdd, onSettings, onReorder
 
       <div className="pointer-events-none fixed inset-x-0 z-30 flex justify-center" style={{ bottom: 'calc(var(--safe-bottom) + 22px)' }}>
         <motion.button
-          type="button"
+          type="button" data-tour="add"
           onClick={onAdd}
           className="no-select pointer-events-auto flex h-14 items-center gap-2.5 rounded-full border-0 bg-[#17171a] pl-5 pr-6 text-[16px] font-semibold text-white outline-none"
           style={{ boxShadow: '0 12px 32px rgba(10,12,24,.32), 0 2px 6px rgba(10,12,24,.2)' }}

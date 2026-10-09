@@ -14,6 +14,8 @@ import { startOriginals, stopOriginals } from './data/originals'
 import { getTheme } from './components/ThemeEngine'
 import { ConfirmDialog, ToastHost, toast } from './components/ui'
 import { useMemories } from './data/useMemories'
+import { Tour } from './components/Tour'
+import { tour, tourSeen } from './lib/tour'
 import { purgePendingDriveCopies, useRemovals } from './data/people'
 import { RemovedScreen } from './components/RemovedScreen'
 import type { Memory } from './types'
@@ -33,6 +35,14 @@ export default function App() {
   const [pendingOpen, setPendingOpen] = useState<string | null>(null)
   const [shareId, setShareId] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Memory | null>(null)
+
+  // first run: offer the tour to people who have no books yet (people who already do never see it unasked)
+  useEffect(() => {
+    if (loading || tourSeen() || joinToken) return
+    if (memories.length > 0) { tour.dismissSilently(); return }
+    const t = window.setTimeout(() => { if (!tourSeen()) tour.start() }, 1400)
+    return () => window.clearTimeout(t)
+  }, [loading, memories.length, joinToken])
 
   const byId = useCallback((id?: string | null) => memories.find((m) => m.id === id), [memories])
   const openMemory = openId ? byId(openId) : undefined
@@ -112,6 +122,7 @@ export default function App() {
         burst(0.85, 120)
       }
       openWhenReady(m)
+      tour.emit('memory-created')
     } else {
       toast('Saved')
     }
@@ -127,7 +138,7 @@ export default function App() {
         hiddenId={opening?.mode === 'open' ? opening.memory.id : null}
         onSettings={() => setSettingsOpen(true)}
         onReorder={(ids) => void reorder(ids)}
-        onAdd={() => setSheet({ mode: 'create' })}
+        onAdd={() => { setSheet({ mode: 'create' }); tour.emit('create-open') }}
         onOpen={startOpen}
         onEdit={(m) => setSheet({ mode: 'edit', id: m.id })}
         onTheme={(m) => setSheet({ mode: 'theme', id: m.id })}
@@ -173,7 +184,7 @@ export default function App() {
       <CreateMemorySheet
         state={sheet}
         memory={sheetMemory}
-        onClose={() => setSheet(null)}
+        onClose={() => { setSheet(null); tour.emit('create-close') }}
         onSubmit={(m, isNew) => void submit(m, isNew)}
       />
 
@@ -192,6 +203,7 @@ export default function App() {
       <AnimatePresence>
         {notices[0] && <RemovedScreen key={notices[0].id} notice={notices[0]} index={0} total={notices.length} pending={notices[0].pending} onContinue={() => void dismiss(notices[0].id)} />}
       </AnimatePresence>
+      <Tour />
       <ToastHost />
     </MotionConfig>
   )

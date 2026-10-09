@@ -8,6 +8,16 @@ import { createInvite, reportError } from '../data/sync'
 import { ShareLayout } from './ShareLayout'
 import { toast } from './ui'
 
+const SHARE_COPY: Record<Memory['themeId'], string> = {
+  romantic: 'Share this memory with someone you love.',
+  trip: 'Take your travel buddies back on the road.',
+  dinner: 'Pass the table around. Share it with everyone who was there.',
+  friends: 'Send it to the crew and relive the chaos.',
+  family: 'Share it with the family who made it special.',
+  birthday: 'Let everyone relive the party.',
+  anniversary: 'Share this milestone with the people who cheered you on.',
+}
+
 export function ShareScreen({ memory, onClose }: { memory: Memory; onClose: () => void }) {
   const { user, signIn, configured } = useAuth()
   const [busy, setBusy] = useState(false)
@@ -74,7 +84,7 @@ export function ShareScreen({ memory, onClose }: { memory: Memory; onClose: () =
     <ShareLayout
       book={memory} onClose={onClose}
       heading="Your memory is ready!"
-      sub="Share this memory with someone you love."
+      sub={SHARE_COPY[memory.themeId] ?? 'Share this memory with the people who were there.'}
     >
       <motion.button
         type="button" whileTap={{ scale: 0.96 }} onClick={() => void share()} disabled={sharing}

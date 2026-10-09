@@ -15,6 +15,7 @@ import { bookEase, clipAt } from '../lib/bookTransition'
 import { clamp, cloneItem, frameHeight, nextZ, rnd } from '../lib/items'
 import { placeInOrder } from '../lib/layout'
 import { useGestures } from '../lib/useGestures'
+import { tour } from '../lib/tour'
 import type { Guides } from '../lib/snap'
 import { frameHeightFor } from '../lib/exportStory'
 import type { PhotoProps, BubbleProps, CanvasItem, FrameId, ItemPatch, MapProps, Stroke, StickerProps, TextProps } from '../types'
@@ -308,6 +309,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
         }))]
       })
       setSelectedId(ids[0])
+      tour.emit('photo-added')
       // bring the first photo into view
       const first = spots[0]
       const sc = scroller.current
@@ -697,7 +699,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
               >
                 {memory.title}
               </motion.h1>
-              <div className="relative">
+              <div className="relative" data-tour="menu">
                 <IconButton label="More options" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((v) => !v)}>
                   <MoreHorizontal size={21} />
                 </IconButton>

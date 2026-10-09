@@ -12,10 +12,10 @@ interface Props {
   inStory?: boolean
 }
 
-function Btn({ label, active, onClick, children }: { label: string; active?: boolean; onClick: () => void; children: ReactNode }) {
+function Btn({ label, active, onClick, children, tour }: { label: string; active?: boolean; onClick: () => void; children: ReactNode; tour?: string }) {
   return (
     <motion.button
-      type="button" aria-label={label} title={label} aria-pressed={active} whileTap={{ scale: 0.9 }}
+      type="button" aria-label={label} title={label} aria-pressed={active} data-tour={tour} whileTap={{ scale: 0.9 }}
       transition={{ type: 'spring', stiffness: 500, damping: 28 }}
       onClick={onClick}
       className="grid h-12 w-12 place-items-center rounded-full border-0 bg-transparent text-[#17171a]"
@@ -94,16 +94,16 @@ export function BottomToolbar({ visible, onTool, inStory }: Props) {
               className="pointer-events-auto flex items-center gap-1 rounded-full bg-white p-2"
               style={{ boxShadow: '0 10px 34px rgba(20,24,40,.2), 0 2px 6px rgba(20,24,40,.08), 0 0 0 1px rgba(20,24,40,.04)' }}
             >
-              <Btn label="Sticker" onClick={() => pick('sticker')}><Smile size={23} strokeWidth={1.9} /></Btn>
+              <Btn label="Sticker" tour="sticker" onClick={() => pick('sticker')}><Smile size={23} strokeWidth={1.9} /></Btn>
               <Btn label="Draw" onClick={() => pick('draw')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <path d="M15.2 3.6a2.1 2.1 0 0 1 3 3L8.4 16.4 4.6 17.4l1-3.8Z" />
                   <path d="m13.6 5.2 3 3" />
                   <path d="M3 21c2.2-2.2 3.6 1.2 6 0s3.6-2.6 5.4-1.2 3.2.4 4.6-.8" />
                 </svg></Btn>
               <Btn label="Text" onClick={() => pick('text')}><Type size={23} strokeWidth={1.9} /></Btn>
-              <Btn label="Photo" active={photoMenu} onClick={() => { setMore(false); setPhotoMenu((v) => !v) }}><ImageIcon size={23} strokeWidth={1.9} /></Btn>
+              <Btn label="Photo" tour="photo" active={photoMenu} onClick={() => { setMore(false); setPhotoMenu((v) => !v) }}><ImageIcon size={23} strokeWidth={1.9} /></Btn>
               <span className="mx-1 h-7 w-px bg-neutral-200" aria-hidden />
-              <Btn label="More" active={more} onClick={() => { setPhotoMenu(false); setMore((v) => !v) }}><MoreHorizontal size={23} strokeWidth={1.9} /></Btn>
+              <Btn label="More" tour="more" active={more} onClick={() => { setPhotoMenu(false); setMore((v) => !v) }}><MoreHorizontal size={23} strokeWidth={1.9} /></Btn>
             </div>
           </div>
         </motion.div>
