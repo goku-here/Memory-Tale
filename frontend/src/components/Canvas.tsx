@@ -15,7 +15,7 @@ import { bookEase, clipAt } from '../lib/bookTransition'
 import { clamp, cloneItem, frameHeight, nextZ, rnd } from '../lib/items'
 import { placeInOrder } from '../lib/layout'
 import { useGestures } from '../lib/useGestures'
-import { frameHeightFor, SAFE_TOP } from '../lib/exportStory'
+import { frameHeightFor } from '../lib/exportStory'
 import type { PhotoProps, BubbleProps, CanvasItem, FrameId, ItemPatch, MapProps, Stroke, StickerProps, TextProps } from '../types'
 import { formatDate } from './BookCard'
 import { BottomToolbar, type ToolId } from './BottomToolbar'
@@ -34,7 +34,7 @@ import { CameraCapture } from './CameraCapture'
 import { Lightbox, type ViewerImage } from './Lightbox'
 import { ToolSheet as Sheet } from './ToolSheet'
 import { LocationTool } from './LocationTool'
-import { copyText, StoryBar, StoryOverlay, StoryPreview, storyCaption } from './StoryMode'
+import { StoryOverlay, StoryPreview } from './StoryMode'
 import { THREAD_COLORS, ThreadsSvg, threadMid } from './Threads'
 import { IconButton, toast } from './ui'
 import type { Memory } from '../types'
@@ -486,17 +486,6 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     const need = Math.ceil((storyY + frameHeightFor(canvasW) + 300) / 100) * 100
     if (need > heightRef.current) setHeight(need)
   }, [story, storyY, canvasW, setHeight])
-  const addTaleName = () => {
-    const fh = frameHeightFor(canvasW)
-    const h = 56
-    addItem((z) => ({
-      id: '', type: 'text', zIndex: z, x: 50, y: storyYRef.current + fh * SAFE_TOP + h / 2 + 10, width: Math.round(canvasW * 0.8), height: h, rotation: 0,
-      props: { text: memory.title, font: theme.font, size: 38, color: theme.palette[0], align: 'center' },
-    }))
-  }
-  const storyCap = storyCaption(memory, formatDate(memory.date))
-  const copyCaption = async () => toast((await copyText(storyCap)) ? 'Caption copied' : "Couldn't copy the caption")
-
   const onTool = (t: ToolId) => {
     setSelectedId(null)
     switch (t) {
@@ -697,7 +686,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
             }}
           >
             <div className="relative flex items-center justify-between">
-              <IconButton label="Back" onClick={onBack}><ArrowLeft size={21} /></IconButton>
+              <IconButton label={story ? 'Exit story mode' : 'Back'} onClick={story ? leaveStory : onBack}><ArrowLeft size={21} /></IconButton>
               <motion.h1
                 className="pointer-events-none absolute inset-x-14 m-0 truncate text-center text-[26px] font-extrabold leading-tight tracking-tight"
                 style={{ scale: titleScale, y: titleY }}
@@ -742,7 +731,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
               </div>
               {story ? (
                 <motion.button
-                  type="button" onClick={leaveStory} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 460, damping: 28 }}
+                  type="button" onClick={() => setStoryPreview(true)} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 460, damping: 28 }}
                   className="flex h-10 items-center gap-1.5 rounded-full border-0 bg-[#17171a] px-4 text-[14px] font-bold text-white"
                 ><Clapperboard size={16} /> Done</motion.button>
               ) : (
@@ -916,8 +905,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       </AnimatePresence>
 
       <BottomToolbar visible={!sheet && !editingId} inStory={story} accent={accent} onTool={onTool} />
-      <StoryBar visible={story && !sheet && !editingId && !storyPreview} onName={addTaleName} onCaption={() => void copyCaption()} onShare={() => setStoryPreview(true)} />
-      <StoryPreview open={storyPreview} onClose={() => setStoryPreview(false)} memory={memory} caption={storyCap} accent={accent} getItems={() => itemsRef.current} frameY={storyY} canvasW={canvasW} />
+      <StoryPreview open={storyPreview} onClose={() => setStoryPreview(false)} memory={memory} accent={accent} getItems={() => itemsRef.current} frameY={storyY} canvasW={canvasW} />
 
       {/* ---- tool sheets ---- */}
       <ToolSheet

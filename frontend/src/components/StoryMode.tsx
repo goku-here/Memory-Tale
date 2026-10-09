@@ -1,6 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion'
-import { Copy, Download, Loader2, Share2, Type } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { Download, Loader2, Share2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { exportStoryPng, frameHeightFor, SAFE_BOTTOM, SAFE_TOP, storyPrefs } from '../lib/exportStory'
 import type { CanvasItem, Memory } from '../types'
 import { ToolSheet } from './ToolSheet'
@@ -115,53 +115,7 @@ export function StoryOverlay({ surfaceRef, scrollerRef, canvasW, surfaceH, y, on
   )
 }
 
-function BarBtn({ label, icon, onClick, primary }: { label: string; icon: ReactNode; onClick: () => void; primary?: boolean }) {
-  return (
-    <motion.button
-      type="button" whileTap={{ scale: 0.92 }} onClick={onClick} aria-label={label}
-      className="flex h-12 min-w-[72px] flex-col items-center justify-center gap-0.5 rounded-full border-0 px-3 text-[11px] font-bold"
-      style={primary ? { background: '#17171a', color: '#fff' } : { background: 'transparent', color: '#17171a' }}
-    >
-      {icon}{label}
-    </motion.button>
-  )
-}
-
-export function StoryBar({ visible, onName, onShare, onCaption }: { visible: boolean; onName: () => void; onShare: () => void; onCaption: () => void }) {
-  const calm = useReducedMotion()
-  if (!visible) return null
-  return (
-    <motion.div
-      data-ui className="pointer-events-none fixed inset-x-0 z-40 flex justify-center" style={{ bottom: 'calc(var(--safe-bottom) + 100px)' }}
-      initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={calm ? { duration: 0 } : { type: 'spring', stiffness: 380, damping: 30 }}
-    >
-      <div className="pointer-events-auto flex items-center gap-0.5 rounded-full bg-white p-1.5" style={{ boxShadow: '0 10px 34px rgba(20,24,40,.2), 0 0 0 1px rgba(20,24,40,.04)' }}>
-        <BarBtn label="Tale name" icon={<Type size={20} />} onClick={onName} />
-        <BarBtn label="Caption" icon={<Copy size={20} />} onClick={onCaption} />
-        <BarBtn label="Share" icon={<Share2 size={20} />} onClick={onShare} primary />
-      </div>
-    </motion.div>
-  )
-}
-
 export const storyFileName = (title: string) => `memory-tale-${title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'story'}-story.png`
-
-export function storyCaption(memory: Memory, date: string) {
-  return `${memory.title}\n${date}\n\n#MemoryTale`
-}
-
-export async function copyText(text: string) {
-  try { await navigator.clipboard.writeText(text); return true } catch {
-    const ta = document.createElement('textarea')
-    ta.value = text
-    ta.style.cssText = 'position:fixed;opacity:0'
-    document.body.appendChild(ta)
-    ta.select()
-    const ok = document.execCommand('copy')
-    ta.remove()
-    return ok
-  }
-}
 
 export function downloadBlob(blob: Blob, name: string) {
   const a = document.createElement('a')
@@ -175,7 +129,6 @@ interface PreviewProps {
   open: boolean
   onClose: () => void
   memory: Memory
-  caption: string
   accent: string
   getItems: () => CanvasItem[]
   frameY: number
@@ -183,7 +136,7 @@ interface PreviewProps {
 }
 
 /** Renders the story and shows it before anything is shared. */
-export function StoryPreview({ open, onClose, memory, caption, accent, getItems, frameY, canvasW }: PreviewProps) {
+export function StoryPreview({ open, onClose, memory, accent, getItems, frameY, canvasW }: PreviewProps) {
   const [dots, setDots] = useState(storyPrefs.dots)
   const [mark, setMark] = useState(storyPrefs.mark)
   const [state, setState] = useState<{ blob: Blob; url: string } | null>(null)
@@ -207,7 +160,7 @@ export function StoryPreview({ open, onClose, memory, caption, accent, getItems,
     if (!state) return
     const file = new File([state.blob], storyFileName(memory.title), { type: 'image/png' })
     try {
-      if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: memory.title, text: caption }); return }
+      if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: memory.title }); return }
     } catch (e) { if ((e as Error).name === 'AbortError') return }
     downloadBlob(state.blob, file.name)
     toast('Saved the story image')
