@@ -1,9 +1,13 @@
 import { useSyncExternalStore } from 'react'
 
-/** The first-run tour: where it is, and a tiny event bus so the app can tell it what the user just did. */
-interface TourState { active: boolean; step: number }
+/**
+ * The first-run tour: which step it is on, and whether the person is currently *doing* that step
+ * (the card hides while they act and the next one appears once they have). A tiny event bus lets the
+ * app report what the user just did.
+ */
+interface TourState { active: boolean; step: number; phase: 'intro' | 'doing' }
 const KEY = 'mt-tour'
-let state: TourState = { active: false, step: 0 }
+let state: TourState = { active: false, step: 0, phase: 'intro' }
 const subs = new Set<() => void>()
 const set = (s: TourState) => { state = s; subs.forEach((f) => f()) }
 
@@ -12,13 +16,13 @@ const mark = () => { try { localStorage.setItem(KEY, 'done') } catch { /* privat
 
 export const tour = {
   /** begin (or replay) the tour from the first step */
-  start() { set({ active: true, step: 0 }) },
+  start() { set({ active: true, step: 0, phase: 'intro' }) },
   /** leave the tour for good (skip or finish) */
-  stop() { mark(); set({ active: false, step: 0 }) },
+  stop() { mark(); set({ active: false, step: 0, phase: 'intro' }) },
   /** never show the tour to this person (they already have books) */
   dismissSilently: mark,
-  go(step: number) { set({ active: true, step }) },
-  /** the app reports what the user just did: 'create-open' | 'create-close' | 'memory-created' | 'photo-added' */
+  go(step: number, phase: 'intro' | 'doing' = 'intro') { set({ active: true, step, phase }) },
+  /** the app reports what the user just did, e.g. 'create-open', 'memory-created', 'photo-added', 'sticker-added', 'more-used', 'story-open', 'story-close' */
   emit(event: string) { window.dispatchEvent(new CustomEvent('mt-tour', { detail: event })) },
 }
 

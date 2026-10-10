@@ -388,6 +388,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       width: w, height: w / ratio, rotation: Math.round(rnd(-12, 12)), props: s,
     }), { ignoreSheet: true })
     setSheet(null) // close the tray so the new sticker is visible
+    tour.emit('sticker-added')
   }
 
   const addText = () => {
@@ -482,10 +483,11 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     setStoryY(y)
     setSelectedId(null)
     setStory(true)
+    tour.emit('story-open')
     sc.scrollTo({ top: Math.max(0, sf.offsetTop + y - HEADER_H - 10), behavior: 'smooth' })
     try { if (!localStorage.getItem('mt-story-hint')) { localStorage.setItem('mt-story-hint', '1'); toast('Keep titles and faces out of the shaded zones.') } } catch { /* ignore */ }
   }
-  const leaveStory = () => { setStory(false); setStoryPreview(false) }
+  const leaveStory = () => { setStory(false); setStoryPreview(false); tour.emit('story-close') }
   useEffect(() => { if (story) try { localStorage.setItem(storyKey, String(Math.round(storyY))) } catch { /* ignore */ } }, [story, storyY, storyKey])
   useEffect(() => {
     if (!story) return
@@ -494,6 +496,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   }, [story, storyY, canvasW, setHeight])
   const onTool = (t: ToolId) => {
     setSelectedId(null)
+    if (['note', 'bubble', 'line', 'location', 'divider'].includes(t)) tour.emit('more-used')
     switch (t) {
       case 'photo': fileInput.current?.click(); break
       case 'camera': setCameraOpen(true); break
