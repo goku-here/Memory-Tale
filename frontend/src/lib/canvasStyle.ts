@@ -15,6 +15,7 @@ export const isTexture = (p: PatternId) => !!PATTERNS.find((x) => x.id === p)?.t
 
 export interface Swatch { value: string; name: string; why: string }
 const W: Swatch = { value: '#FFFFFF', name: 'White', why: 'Clean and calm: lets your photos do the talking.' }
+const GREY: Swatch = { value: '#E9E9ED', name: 'Light grey', why: 'Neutral and quiet: every colour on top of it stands out.' }
 
 /**
  * Background colours for each kind of memory, chosen for the mood people want to remember it in.
@@ -95,7 +96,7 @@ const EXTRA: Record<CategoryId, { first: Omit<Swatch, 'value'>; list: Swatch[] }
 
 export function swatchesFor(theme: Theme): Swatch[] {
   const e = EXTRA[theme.id] ?? EXTRA.romantic
-  return [{ value: theme.canvasBg, ...e.first }, ...e.list, W]
+  return [{ value: theme.canvasBg, ...e.first }, ...e.list, GREY, W]
 }
 
 export const isDark = (hex: string) => luminance(hex) < 0.3
