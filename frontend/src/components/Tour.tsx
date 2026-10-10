@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { tour, useTour } from '../lib/tour'
 
 type Goto = { to: number; phase?: 'intro' | 'doing' }
@@ -52,6 +52,9 @@ const STEPS: Step[] = [
   { center: true, title: "That's the tour 🎉", body: 'Tip: on your phone, press and hold a photo to pick it up, then drag. Two fingers pinch, resize and rotate. Now go make something worth keeping.', cta: { label: 'Start creating', does: 'next' } },
 ]
 
+/** after the user finishes something, let them enjoy the result for a few seconds before the next card */
+const ENJOY: Record<string, number> = { 'memory-created': 3500, 'photo-added': 3500, 'sticker-added': 3500, 'more-used': 3500, 'story-close': 3000 }
+
 interface Rect { x: number; y: number; w: number; h: number }
 
 /** Coach marks: a spotlight on the real button and a short card. While the person is acting the card steps aside. */
@@ -62,20 +65,28 @@ export function Tour() {
   const [rect, setRect] = useState<Rect | null>(null)
   const [seen, setSeen] = useState<string[]>([])
 
+  const pending = useRef(0)
   useEffect(() => { setSeen([]) }, [step, phase])
+  useEffect(() => () => window.clearTimeout(pending.current), [])
+  useEffect(() => { if (!active) window.clearTimeout(pending.current) }, [active])
 
   // react to what the user does
   useEffect(() => {
     if (!active || !s) return
     const on = (e: Event) => {
       const ev = (e as CustomEvent<string>).detail
+      if (phase === 'wait') return
       const dest = s.on?.[ev]
-      if (dest) tour.go(dest.to, dest.phase ?? 'intro')
+      if (dest && ENJOY[ev]) {
+        tour.go(step, 'wait') // nothing on screen: they look at what they just made
+        window.clearTimeout(pending.current)
+        pending.current = window.setTimeout(() => tour.go(dest.to, dest.phase ?? 'intro'), ENJOY[ev])
+      } else if (dest) tour.go(dest.to, dest.phase ?? 'intro')
       else setSeen((l) => [...l, ev])
     }
     window.addEventListener('mt-tour', on)
     return () => window.removeEventListener('mt-tour', on)
-  }, [active, step, s])
+  }, [active, step, s, phase])
 
   // tapping the spotlighted button starts the step: hide the card and let them get on with it
   useEffect(() => {
@@ -105,7 +116,7 @@ export function Tour() {
     return () => cancelAnimationFrame(raf)
   }, [active, s, phase])
 
-  if (!active || !s) return null
+  if (!active || !s || phase === 'wait') return null
 
   const spring = calm ? { duration: 0 } : { type: 'spring' as const, stiffness: 320, damping: 30 }
   const vh = window.innerHeight

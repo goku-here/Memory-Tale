@@ -5,7 +5,7 @@ import { useSyncExternalStore } from 'react'
  * (the card hides while they act and the next one appears once they have). A tiny event bus lets the
  * app report what the user just did.
  */
-interface TourState { active: boolean; step: number; phase: 'intro' | 'doing' }
+interface TourState { active: boolean; step: number; phase: 'intro' | 'doing' | 'wait' }
 const KEY = 'mt-tour'
 let state: TourState = { active: false, step: 0, phase: 'intro' }
 const subs = new Set<() => void>()
@@ -21,7 +21,7 @@ export const tour = {
   stop() { mark(); set({ active: false, step: 0, phase: 'intro' }) },
   /** never show the tour to this person (they already have books) */
   dismissSilently: mark,
-  go(step: number, phase: 'intro' | 'doing' = 'intro') { set({ active: true, step, phase }) },
+  go(step: number, phase: 'intro' | 'doing' | 'wait' = 'intro') { set({ active: true, step, phase }) },
   /** the app reports what the user just did, e.g. 'create-open', 'memory-created', 'photo-added', 'sticker-added', 'more-used', 'story-open', 'story-close' */
   emit(event: string) { window.dispatchEvent(new CustomEvent('mt-tour', { detail: event })) },
 }
