@@ -28,6 +28,8 @@ export interface GestureOptions {
   scrollerRef: RefObject<HTMLDivElement | null>
   itemsRef: RefObject<CanvasItem[]>
   heightRef: RefObject<number>
+  /** canvas zoom (1 = fit to width); screen movement is divided by it to get canvas movement */
+  zoomRef?: RefObject<number>
   live: (fn: (items: CanvasItem[]) => CanvasItem[]) => void
   begin: () => void
   end: () => void
@@ -74,11 +76,12 @@ export function useGestures(opts: GestureOptions) {
 
   const geometry = () => {
     const r = o.current.surfaceRef.current!.getBoundingClientRect()
-    return { left: r.left, top: r.top, W: r.width }
+    const z = o.current.zoomRef?.current || 1
+    return { left: r.left, top: r.top, W: r.width / z, z }
   }
 
   const baseline = (mode: Mode, st: G) => {
-    const { top, left, W } = geometry()
+    const { top, left, W, z } = geometry()
     const item = o.current.itemsRef.current.find((i) => i.id === st.id)
     if (!item) return
     const pts = [...st.pointers.values()]
@@ -92,7 +95,7 @@ export function useGestures(opts: GestureOptions) {
       scrollTop: o.current.scrollerRef.current?.scrollTop ?? 0,
     }
     if (mode === 'resize' || mode === 'rotate') {
-      const c = { x: left + cx, y: top + item.y }
+      const c = { x: left + cx * z, y: top + item.y * z }
       base.d = Math.max(8, dist(c, pts[0]))
       base.a = ang(c, pts[0])
     }
@@ -108,15 +111,15 @@ export function useGestures(opts: GestureOptions) {
   const update = () => {
     const st = g.current
     if (!st) return
-    const { left, top, W } = geometry()
+    const { left, top, W, z } = geometry()
     const b = st.base
     const pts = [...st.pointers.values()]
     if (!pts.length) return
 
     if (st.mode === 'drag') {
-      const sc = (o.current.scrollerRef.current?.scrollTop ?? 0) - b.scrollTop
-      const nx = b.cx + (pts[0].x - b.p.x)
-      const ny = b.cy + (pts[0].y - b.p.y) + sc
+      const sc = ((o.current.scrollerRef.current?.scrollTop ?? 0) - b.scrollTop) / z
+      const nx = b.cx + (pts[0].x - b.p.x) / z
+      const ny = b.cy + (pts[0].y - b.p.y) / z + sc
       const item = o.current.itemsRef.current.find((i) => i.id === st.id)
       const sn = item && st.moved ? snapDrag(item, nx, ny, W, o.current.itemsRef.current) : null
       o.current.onGuides?.(sn && (sn.guides.v.length || sn.guides.h.length) ? sn.guides : null)
@@ -132,14 +135,14 @@ export function useGestures(opts: GestureOptions) {
       scale = dist(pts[0], pts[1]) / b.d
       rot = b.rot + (ang(pts[0], pts[1]) - b.a)
       const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 }
-      cx = b.cx + (mid.x - b.p.x)
-      cy = b.cy + (mid.y - b.p.y)
+      cx = b.cx + (mid.x - b.p.x) / z
+      cy = b.cy + (mid.y - b.p.y) / z
     } else if (st.mode === 'resize') {
-      const c = { x: left + b.cx, y: top + b.cy }
+      const c = { x: left + b.cx * z, y: top + b.cy * z }
       scale = dist(c, pts[0]) / b.d
       rot = b.rot + (ang(c, pts[0]) - b.a)
     } else if (st.mode === 'rotate') {
-      const c = { x: left + b.cx, y: top + b.cy }
+      const c = { x: left + b.cx * z, y: top + b.cy * z }
       rot = ang(c, pts[0]) + 90
     } else return
 

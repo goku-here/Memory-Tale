@@ -6,12 +6,8 @@ import { ThreadsSvg } from '../components/Threads'
 import { AssetCtx } from './assets'
 import { resolveItemAssets } from '../data/sync'
 import type { CanvasItem, Memory } from '../types'
+import { frameHeightFor, type StorySize } from './storySizes'
 
-export const STORY_W = 1080
-export const STORY_H = 1920
-/** Instagram's own UI covers these parts of a story (fractions of the frame height) */
-export const SAFE_TOP = 0.13
-export const SAFE_BOTTOM = 0.18
 
 /* ---- settings (kept in one place so the watermark can become a premium option later) ---- */
 const KEY_MARK = 'mt-story-mark'
@@ -28,11 +24,10 @@ export const storyPrefs = {
 }
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
-export const frameHeightFor = (canvasW: number) => (canvasW * 16) / 9
 
-function StoryView({ memory, items, canvasW, frameY, dots, mark }: { memory: Memory; items: CanvasItem[]; canvasW: number; frameY: number; dots: boolean; mark: boolean }) {
+function StoryView({ memory, items, canvasW, frameY, dots, mark, size }: { memory: Memory; items: CanvasItem[]; canvasW: number; frameY: number; dots: boolean; mark: boolean; size: StorySize }) {
   const theme = getTheme(memory.themeId)
-  const h = frameHeightFor(canvasW)
+  const h = frameHeightFor(canvasW, size)
   return (
     <div
       style={{
@@ -56,7 +51,7 @@ function StoryView({ memory, items, canvasW, frameY, dots, mark }: { memory: Mem
       ))}
       <ThreadsSvg items={items} canvasW={canvasW} offsetY={frameY} />
       {mark && (
-        <div style={{ position: 'absolute', left: 0, right: 0, bottom: h * 0.065, textAlign: 'center', fontSize: 12, fontWeight: 800, letterSpacing: '.14em', color: 'rgba(23,23,26,.38)', zIndex: 9999 }}>
+        <div style={{ position: 'absolute', left: 0, right: 0, bottom: Math.max(14, h * size.safeBottom * 0.36), textAlign: 'center', fontSize: 12, fontWeight: 800, letterSpacing: '.14em', color: 'rgba(23,23,26,.38)', zIndex: 9999 }}>
           MADE WITH MEMORY TALE
         </div>
       )}
@@ -118,27 +113,27 @@ export async function embeddedFontCSS(node: HTMLElement): Promise<string | undef
   } catch { return undefined }
 }
 
-/** scale whatever html-to-image produced to exactly 1080 x 1920 */
-async function normalise(blob: Blob): Promise<Blob> {
+/** scale whatever html-to-image produced to exactly the chosen size */
+async function normalise(blob: Blob, size: StorySize): Promise<Blob> {
   const url = URL.createObjectURL(blob)
   try {
     const img = new Image()
     img.src = url
     await img.decode()
     const c = document.createElement('canvas')
-    c.width = STORY_W
-    c.height = STORY_H
+    c.width = size.w
+    c.height = size.h
     const ctx = c.getContext('2d')!
     ctx.imageSmoothingQuality = 'high'
-    ctx.drawImage(img, 0, 0, STORY_W, STORY_H)
+    ctx.drawImage(img, 0, 0, size.w, size.h)
     return await new Promise<Blob>((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('Export failed'))), 'image/png'))
   } finally { URL.revokeObjectURL(url) }
 }
 
-export interface StoryOptions { frameY: number; canvasW: number; dots: boolean; mark: boolean }
+export interface StoryOptions { frameY: number; canvasW: number; dots: boolean; mark: boolean; size: StorySize }
 
 /**
- * Renders just what is inside the story frame, off-screen, as a 1080 x 1920 PNG.
+ * Renders just what is inside the story frame, off-screen, as a PNG of the chosen size (1080 x 1920 for a story).
  * Only the items are drawn: no dim mask, safe-zone guides, handles or selection UI.
  */
 export async function exportStoryPng(memory: Memory, current: CanvasItem[], o: StoryOptions): Promise<Blob> {
@@ -150,7 +145,7 @@ export async function exportStoryPng(memory: Memory, current: CanvasItem[], o: S
   try {
     root.render(
       <AssetCtx.Provider value={{ memoryId: memory.id, root: null }}>
-        <StoryView memory={memory} items={items} canvasW={o.canvasW} frameY={o.frameY} dots={o.dots} mark={o.mark} />
+        <StoryView memory={memory} items={items} canvasW={o.canvasW} frameY={o.frameY} dots={o.dots} mark={o.mark} size={o.size} />
       </AssetCtx.Provider>,
     )
     await wait(80)
@@ -160,12 +155,12 @@ export async function exportStoryPng(memory: Memory, current: CanvasItem[], o: S
     await wait(items.some((i) => i.type === 'map') ? 2200 : 350)
     await imagesReady(node)
     const fontEmbedCSS = await embeddedFontCSS(node)
-    const opts = { pixelRatio: STORY_W / o.canvasW, cacheBust: true, backgroundColor: getTheme(memory.themeId).canvasBg, ...(fontEmbedCSS ? { fontEmbedCSS } : {}) }
+    const opts = { pixelRatio: o.size.w / o.canvasW, cacheBust: true, backgroundColor: getTheme(memory.themeId).canvasBg, ...(fontEmbedCSS ? { fontEmbedCSS } : {}) }
     // iOS Safari often paints the first pass blank or without images: render once and throw it away
     if (isIOS() || isSafari()) { await toBlob(node, opts).catch(() => null); await wait(120) }
     const blob = await toBlob(node, opts)
     if (!blob) throw new Error('Export failed')
-    return await normalise(blob)
+    return await normalise(blob, o.size)
   } finally {
     root.unmount()
     host.remove()

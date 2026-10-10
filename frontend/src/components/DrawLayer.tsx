@@ -44,17 +44,19 @@ interface Props {
   onChange: (s: Stroke[]) => void
   /** px at the bottom the sheet covers (pen input is ignored there) */
   bottomInset: number
+  /** canvas zoom (1 = fit to width) */
+  zoom?: number
 }
 
 /** Transparent pointer-capture layer for freehand drawing (page scroll is locked while active). */
-export function DrawLayer({ surfaceRef, strokes, color, size, onChange, bottomInset }: Props) {
+export function DrawLayer({ surfaceRef, strokes, color, size, onChange, bottomInset, zoom = 1 }: Props) {
   const drawing = useRef(false)
   const live = useRef<Stroke[]>(strokes)
   live.current = strokes
 
   const pos = (e: { clientX: number; clientY: number }): [number, number] => {
     const r = surfaceRef.current!.getBoundingClientRect()
-    return [Math.round((e.clientX - r.left) * 10) / 10, Math.round((e.clientY - r.top) * 10) / 10]
+    return [Math.round(((e.clientX - r.left) / zoom) * 10) / 10, Math.round(((e.clientY - r.top) / zoom) * 10) / 10]
   }
 
   return (

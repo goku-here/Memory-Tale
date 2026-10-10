@@ -156,18 +156,21 @@ function TB({ label, onClick, children, danger }: { label: string; onClick: () =
 }
 
 export function SelectionOverlay({
-  item, canvasW, topLimit, accent, actions, hideToolbar,
-}: { item: CanvasItem; canvasW: number; topLimit: number; accent: string; actions: SelectionActions; hideToolbar?: boolean }) {
+  item, canvasW, topLimit, accent, actions, hideToolbar, zoom = 1,
+}: { item: CanvasItem; canvasW: number; topLimit: number; accent: string; actions: SelectionActions; hideToolbar?: boolean; zoom?: number }) {
   const cx = (item.x / 100) * canvasW
   const rad = (item.rotation * Math.PI) / 180
   const hh = (Math.abs(item.width * Math.sin(rad)) + Math.abs(item.height * Math.cos(rad))) / 2
   const [colorsOpen, setColorsOpen] = useState(false)
   const nButtons = 4 + (actions.onEdit ? 1 : 0) + (actions.onFrame ? 1 : 0) + (actions.onConnect ? 1 : 0) + (actions.onView ? 1 : 0) + (actions.onColor ? 1 : 0)
-  const tbW = nButtons * 44 + 16
-  const above = item.y - hh - 62
-  const placeAbove = above > topLimit
-  const tbY = placeAbove ? above : item.y + hh + 16
-  const tbX = Math.min(Math.max(cx, tbW / 2 + 6), canvasW - tbW / 2 - 6)
+  // the toolbar and handles keep their on-screen size however far the canvas is zoomed out
+  const k = 1 / zoom
+  const tbW = (nButtons * 44 + 16) * k
+  const bottomEdge = item.y - hh - 18 * k
+  const placeAbove = bottomEdge - 44 * k > topLimit
+  const tbY = placeAbove ? bottomEdge - 44 : item.y + hh + 16 * k
+  const tbX = Math.min(Math.max(cx, tbW / 2 + 6 * k), canvasW - tbW / 2 - 6 * k)
+  const origin = placeAbove ? '50% 100%' : '50% 0%'
 
   return (
     <>
@@ -191,7 +194,7 @@ export function SelectionOverlay({
         <button
           type="button" data-ui aria-label="Resize and rotate"
           className="pointer-events-auto absolute grid h-11 w-11 touch-none place-items-center border-0 bg-transparent"
-          style={{ right: -26, bottom: -26 }}
+          style={{ right: -26, bottom: -26, transform: `scale(${k})` }}
           onPointerDown={(e) => actions.onHandle(e, 'resize')}
         >
           <span className="grid h-6 w-6 place-items-center rounded-full bg-white shadow" style={{ border: `2px solid ${accent}` }}>
@@ -202,21 +205,19 @@ export function SelectionOverlay({
         <button
           type="button" data-ui aria-label="Rotate"
           className="pointer-events-auto absolute grid h-11 w-11 touch-none place-items-center border-0 bg-transparent"
-          style={{ left: '50%', top: -52, marginLeft: -22 }}
+          style={{ left: '50%', top: -30 * k - 22, marginLeft: -22, transform: `scale(${k})` }}
           onPointerDown={(e) => actions.onHandle(e, 'rotate')}
         >
           <span className="h-3 w-3 rounded-full bg-white" style={{ border: `2px solid ${accent}` }} />
         </button>
-        <i className="absolute left-1/2 -ml-px w-0.5" style={{ top: -30, height: 26, background: accent, opacity: 0.6 }} />
+        <i className="absolute left-1/2 -ml-px w-0.5" style={{ top: -30 * k, height: 26 * k, background: accent, opacity: 0.6 }} />
       </div>
 
       {/* mini toolbar */}
       <AnimatePresence>
-        {!hideToolbar && <motion.div
-          key={item.id}
-          data-ui
-          className="absolute flex items-center rounded-full bg-white px-2"
-          style={{ left: tbX, top: tbY, x: '-50%', zIndex: 9600, boxShadow: '0 6px 22px rgba(20,24,40,.2), 0 0 0 1px rgba(20,24,40,.05)' }}
+        {!hideToolbar && <div key={item.id} data-ui className="absolute" style={{ left: tbX, top: tbY, zIndex: 9600, transform: `translateX(-50%) scale(${k})`, transformOrigin: origin }}><motion.div
+          className="flex items-center rounded-full bg-white px-2"
+          style={{ boxShadow: '0 6px 22px rgba(20,24,40,.2), 0 0 0 1px rgba(20,24,40,.05)' }}
           initial={{ opacity: 0, scale: 0.85, y: placeAbove ? 8 : -8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 500, damping: 30 }}
@@ -230,12 +231,11 @@ export function SelectionOverlay({
           <TB label="Bring forward" onClick={actions.onForward}><BringToFront size={19} /></TB>
           <TB label="Send backward" onClick={actions.onBackward}><SendToBack size={19} /></TB>
           <TB label="Delete" onClick={actions.onDelete} danger><Trash2 size={18} /></TB>
-        </motion.div>}
+        </motion.div></div>}
         {!hideToolbar && colorsOpen && actions.onColor && (
-          <motion.div
-            key="colors" data-ui
-            className="absolute flex items-center gap-0.5 rounded-full bg-white px-2"
-            style={{ left: tbX, top: placeAbove ? tbY - 54 : tbY + 56, x: '-50%', zIndex: 9600, boxShadow: '0 6px 22px rgba(20,24,40,.2), 0 0 0 1px rgba(20,24,40,.05)' }}
+          <div key="colors" data-ui className="absolute" style={{ left: tbX, top: placeAbove ? tbY - 54 * k : tbY + 56 * k, zIndex: 9600, transform: `translateX(-50%) scale(${k})`, transformOrigin: origin }}><motion.div
+            className="flex items-center gap-0.5 rounded-full bg-white px-2"
+            style={{ boxShadow: '0 6px 22px rgba(20,24,40,.2), 0 0 0 1px rgba(20,24,40,.05)' }}
             initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
             transition={{ type: 'spring', stiffness: 500, damping: 30 }}
           >
@@ -251,7 +251,7 @@ export function SelectionOverlay({
                 </span>
               </motion.button>
             ))}
-          </motion.div>
+          </motion.div></div>
         )}
       </AnimatePresence>
     </>
