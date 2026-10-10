@@ -146,12 +146,12 @@ export interface SelectionActions {
   onColor?: (color: string) => void
 }
 
-function TB({ label, onClick, children, danger, caption }: { label: string; onClick: () => void; children: React.ReactNode; danger?: boolean; caption: string }) {
+function TB({ label, onClick, children, danger, caption, w = 42 }: { label: string; onClick: () => void; children: React.ReactNode; danger?: boolean; caption: string; w?: number }) {
   return (
     <motion.button
       type="button" aria-label={label} title={label} whileTap={{ scale: 0.9 }} onClick={onClick}
       onPointerDown={(e) => e.stopPropagation()}
-      className={`grid h-[54px] w-[46px] place-items-center rounded-2xl border-0 bg-transparent ${danger ? 'text-[#d6455d]' : 'text-[#17171a]'}`}
+      style={{ width: w }} className={`grid h-[54px] place-items-center rounded-2xl border-0 bg-transparent ${danger ? 'text-[#d6455d]' : 'text-[#17171a]'}`}
     >
       <span className="flex flex-col items-center gap-1 leading-none">
         {children}
@@ -171,7 +171,10 @@ export function SelectionOverlay({
   const nButtons = locked ? 2 : 4 + (actions.onEdit ? 1 : 0) + (actions.onFrame ? 1 : 0) + (actions.onConnect ? 1 : 0) + (actions.onView ? 1 : 0) + (actions.onColor ? 1 : 0)
   // the toolbar and handles keep their on-screen size however far the canvas is zoomed out
   const k = 1 / zoom
-  const tbW = (nButtons * 46 + 16) * k
+  // a little more room between the buttons on wider screens; phones need the tighter fit
+  const bw = canvasW >= 440 ? 50 : 42
+  const gap = canvasW >= 440 ? 8 : 4
+  const tbW = (nButtons * bw + (nButtons - 1) * gap + 16) * k
   const bottomEdge = item.y - hh - 18 * k
   const placeAbove = bottomEdge - 54 * k > topLimit
   const tbY = placeAbove ? bottomEdge - 54 : item.y + hh + 16 * k
@@ -223,20 +226,20 @@ export function SelectionOverlay({
       <AnimatePresence>
         {!hideToolbar && <div key={item.id} data-ui className="absolute" style={{ left: tbX, top: tbY, zIndex: 9600, transform: `translateX(-50%) scale(${k})`, transformOrigin: origin }}><motion.div
           className="flex items-center rounded-full bg-white px-2"
-          style={{ boxShadow: '0 6px 22px rgba(20,24,40,.2), 0 0 0 1px rgba(20,24,40,.05)' }}
+          style={{ gap, boxShadow: '0 6px 22px rgba(20,24,40,.2), 0 0 0 1px rgba(20,24,40,.05)' }}
           initial={{ opacity: 0, scale: 0.85, y: placeAbove ? 8 : -8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 500, damping: 30 }}
         >
-          {!locked && actions.onView && <TB label="View full size" caption="View" onClick={actions.onView}><IcExpand /></TB>}
-          {actions.onFrame && <TB label="Frame" caption="Frame" onClick={actions.onFrame}><IcFrame /></TB>}
-          {!locked && actions.onColor && <TB label="Note colour" caption="Colour" onClick={() => setColorsOpen((v) => !v)}><IcPalette /></TB>}
-          {!locked && actions.onEdit && <TB label="Edit" caption="Edit" onClick={actions.onEdit}><IcEdit /></TB>}
-          {!locked && actions.onConnect && <TB label="Tie with thread" caption="Thread" onClick={actions.onConnect}><IcThread /></TB>}
-          {!locked && <TB label="Duplicate" caption="Copy" onClick={actions.onDuplicate}><IcCopy /></TB>}
-          {!locked && <TB label="Bring forward" caption="Bring up" onClick={actions.onForward}><IcUp /></TB>}
-          {!locked && <TB label="Send backward" caption="Send down" onClick={actions.onBackward}><IcDown /></TB>}
-          <TB label="Delete" caption="Delete" onClick={actions.onDelete} danger><IcTrash /></TB>
+          {!locked && actions.onView && <TB w={bw} label="View full size" caption="View" onClick={actions.onView}><IcExpand /></TB>}
+          {actions.onFrame && <TB w={bw} label="Frame" caption="Frame" onClick={actions.onFrame}><IcFrame /></TB>}
+          {!locked && actions.onColor && <TB w={bw} label="Note colour" caption="Colour" onClick={() => setColorsOpen((v) => !v)}><IcPalette /></TB>}
+          {!locked && actions.onEdit && <TB w={bw} label="Edit" caption="Edit" onClick={actions.onEdit}><IcEdit /></TB>}
+          {!locked && actions.onConnect && <TB w={bw} label="Tie with thread" caption="Thread" onClick={actions.onConnect}><IcThread /></TB>}
+          {!locked && <TB w={bw} label="Duplicate" caption="Copy" onClick={actions.onDuplicate}><IcCopy /></TB>}
+          {!locked && <TB w={bw} label="Bring forward" caption="Bring up" onClick={actions.onForward}><IcUp /></TB>}
+          {!locked && <TB w={bw} label="Send backward" caption="Send down" onClick={actions.onBackward}><IcDown /></TB>}
+          <TB w={bw} label="Delete" caption="Delete" onClick={actions.onDelete} danger><IcTrash /></TB>
         </motion.div></div>}
         {!hideToolbar && colorsOpen && actions.onColor && (
           <div key="colors" data-ui className="absolute" style={{ left: tbX, top: placeAbove ? tbY - 54 * k : tbY + 56 * k, zIndex: 9600, transform: `translateX(-50%) scale(${k})`, transformOrigin: origin }}><motion.div
