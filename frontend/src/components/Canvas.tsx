@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useMotionValue, useTransform, type MotionValue } from 'framer-motion'
-import { ArrowLeft, Check, ChevronDown, Clapperboard, Image as ImageIcon, ZoomOut, Download, Loader2, MoreHorizontal, Palette, PenLine, Redo2, Share2, Trash2, Undo2, Users, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, Clapperboard, Image as ImageIcon, Download, Loader2, MoreHorizontal, Palette, PenLine, Redo2, Share2, Trash2, Undo2, Users, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../data/useAuth'
 import { useCanvas } from '../data/useCanvas'
@@ -923,7 +923,6 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
                         <MenuItem icon={<Palette size={18} />} label="Change theme" onClick={run(onTheme)} />
                         <MenuItem icon={<Share2 size={18} />} label="Share" onClick={run(onShare)} />
                         {user && <MenuItem icon={<Users size={18} />} label="People" onClick={run(() => setPeopleOpen(true))} />}
-                        {Math.abs(zoom - 1) > 0.001 && <MenuItem icon={<ZoomOut size={18} />} label="Fit to width" onClick={run(() => applyZoom(1))} />}
                         <MenuItem icon={<Download size={18} />} label="Download book" onClick={run(() => void downloadBook())} />
                         <MenuItem danger icon={<Trash2 size={18} />} label="Delete" onClick={run(onDelete)} />
                       </motion.div>
