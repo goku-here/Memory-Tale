@@ -1175,7 +1175,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       <AnimatePresence>
         {connectFrom && (
           <motion.div
-            key="thread-hint" data-ui className="fixed left-1/2 z-40 flex items-center gap-3 rounded-full bg-[#17171a] py-1.5 pl-4 pr-1.5 text-[13.5px] font-bold text-white shadow-[0_10px_28px_rgba(20,24,40,.35)]"
+            key="thread-hint" data-ui className="fixed left-1/2 z-40 flex w-max max-w-[94vw] items-center gap-3 whitespace-nowrap rounded-full bg-[#17171a] py-1.5 pl-4 pr-1.5 text-[13.5px] font-bold text-white shadow-[0_10px_28px_rgba(20,24,40,.35)]"
             style={{ top: 'calc(var(--safe-top) + 138px)', x: '-50%' }}
             initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
           >
