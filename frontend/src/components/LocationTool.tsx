@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Bike, Car, Check, Footprints, Loader2, LocateFixed, MapPin, Search, X } from 'lucide-react'
+import { Bike, Car, Check, Footprints, Motorbike, Loader2, LocateFixed, MapPin, Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { MapProps, MapStyle, Place, TravelMode } from '../types'
 import { fetchRegion, fetchRouteInfo, searchPlaces, type PlaceHit } from '../lib/geo'
@@ -185,11 +185,11 @@ export function LocationTool({ pins, accent, onAdd, initial }: Props) {
       <PlaceField label="Destination" dot={pins[1]} value={to} onPick={setTo} />
 
       <div className="px-5">
-        <div className="mb-3 grid grid-cols-3 gap-1.5 rounded-2xl bg-neutral-100 p-1" role="radiogroup" aria-label="Way of travelling">
-          {([['car', 'Car', Car], ['bike', 'Bike', Bike], ['walk', 'Walk', Footprints]] as const).map(([id, label, Icon]) => (
+        <div className="mb-3 grid grid-cols-4 gap-1.5 rounded-2xl bg-neutral-100 p-1" role="radiogroup" aria-label="Way of travelling">
+          {([['car', 'Car', Car], ['bike', 'Bike', Motorbike], ['cycle', 'Cycle', Bike], ['walk', 'Walk', Footprints]] as const).map(([id, label, Icon]) => (
             <button
               key={id} type="button" role="radio" aria-checked={mode === id} onClick={() => setMode(id)}
-              className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border-0 text-[13.5px] font-bold"
+              className="flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-xl border-0 px-0.5 text-[12px] font-bold leading-none"
               style={mode === id ? { background: '#fff', color: '#17171a', boxShadow: '0 1px 4px rgba(0,0,0,.12)' } : { background: 'transparent', color: '#7a7a85' }}
             ><Icon size={17} /> {label}</button>
           ))}

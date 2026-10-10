@@ -51,9 +51,11 @@ export interface RouteInfo { coords: [number, number][]; seconds?: number }
 export async function fetchRouteInfo(a: Place, b: Place, mode: TravelMode = 'car'): Promise<RouteInfo> {
   const km = distanceKm(a, b)
   // free routing servers for each way of travelling (FOSSGIS, built on OpenStreetMap); the OSRM demo is a car-only fallback
-  const servers = [`https://routing.openstreetmap.de/routed-${mode === 'walk' ? 'foot' : mode === 'bike' ? 'bike' : 'car'}/route/v1/driving`]
-  if (mode === 'car') servers.push('https://router.project-osrm.org/route/v1/driving')
-  if (km < (mode === 'car' ? 1500 : 600)) {
+  // a motorbike uses the same roads as a car; a bicycle and walking have their own networks
+  const profile = mode === 'walk' ? 'foot' : mode === 'cycle' ? 'bike' : 'car'
+  const servers = [`https://routing.openstreetmap.de/routed-${profile}/route/v1/driving`]
+  if (profile === 'car') servers.push('https://router.project-osrm.org/route/v1/driving')
+  if (km < (profile === 'car' ? 1500 : 600)) {
     for (const base of servers) {
       try {
         const ctl = new AbortController()
@@ -63,7 +65,7 @@ export async function fetchRouteInfo(a: Place, b: Place, mode: TravelMode = 'car
         if (!res.ok) continue
         const data = (await res.json()) as { routes?: { duration?: number; geometry: { coordinates: [number, number][] } }[] }
         const coords = data.routes?.[0]?.geometry.coordinates
-        if (coords && coords.length > 1) return { coords: coords.map(([lng, lat]) => [lat, lng] as [number, number]), seconds: data.routes?.[0]?.duration }
+        if (coords && coords.length > 1) return { coords: coords.map(([lng, lat]) => [lat, lng] as [number, number]), seconds: data.routes?.[0]?.duration != null ? data.routes[0].duration * (mode === 'bike' ? 0.88 : 1) : undefined }
       } catch {
         /* try the next server, then fall back to an arc */
       }

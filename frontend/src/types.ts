@@ -110,7 +110,8 @@ export interface Place {
   lng: number
 }
 /** card = map in a frame; route = only the line and pins (no map); around = the map cut out along the route; region = the map cut out in the shape of the area */
-export type TravelMode = 'car' | 'bike' | 'walk'
+/** bike = motorbike or scooter; cycle = bicycle */
+export type TravelMode = 'car' | 'bike' | 'cycle' | 'walk'
 export type MapStyle = 'card' | 'route' | 'around' | 'region'
 export interface MapProps {
   from: Place

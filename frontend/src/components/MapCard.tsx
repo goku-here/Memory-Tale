@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { MapProps } from '../types'
 import { arcRoute, fitProjector, formatDuration } from '../lib/geo'
 
-const MODE_ICON = { car: '🚗', bike: '🚲', walk: '🚶' } as const
+const MODE_ICON = { car: '🚗', bike: '🏍️', cycle: '🚲', walk: '🚶' } as const
 const timeText = (m: MapProps) => (m.seconds ? `${MODE_ICON[m.mode ?? 'car']} ${formatDuration(m.seconds)}` : '')
 
 const startIcon = L.divIcon({
