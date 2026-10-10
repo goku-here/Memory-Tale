@@ -593,6 +593,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   }, [selected, sheet, viewer, cameraOpen])
 
   const run = (fn: () => void) => () => { setMenu(false); fn() }
+  const wasMenu = useRef(false)
+  useEffect(() => { if (wasMenu.current && !menu) tour.emit('menu-close'); wasMenu.current = menu }, [menu])
 
   /* ---------- a deleted/replaced photo takes its stored original with it ---------- */
   const prevPhotos = useRef(new Map<string, string | undefined>())

@@ -81,7 +81,7 @@ export function BottomToolbar({ visible, onTool, inStory }: Props) {
                     ['story', 'Story mode', <RectangleVertical size={19} key="s" />],
                   ] as [ToolId, string, ReactNode][]).filter(([id]) => !(inStory && id === 'story')).map(([id, label, icon]) => (
                     <motion.button
-                      key={id} type="button" role="menuitem" whileTap={{ scale: 0.96 }} onClick={() => pick(id)}
+                      key={id} data-tour={id === 'story' ? 'story-item' : undefined} type="button" role="menuitem" whileTap={{ scale: 0.96 }} onClick={() => pick(id)}
                       className="flex min-h-12 w-full items-center gap-3 rounded-2xl border-0 bg-transparent px-3 text-left text-[15px] font-semibold text-[#17171a]"
                     >
                       {icon}{label}
