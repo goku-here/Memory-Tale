@@ -974,7 +974,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
           </header>
 
           {/* the infinite canvas surface */}
-          <div ref={wrap} className="no-scrollbar" style={{ height: height * zoom, overflowX: 'auto', overflowY: 'hidden', touchAction: 'pan-x pan-y' }}>
+          <div ref={wrap} className="no-scrollbar" style={{ height: height * zoom, overflowX: zoom > 1.001 ? 'auto' : 'hidden', overflowY: 'hidden', touchAction: zoom > 1.001 ? 'pan-x pan-y' : 'pan-y' }}>
           <div ref={inner} style={{ position: 'relative', width: canvasW * Math.max(1, zoom), height: height * zoom }}>
           <div
             ref={surface}
@@ -983,7 +983,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
               position: 'absolute', top: 0, left: zoom < 1 ? (canvasW * (1 - zoom)) / 2 : 0, width: canvasW, height,
               transform: zoom !== 1 ? `scale(${zoom})` : undefined, transformOrigin: 'top left',
               ...rc.css,
-              touchAction: 'pan-x pan-y',
+              touchAction: zoom > 1.001 ? 'pan-x pan-y' : 'pan-y',
             }}
             onClick={(e) => {
               if ((e.target as HTMLElement).closest('[data-item],[data-ui]')) return
