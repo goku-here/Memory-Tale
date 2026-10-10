@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion'
 import { Check, Loader2, LocateFixed, MapPin, Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import type { MapProps, Place } from '../types'
-import { fetchRoute, searchPlaces, type PlaceHit } from '../lib/geo'
+import type { MapProps, MapStyle, Place } from '../types'
+import { fetchRegion, fetchRouteInfo, searchPlaces, type PlaceHit } from '../lib/geo'
 import { MapCard } from './MapCard'
 
 interface FieldProps {
@@ -126,20 +126,51 @@ export function LocationTool({ pins, accent, onAdd, initial }: Props) {
   const [from, setFrom] = useState<Place | null>(initial?.from ?? null)
   const [to, setTo] = useState<Place | null>(initial?.to ?? null)
   const [route, setRoute] = useState<[number, number][] | undefined>(initial?.route)
+  const [seconds, setSeconds] = useState<number | undefined>(initial?.seconds)
+  const [style, setStyle] = useState<MapStyle>(initial?.style ?? 'card')
+  const [color, setColor] = useState(initial?.color ?? '#3B82F6')
+  const [region, setRegion] = useState(initial?.region)
+  const [regionBusy, setRegionBusy] = useState(false)
+  const [regionFailed, setRegionFailed] = useState(false)
   const first = useRef(!!initial)
   const [routing, setRouting] = useState(false)
 
   useEffect(() => {
     if (first.current) { first.current = false; return }
     setRoute(undefined)
+    setSeconds(undefined)
+    setRegion(undefined)
+    setRegionFailed(false)
     if (!from || !to) return
     let alive = true
     setRouting(true)
-    void fetchRoute(from, to).then((r) => { if (alive) { setRoute(r); setRouting(false) } })
+    void fetchRouteInfo(from, to).then((r) => { if (alive) { setRoute(r.coords); setSeconds(r.seconds); setRouting(false) } })
     return () => { alive = false }
   }, [from, to])
 
+  // the area outline is looked up only when asked for
+  useEffect(() => {
+    if (style !== 'region' || region || regionFailed || !from || !to) return
+    let alive = true
+    setRegionBusy(true)
+    void fetchRegion(from, to).then((r) => {
+      if (!alive) return
+      setRegionBusy(false)
+      if (r) setRegion(r)
+      else { setRegionFailed(true); setStyle('around') }
+    })
+    return () => { alive = false }
+  }, [style, region, regionFailed, from, to])
+
   const ready = from && to && route
+  const cut = style !== 'card'
+  const STYLES: { id: MapStyle; label: string }[] = [
+    { id: 'card', label: 'Map card' },
+    { id: 'route', label: 'Route only' },
+    { id: 'around', label: 'Cut out' },
+    { id: 'region', label: 'Area shape' },
+  ]
+  const COLORS = ['#3B82F6', '#FFFFFF', '#EF4444', '#F59E0B', '#111827']
 
   return (
     <div className="space-y-4 pb-2">
@@ -147,13 +178,18 @@ export function LocationTool({ pins, accent, onAdd, initial }: Props) {
       <PlaceField label="Destination" dot={pins[1]} value={to} onPick={setTo} />
 
       <div className="px-5">
-        <div className="relative overflow-hidden rounded-3xl bg-neutral-100" style={{ height: 190 }}>
+        <div className="relative overflow-hidden rounded-3xl" style={{ height: cut ? 230 : 190, background: style === 'route' ? 'linear-gradient(160deg,#6c8a6a,#2f4a3a)' : '#f3f3f6' }}>
           {from && to ? (
-            <div className="absolute inset-0 p-1.5"><MapCard map={{ from, to, route }} /></div>
+            <div className={`absolute inset-0 ${cut ? 'p-0.5' : 'p-1.5'}`}><MapCard key={style + (region ? 'r' : '')} map={{ from, to, route, style, color, seconds, region }} /></div>
           ) : (
             <div className="grid h-full place-items-center px-8 text-center text-[14px] font-semibold text-neutral-400">
               <span><MapPin className="mx-auto mb-2" size={26} />Pick two places to see your route</span>
             </div>
+          )}
+          {regionBusy && (
+            <span className="absolute left-4 top-4 z-[600] flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-[12px] font-bold shadow">
+              <Loader2 size={13} className="animate-spin" /> Finding the area
+            </span>
           )}
           {routing && (
             <span className="absolute left-4 top-4 z-[600] flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-[12px] font-bold shadow">
@@ -164,9 +200,33 @@ export function LocationTool({ pins, accent, onAdd, initial }: Props) {
       </div>
 
       <div className="px-5">
+        <span className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-neutral-400">Look</span>
+        <div className="grid grid-cols-4 gap-1.5 rounded-2xl bg-neutral-100 p-1" role="radiogroup" aria-label="Map look">
+          {STYLES.map((o) => (
+            <button
+              key={o.id} type="button" role="radio" aria-checked={style === o.id} onClick={() => { setRegionFailed(false); setStyle(o.id) }}
+              className="min-h-11 rounded-xl border-0 px-1 text-[12.5px] font-bold leading-tight"
+              style={style === o.id ? { background: '#fff', color: '#17171a', boxShadow: '0 1px 4px rgba(0,0,0,.12)' } : { background: 'transparent', color: '#7a7a85' }}
+            >{o.label}</button>
+          ))}
+        </div>
+        {regionFailed && <p className="m-0 mt-1.5 text-[12px] text-amber-700">Couldn't find an outline for this area, so it is cut out along the route instead.</p>}
+        {style === 'route' && (
+          <div className="mt-3 flex items-center gap-2.5">
+            <span className="text-[12px] font-bold uppercase tracking-wider text-neutral-400">Line</span>
+            {COLORS.map((c) => (
+              <button key={c} type="button" aria-label={`Line colour ${c}`} aria-pressed={color === c} onClick={() => setColor(c)} className="grid h-9 w-9 place-items-center rounded-full border-0 bg-transparent p-0">
+                <span className="h-7 w-7 rounded-full" style={{ background: c, boxShadow: color === c ? '0 0 0 2px #fff, 0 0 0 4px #17171a' : 'inset 0 0 0 1px rgba(0,0,0,.18)' }} />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="px-5">
         <motion.button
-          type="button" whileTap={{ scale: 0.96 }} disabled={!ready}
-          onClick={() => ready && onAdd({ from, to, route })}
+          type="button" whileTap={{ scale: 0.96 }} disabled={!ready || regionBusy}
+          onClick={() => ready && onAdd({ from, to, route, style, color, seconds, region: style === 'region' ? region : undefined })}
           className="flex h-13 min-h-12 w-full items-center justify-center gap-2 rounded-full border-0 bg-[#17171a] text-[15px] font-semibold text-white disabled:opacity-35"
           style={ready ? { boxShadow: `0 8px 22px ${accent}55` } : undefined}
         >

@@ -37,6 +37,7 @@ import { Lightbox, type ViewerImage } from './Lightbox'
 import { ToolSheet as Sheet } from './ToolSheet'
 import { LocationTool } from './LocationTool'
 import { PeopleSheet } from './PeopleSheet'
+import { mapAspect } from '../lib/geo'
 import { CanvasStyleSheet } from './CanvasStyleSheet'
 import { resolveCanvas } from '../lib/canvasStyle'
 import { SizeSheet, StoryOverlay, StoryPreview } from './StoryMode'
@@ -568,8 +569,12 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   }
 
   const addMap = (map: MapProps) => {
+    // route-only and cut-out maps take the shape of the route, so they are as tall as it is
+    const shaped = (map.style ?? 'card') !== 'card'
+    const heightFor = (w: number) => (shaped ? Math.round(clamp(w / mapAspect(map), w * 0.6, w * 1.6)) : Math.round(w * 0.78))
     if (editMapId) {
-      patch(editMapId, { props: { ...map } }, true)
+      const cur = itemsRef.current.find((i) => i.id === editMapId)
+      patch(editMapId, { ...(cur ? { height: heightFor(cur.width) } : {}), props: { ...map } }, true)
       setEditMapId(null)
       setSheet(null)
       return
@@ -578,7 +583,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     setSheet(null)
     window.setTimeout(() => {
       addItem((z, c) => ({
-        id: '', type: 'map', zIndex: z, x: c.x, y: c.y, width: w, height: Math.round(w * 0.78),
+        id: '', type: 'map', zIndex: z, x: c.x, y: c.y, width: w, height: heightFor(w),
         rotation: Math.round(rnd(-3, 3) * 10) / 10, props: map,
       }))
     }, 120)

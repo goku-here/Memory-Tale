@@ -109,11 +109,20 @@ export interface Place {
   lat: number
   lng: number
 }
+/** card = map in a frame; route = only the line and pins (no map); around = the map cut out along the route; region = the map cut out in the shape of the area */
+export type MapStyle = 'card' | 'route' | 'around' | 'region'
 export interface MapProps {
   from: Place
   to: Place
   /** route polyline as [lat, lng] pairs (road route or a curved arc) */
   route?: [number, number][]
+  style?: MapStyle
+  /** colour of the route line (route-only style) */
+  color?: string
+  /** travel time in seconds, shown as a small chip */
+  seconds?: number
+  /** outline(s) of the surrounding area as [lat, lng] rings (region style) */
+  region?: [number, number][][]
 }
 export interface DividerProps {
   label: string

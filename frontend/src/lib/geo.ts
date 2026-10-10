@@ -45,8 +45,10 @@ export function arcRoute(a: Place, b: Place, steps = 48): [number, number][] {
   return out
 }
 
-/** Road route from the public OSRM demo server; falls back to an arc. */
-export async function fetchRoute(a: Place, b: Place): Promise<[number, number][]> {
+export interface RouteInfo { coords: [number, number][]; seconds?: number }
+
+/** Road route (and travel time) from the public OSRM demo server; falls back to an arc. */
+export async function fetchRouteInfo(a: Place, b: Place): Promise<RouteInfo> {
   if (distanceKm(a, b) < 1500) {
     try {
       const ctl = new AbortController()
@@ -55,13 +57,74 @@ export async function fetchRoute(a: Place, b: Place): Promise<[number, number][]
       const res = await fetch(url, { signal: ctl.signal })
       clearTimeout(t)
       if (res.ok) {
-        const data = (await res.json()) as { routes?: { geometry: { coordinates: [number, number][] } }[] }
+        const data = (await res.json()) as { routes?: { duration?: number; geometry: { coordinates: [number, number][] } }[] }
         const coords = data.routes?.[0]?.geometry.coordinates
-        if (coords && coords.length > 1) return coords.map(([lng, lat]) => [lat, lng] as [number, number])
+        if (coords && coords.length > 1) return { coords: coords.map(([lng, lat]) => [lat, lng] as [number, number]), seconds: data.routes?.[0]?.duration }
       }
     } catch {
       /* fall through to the arc */
     }
   }
-  return arcRoute(a, b)
+  return { coords: arcRoute(a, b) }
+}
+
+export const fetchRoute = async (a: Place, b: Place) => (await fetchRouteInfo(a, b)).coords
+
+/** 4980 -> "1 hr 23 min" */
+export function formatDuration(sec: number) {
+  const m = Math.max(1, Math.round(sec / 60))
+  const h = Math.floor(m / 60)
+  return h ? `${h} hr${m % 60 ? ` ${m % 60} min` : ''}` : `${m} min`
+}
+
+/**
+ * Outline of the state / district around a route (Nominatim, OpenStreetMap), as simplified [lat, lng] rings.
+ * Returns null when no outline is found.
+ */
+export async function fetchRegion(a: Place, b: Place): Promise<[number, number][][] | null> {
+  try {
+    const lat = (a.lat + b.lat) / 2, lon = (a.lng + b.lng) / 2
+    const zoom = distanceKm(a, b) > 40 ? 5 : 8
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=${zoom}&polygon_geojson=1&polygon_threshold=0.015&lat=${lat}&lon=${lon}`
+    const res = await fetch(url, { headers: { Accept: 'application/json' } })
+    if (!res.ok) return null
+    const g = ((await res.json()) as { geojson?: { type: string; coordinates: unknown } }).geojson
+    if (!g) return null
+    const raw: [number, number][][] =
+      g.type === 'Polygon' ? [(g.coordinates as [number, number][][])[0]]
+      : g.type === 'MultiPolygon' ? (g.coordinates as [number, number][][][]).map((p) => p[0])
+      : []
+    const rings = raw
+      .filter((r) => r && r.length > 8)
+      .sort((x, y) => y.length - x.length)
+      .slice(0, 4)
+      .map((r) => {
+        const step = Math.max(1, Math.ceil(r.length / 320))
+        return r.filter((_, i) => i % step === 0).map(([lng, la]) => [la, lng] as [number, number])
+      })
+    return rings.length ? rings : null
+  } catch {
+    return null
+  }
+}
+
+/** projection that fits points into a box (flat, scaled by latitude: fine for trips) */
+export function fitProjector(points: [number, number][], box: { w: number; h: number }, pad: { t: number; r: number; b: number; l: number }) {
+  let minLa = Infinity, maxLa = -Infinity, minLo = Infinity, maxLo = -Infinity
+  for (const [la, lo] of points) { minLa = Math.min(minLa, la); maxLa = Math.max(maxLa, la); minLo = Math.min(minLo, lo); maxLo = Math.max(maxLo, lo) }
+  const k = Math.cos((((minLa + maxLa) / 2) * Math.PI) / 180)
+  const spanX = Math.max(1e-6, (maxLo - minLo) * k), spanY = Math.max(1e-6, maxLa - minLa)
+  const sc = Math.min((box.w - pad.l - pad.r) / spanX, (box.h - pad.t - pad.b) / spanY)
+  const ox = pad.l + (box.w - pad.l - pad.r - spanX * sc) / 2
+  const oy = pad.t + (box.h - pad.t - pad.b - spanY * sc) / 2
+  return (la: number, lo: number) => ({ x: ox + (lo - minLo) * k * sc, y: oy + (maxLa - la) * sc })
+}
+
+/** width / height of what a map shows (route, or the region when it is one) */
+export function mapAspect(m: { route?: [number, number][]; region?: [number, number][][]; style?: string; from: Place; to: Place }) {
+  const pts = m.style === 'region' && m.region?.length ? m.region.flat() : m.route?.length ? m.route : [[m.from.lat, m.from.lng], [m.to.lat, m.to.lng]] as [number, number][]
+  let minLa = Infinity, maxLa = -Infinity, minLo = Infinity, maxLo = -Infinity
+  for (const [la, lo] of pts) { minLa = Math.min(minLa, la); maxLa = Math.max(maxLa, la); minLo = Math.min(minLo, lo); maxLo = Math.max(maxLo, lo) }
+  const k = Math.cos((((minLa + maxLa) / 2) * Math.PI) / 180)
+  return Math.max(0.2, ((maxLo - minLo) * k) / Math.max(1e-6, maxLa - minLa))
 }
