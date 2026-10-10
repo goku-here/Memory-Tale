@@ -81,6 +81,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   const surface = useRef<HTMLDivElement>(null)
   /** holds the (scaled) surface; scrolls sideways only when zoomed in */
   const wrap = useRef<HTMLDivElement>(null)
+  const inner = useRef<HTMLDivElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const replaceInput = useRef<HTMLInputElement>(null)
   const scrollY = useMotionValue(0)
@@ -172,6 +173,28 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     zoomRef.current = nz
     setZoomState(nz)
   }, [])
+  /**
+   * Zoom while a finger or wheel is moving: change the DOM directly (no React render per frame, which is what
+   * made pinching feel sticky on phones) and let React catch up shortly after.
+   */
+  const commitTimer = useRef(0)
+  const liveZoom = useCallback((z: number, f: { y: number; screenY: number; x: number; screenX: number }) => {
+    const nz = Math.round(clamp(z, ZMIN, ZMAX) * 1000) / 1000
+    const sf = surface.current, w = wrap.current, sc = scroller.current, box = inner.current
+    if (!sf || !w || !sc || !box) return
+    const cw = canvasWRef.current, h = heightRef.current
+    zoomRef.current = nz
+    box.style.width = `${cw * Math.max(1, nz)}px`
+    box.style.height = `${h * nz}px`
+    w.style.height = `${h * nz}px`
+    sf.style.left = `${nz < 1 ? (cw * (1 - nz)) / 2 : 0}px`
+    sf.style.transform = nz !== 1 ? `scale(${nz})` : ''
+    sc.scrollTop = w.offsetTop + f.y * nz - f.screenY
+    w.scrollLeft = Math.max(0, f.x * nz - (f.screenX - w.getBoundingClientRect().left))
+    window.clearTimeout(commitTimer.current)
+    commitTimer.current = window.setTimeout(() => setZoomState(zoomRef.current), 120)
+  }, [])
+
   // once the page has the new size, scroll so the anchor stays where the fingers are
   useLayoutEffect(() => {
     const a = zoomAnchor.current
@@ -189,31 +212,44 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     const el = scroller.current
     if (!el) return
     let g: { d: number; z: number; y: number; x: number } | null = null
+    let locked: { y: string; x: string } | null = null
+    const unlock = () => {
+      if (!locked) return
+      el.style.overflowY = locked.y
+      if (wrap.current) wrap.current.style.overflowX = locked.x
+      locked = null
+      window.clearTimeout(commitTimer.current)
+      setZoomState(zoomRef.current)
+    }
     const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
     const mid = (t: TouchList) => (t[0].clientY + t[1].clientY) / 2
     const midX = (t: TouchList) => (t[0].clientX + t[1].clientX) / 2
     const start = (e: TouchEvent) => {
       g = null
       if (e.touches.length !== 2 || drawingRef.current || draggingRef.current) return
-      if ([...e.touches].some((t) => (t.target as HTMLElement).closest?.('[data-item],[data-ui]'))) return
+      if ([...e.touches].some((t) => (t.target as HTMLElement).closest?.('[data-ui]'))) return
       const sf = surface.current
       if (!sf) return
+      // the browser must not also scroll while two fingers zoom: lock both scrollers until they lift
+      locked = { y: el.style.overflowY, x: wrap.current?.style.overflowX ?? '' }
+      el.style.overflowY = 'hidden'
+      if (wrap.current) wrap.current.style.overflowX = 'hidden'
       const r = sf.getBoundingClientRect()
       g = { d: Math.max(1, dist(e.touches)), z: zoomRef.current, y: (mid(e.touches) - r.top) / zoomRef.current, x: (midX(e.touches) - r.left) / zoomRef.current }
     }
     const move = (e: TouchEvent) => {
       if (!g || e.touches.length !== 2) return
       if (e.cancelable) e.preventDefault()
-      applyZoom(g.z * (dist(e.touches) / g.d), { y: g.y, screenY: mid(e.touches), x: g.x, screenX: midX(e.touches) })
+      liveZoom(g.z * (dist(e.touches) / g.d), { y: g.y, screenY: mid(e.touches), x: g.x, screenX: midX(e.touches) })
     }
-    const end = (e: TouchEvent) => { if (e.touches.length < 2) g = null }
+    const end = (e: TouchEvent) => { if (e.touches.length < 2) { g = null; unlock() } }
     const wheel = (e: WheelEvent) => {
       if (!e.ctrlKey || drawingRef.current) return
       e.preventDefault()
       const sf = surface.current
       if (!sf) return
       const r = sf.getBoundingClientRect()
-      applyZoom(zoomRef.current * Math.exp(-e.deltaY * 0.01), { y: (e.clientY - r.top) / zoomRef.current, screenY: e.clientY, x: (e.clientX - r.left) / zoomRef.current, screenX: e.clientX })
+      liveZoom(zoomRef.current * Math.exp(-e.deltaY * 0.01), { y: (e.clientY - r.top) / zoomRef.current, screenY: e.clientY, x: (e.clientX - r.left) / zoomRef.current, screenX: e.clientX })
     }
     el.addEventListener('touchstart', start, { passive: true })
     el.addEventListener('touchmove', move, { passive: false })
@@ -226,8 +262,9 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       el.removeEventListener('touchend', end)
       el.removeEventListener('touchcancel', end)
       el.removeEventListener('wheel', wheel)
+      unlock()
     }
-  }, [applyZoom])
+  }, [liveZoom])
 
   const idle = useMotionValue(1)
   const clip = useTransform(reveal?.p ?? idle, (v) => (reveal ? clipAt(reveal.rect, bookEase(v)) : 'none'))
@@ -905,7 +942,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
 
           {/* the infinite canvas surface */}
           <div ref={wrap} className="no-scrollbar" style={{ height: height * zoom, overflowX: 'auto', overflowY: 'hidden', touchAction: 'pan-x pan-y' }}>
-          <div style={{ position: 'relative', width: canvasW * Math.max(1, zoom), height: height * zoom }}>
+          <div ref={inner} style={{ position: 'relative', width: canvasW * Math.max(1, zoom), height: height * zoom }}>
           <div
             ref={surface}
             className="isolate"
