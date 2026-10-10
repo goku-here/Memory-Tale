@@ -1,7 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Camera, Image as ImageIcon } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
-import { IcBubble, IcDraw, IcFlag, IcGrid, IcLine, IcMore, IcNote, IcPhoto, IcPhone, IcPin, IcSticker, IcText } from './ToolIcons'
+import { IcBubble, IcCamera, IcGallery, IcDraw, IcFlag, IcGrid, IcLine, IcMore, IcNote, IcPhoto, IcPhone, IcPin, IcSticker, IcText } from './ToolIcons'
 
 export type ToolId = 'sticker' | 'draw' | 'text' | 'photo' | 'camera' | 'note' | 'location' | 'divider' | 'bubble' | 'line' | 'story' | 'canvas'
 
@@ -56,8 +55,8 @@ export function BottomToolbar({ visible, onTool, inStory }: Props) {
                   transition={{ type: 'spring', stiffness: 480, damping: 30 }}
                 >
                   {([
-                    ['camera', 'Take a photo', <Camera size={19} key="c" />],
-                    ['photo', 'Choose from gallery', <ImageIcon size={19} key="g" />],
+                    ['camera', 'Take a photo', <IcCamera key="c" />],
+                    ['photo', 'Choose from gallery', <IcGallery key="g" />],
                   ] as [ToolId, string, ReactNode][]).map(([id, label, icon]) => (
                     <motion.button
                       key={id} type="button" role="menuitem" whileTap={{ scale: 0.96 }} onClick={() => pick(id)}

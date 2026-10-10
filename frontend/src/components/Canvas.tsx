@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useMotionValue, useTransform, type MotionValue } from 'framer-motion'
-import { ArrowLeft, Check, ChevronDown, Clapperboard, Image as ImageIcon, Download, Loader2, MoreHorizontal, Palette, PenLine, Redo2, Share2, Trash2, Undo2, Users, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, Clapperboard, Image as ImageIcon, Loader2, MoreHorizontal, Redo2, Trash2, Undo2, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../data/useAuth'
 import { useCanvas } from '../data/useCanvas'
@@ -39,6 +39,7 @@ import { LocationTool } from './LocationTool'
 import { PeopleSheet } from './PeopleSheet'
 import { mapAspect } from '../lib/geo'
 import { CanvasStyleSheet } from './CanvasStyleSheet'
+import { IcDownload, IcEdit, IcPalette, IcPeople, IcShare, IcTrash } from './ToolIcons'
 import { resolveCanvas } from '../lib/canvasStyle'
 import { SizeSheet, StoryOverlay, StoryPreview } from './StoryMode'
 import { THREAD_COLORS, ThreadsSvg, threadMid } from './Threads'
@@ -65,7 +66,7 @@ function MenuItem({ icon, label, onClick, danger }: { icon: ReactNode; label: st
       type="button" role="menuitem" whileTap={{ scale: 0.97 }} onClick={onClick}
       className={`flex min-h-11 w-full items-center gap-3 rounded-xl border-0 bg-transparent px-3 text-left text-[15px] font-semibold ${danger ? 'text-[#d6455d]' : 'text-[#17171a]'}`}
     >
-      {icon}
+      <span className="grid h-6 w-6 shrink-0 place-items-center [&_svg]:h-[22px] [&_svg]:w-[22px]">{icon}</span>
       {label}
     </motion.button>
   )
@@ -920,12 +921,12 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
                         initial={{ opacity: 0, scale: 0.85, y: -6 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }}
                         transition={{ type: 'spring', stiffness: 460, damping: 30 }}
                       >
-                        <MenuItem icon={<PenLine size={18} />} label="Edit book" onClick={run(onEdit)} />
-                        <MenuItem icon={<Palette size={18} />} label="Change theme" onClick={run(onTheme)} />
-                        <MenuItem icon={<Share2 size={18} />} label="Share" onClick={run(onShare)} />
-                        {user && <MenuItem icon={<Users size={18} />} label="People" onClick={run(() => setPeopleOpen(true))} />}
-                        <MenuItem icon={<Download size={18} />} label="Download book" onClick={run(() => void downloadBook())} />
-                        <MenuItem danger icon={<Trash2 size={18} />} label="Delete" onClick={run(onDelete)} />
+                        <MenuItem icon={<IcEdit />} label="Edit book" onClick={run(onEdit)} />
+                        <MenuItem icon={<IcPalette />} label="Change theme" onClick={run(onTheme)} />
+                        <MenuItem icon={<IcShare />} label="Share" onClick={run(onShare)} />
+                        {user && <MenuItem icon={<IcPeople />} label="People" onClick={run(() => setPeopleOpen(true))} />}
+                        <MenuItem icon={<IcDownload />} label="Download book" onClick={run(() => void downloadBook())} />
+                        <MenuItem danger icon={<IcTrash />} label="Delete" onClick={run(onDelete)} />
                       </motion.div>
                     </>
                   )}

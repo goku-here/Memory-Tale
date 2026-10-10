@@ -181,3 +181,45 @@ export const IcPhone = () => (
     <rect x="6" y="2.4" width="12" height="19.2" rx="3.4" fill="url(#ic-phone)" stroke="#6B63E8" strokeWidth="2.3" />
   </S>
 )
+
+export const IcCamera = () => (
+  <S>
+    <defs><G id="ic-cam" a="#8FAEFF" b="#3F6BF5" /></defs>
+    <path d="M8.6 5.6l.9-1.7A1.3 1.3 0 0 1 10.7 3h2.6a1.3 1.3 0 0 1 1.2.9l.9 1.7H19A2.5 2.5 0 0 1 21.5 8v10a2.5 2.5 0 0 1-2.5 2.5H5A2.5 2.5 0 0 1 2.5 18V8A2.5 2.5 0 0 1 5 5.6Z" fill="url(#ic-cam)" />
+    <circle cx="12" cy="12.6" r="4.6" fill="#fff" /><circle cx="12" cy="12.6" r="2.6" fill="#2F62F0" />
+    <circle cx="18.2" cy="8.8" r="1" fill="#fff" opacity=".85" />
+  </S>
+)
+
+export const IcGallery = () => (
+  <S>
+    <defs><G id="ic-gal" a="#CFE2FF" b="#8CB0FF" /><G id="ic-galh" a="#5C93FF" b="#1F5BEF" /></defs>
+    <rect x="6" y="2.5" width="15.5" height="14" rx="3.2" fill="#C5D6FB" />
+    <rect x="2.5" y="6.5" width="15.5" height="14.5" rx="3.4" fill="url(#ic-gal)" />
+    <circle cx="7.4" cy="11.2" r="1.9" fill="#2F62F0" />
+    <path d="M3.6 20.6c0-.6.2-1.1.7-1.6l4.2-4.4a1.4 1.4 0 0 1 2 0L18 20.5v.5H4.5Z" fill="url(#ic-galh)" />
+  </S>
+)
+
+export const IcShare = () => (
+  <S>
+    <path d="M6.5 12 17.5 6M6.5 12l11 6" stroke="#8FAEF5" strokeWidth="2" strokeLinecap="round" />
+    <circle cx="6" cy="12" r="3.4" fill="#2F62F0" /><circle cx="18" cy="5.6" r="3.2" fill="#5B8CFF" /><circle cx="18" cy="18.4" r="3.2" fill="#5B8CFF" />
+  </S>
+)
+
+export const IcPeople = () => (
+  <S>
+    <circle cx="16.6" cy="8.4" r="3" fill="#B7C6F7" />
+    <path d="M12.6 19.5c.2-3.1 1.9-5 4-5s3.8 1.9 4 5Z" fill="#B7C6F7" />
+    <circle cx="9.4" cy="8" r="3.6" fill="#2F62F0" />
+    <path d="M2.8 20.2c.3-3.8 2.7-6.2 6.6-6.2s6.3 2.4 6.6 6.2Z" fill="#3F6BF5" />
+  </S>
+)
+
+export const IcDownload = () => (
+  <S>
+    <path d="M4 14.6v3.4A2.6 2.6 0 0 0 6.6 20.6h10.8A2.6 2.6 0 0 0 20 18v-3.4" stroke="#8FAEF5" strokeWidth="2.4" strokeLinecap="round" />
+    <path d="M12 3.4v11M7.4 10.2 12 14.8l4.6-4.6" stroke="#2F62F0" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+  </S>
+)
