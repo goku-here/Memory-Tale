@@ -15,7 +15,7 @@ import { bookEase, clipAt } from '../lib/bookTransition'
 import { clamp, cloneItem, frameHeight, nextZ, rnd } from '../lib/items'
 import { placeInOrder } from '../lib/layout'
 import { useGestures } from '../lib/useGestures'
-import { tour } from '../lib/tour'
+import { tour, tourSeen } from '../lib/tour'
 import type { Guides } from '../lib/snap'
 import { frameHeightFor } from '../lib/exportStory'
 import type { PhotoProps, BubbleProps, CanvasItem, FrameId, ItemPatch, MapProps, Stroke, StickerProps, TextProps } from '../types'
@@ -200,6 +200,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       }
       commit((list) => [...list, { id: uid(), type: 'thread', x: 0, y: 0, width: 0, height: 0, rotation: 0, zIndex: 0, props: { a: from, b: id, color: THREAD_COLORS[0] } }])
       toast('Tied with a thread')
+      tour.emit('thread-made')
       return
     }
     rawStart(e, id)
@@ -253,6 +254,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       end()
       if (it?.type === 'text' && !it.props.text.trim()) setSelectedId(null)
     } else if (sheet === 'frame' || sheet === 'bubble') end()
+    if (sheet === 'frame') tour.emit('frame-close')
     setSheet(null)
     setCaptionFocus(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -516,6 +518,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
 
   const reorder = (dir: 1 | -1) => {
     if (!selected) return
+    tour.emit('reorder')
     commit((list) => {
       const order = list.filter((x) => x.type !== 'thread').sort((a, b) => a.zIndex - b.zIndex)
       const i = order.findIndex((x) => x.id === selected.id)
@@ -593,6 +596,13 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   }, [selected, sheet, viewer, cameraOpen])
 
   const run = (fn: () => void) => () => { setMenu(false); fn() }
+
+  // the first time something is selected, show what the little toolbar does (never over the main tour)
+  useEffect(() => {
+    if (!selectedId || story || sheet || tourSeen('select') || tour.isActive()) return
+    const t = window.setTimeout(() => { if (!tour.isActive() && !tourSeen('select')) tour.start('select') }, 900)
+    return () => window.clearTimeout(t)
+  }, [selectedId, story, sheet])
   const wasMenu = useRef(false)
   useEffect(() => { if (wasMenu.current && !menu) tour.emit('menu-close'); wasMenu.current = menu }, [menu])
 
