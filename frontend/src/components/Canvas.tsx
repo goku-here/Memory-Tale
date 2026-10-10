@@ -68,8 +68,9 @@ function MenuItem({ icon, label, onClick, danger }: { icon: ReactNode; label: st
 }
 
 const HEADER_H = 116
-/** smallest zoom: 40% shows two and a half screens at once. 1 = fit to width (the largest, so the canvas never scrolls sideways). */
+/** 40% shows two and a half screens at once; 1 = fit to width; above 1 you zoom in to edit (and can scroll sideways). */
 const ZMIN = 0.4
+const ZMAX = 3
 /** phones open photos with a tap; the expand button is only for mouse users */
 const hasMouse = () => typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches && !window.matchMedia('(pointer: coarse)').matches
 
@@ -78,6 +79,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   const accent = theme.palette[0]
   const scroller = useRef<HTMLDivElement>(null)
   const surface = useRef<HTMLDivElement>(null)
+  /** holds the (scaled) surface; scrolls sideways only when zoomed in */
+  const wrap = useRef<HTMLDivElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const replaceInput = useRef<HTMLInputElement>(null)
   const scrollY = useMotionValue(0)
@@ -91,7 +94,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   const [story, setStory] = useState(false)
   const [zoom, setZoomState] = useState(1)
   const zoomRef = useRef(1)
-  const zoomAnchor = useRef<{ y: number; screenY: number } | null>(null)
+  const zoomAnchor = useRef<{ y: number; screenY: number; x?: number; screenX?: number } | null>(null)
   const preStoryZoom = useRef(1)
   const [sizeId, setSizeId] = useState<string | null>(() => { try { return localStorage.getItem(`mt-story-size:${memory.id}`) } catch { return null } })
   const size: StorySize = getSize(sizeId)
@@ -109,6 +112,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   const [sheet, setSheet] = useState<Sheet>(null)
   const [sheetHs, setSheetHs] = useState<Record<string, number>>({})
   const [canvasW, setCanvasW] = useState(() => Math.min(window.innerWidth, 520))
+  const canvasWRef = useRef(canvasW)
+  canvasWRef.current = canvasW
   const [captionFocus, setCaptionFocus] = useState(false)
   const [editMapId, setEditMapId] = useState<string | null>(null)
   const [viewer, setViewer] = useState<{ images: ViewerImage[]; start: number } | null>(null)
@@ -141,17 +146,26 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   draggingRef.current = draggingId
 
   /** change the zoom, keeping the picked canvas point (`y`) under `screenY` */
-  const applyZoom = useCallback((z: number, focal?: { y: number; screenY: number }) => {
-    const nz = Math.round(clamp(z, ZMIN, 1) * 1000) / 1000
+  const applyZoom = useCallback((z: number, focal?: { y: number; screenY: number; x?: number; screenX?: number }) => {
+    const nz = Math.round(clamp(z, ZMIN, ZMAX) * 1000) / 1000
     const sf = surface.current
-    if (!focal && sf) {
+    if (sf) {
+      const r = sf.getBoundingClientRect()
       const mid = (HEADER_H + window.innerHeight - 110) / 2
-      focal = { y: (mid - sf.getBoundingClientRect().top) / zoomRef.current, screenY: mid }
+      const midX = window.innerWidth / 2
+      // anything not given is the middle of what is on screen
+      focal = {
+        y: focal?.y ?? (mid - r.top) / zoomRef.current, screenY: focal?.screenY ?? mid,
+        x: focal?.x ?? (midX - r.left) / zoomRef.current, screenX: focal?.screenX ?? midX,
+      }
     }
     zoomAnchor.current = focal ?? null
     if (nz === zoomRef.current) {
       // same zoom: still honour the anchor (scroll to it)
-      if (focal && sf && scroller.current) scroller.current.scrollTop = sf.offsetTop + focal.y * nz - focal.screenY
+      if (focal && sf && scroller.current && wrap.current) {
+        scroller.current.scrollTop = wrap.current.offsetTop + focal.y * nz - focal.screenY
+        wrap.current.scrollLeft = focal.x! * nz - (focal.screenX! - wrap.current.getBoundingClientRect().left)
+      }
       zoomAnchor.current = null
       return
     }
@@ -162,30 +176,35 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   useLayoutEffect(() => {
     const a = zoomAnchor.current
     const sc = scroller.current
-    const sf = surface.current
+    const w = wrap.current
     zoomAnchor.current = null
-    if (a && sc && sf) sc.scrollTop = sf.offsetTop + a.y * zoom - a.screenY
+    if (a && sc && w) {
+      sc.scrollTop = w.offsetTop + a.y * zoom - a.screenY
+      if (a.x !== undefined && a.screenX !== undefined) w.scrollLeft = Math.max(0, a.x * zoom - (a.screenX - w.getBoundingClientRect().left))
+    }
   }, [zoom])
 
   // pinch with two fingers on the empty canvas, or Ctrl + wheel / trackpad pinch
   useEffect(() => {
     const el = scroller.current
     if (!el) return
-    let g: { d: number; z: number; y: number } | null = null
+    let g: { d: number; z: number; y: number; x: number } | null = null
     const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
     const mid = (t: TouchList) => (t[0].clientY + t[1].clientY) / 2
+    const midX = (t: TouchList) => (t[0].clientX + t[1].clientX) / 2
     const start = (e: TouchEvent) => {
       g = null
       if (e.touches.length !== 2 || drawingRef.current || draggingRef.current) return
       if ([...e.touches].some((t) => (t.target as HTMLElement).closest?.('[data-item],[data-ui]'))) return
       const sf = surface.current
       if (!sf) return
-      g = { d: Math.max(1, dist(e.touches)), z: zoomRef.current, y: (mid(e.touches) - sf.getBoundingClientRect().top) / zoomRef.current }
+      const r = sf.getBoundingClientRect()
+      g = { d: Math.max(1, dist(e.touches)), z: zoomRef.current, y: (mid(e.touches) - r.top) / zoomRef.current, x: (midX(e.touches) - r.left) / zoomRef.current }
     }
     const move = (e: TouchEvent) => {
       if (!g || e.touches.length !== 2) return
       if (e.cancelable) e.preventDefault()
-      applyZoom(g.z * (dist(e.touches) / g.d), { y: g.y, screenY: mid(e.touches) })
+      applyZoom(g.z * (dist(e.touches) / g.d), { y: g.y, screenY: mid(e.touches), x: g.x, screenX: midX(e.touches) })
     }
     const end = (e: TouchEvent) => { if (e.touches.length < 2) g = null }
     const wheel = (e: WheelEvent) => {
@@ -193,7 +212,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       e.preventDefault()
       const sf = surface.current
       if (!sf) return
-      applyZoom(zoomRef.current * Math.exp(-e.deltaY * 0.01), { y: (e.clientY - sf.getBoundingClientRect().top) / zoomRef.current, screenY: e.clientY })
+      const r = sf.getBoundingClientRect()
+      applyZoom(zoomRef.current * Math.exp(-e.deltaY * 0.01), { y: (e.clientY - r.top) / zoomRef.current, screenY: e.clientY, x: (e.clientX - r.left) / zoomRef.current, screenX: e.clientX })
     }
     el.addEventListener('touchstart', start, { passive: true })
     el.addEventListener('touchmove', move, { passive: false })
@@ -217,9 +237,9 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
 
   useEffect(() => { scroller.current?.scrollTo(0, 0) }, [])
   useEffect(() => {
-    const el = surface.current
+    const el = wrap.current
     if (!el) return
-    const ro = new ResizeObserver(() => { const w = el.offsetWidth; setCanvasW(w); cv.setWidth(w) })
+    const ro = new ResizeObserver(() => { const w = el.clientWidth; setCanvasW(w); cv.setWidth(w) })
     ro.observe(el)
     return () => ro.disconnect()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -238,7 +258,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     const r = surface.current!.getBoundingClientRect()
     const top = HEADER_H + 20
     const bottom = window.innerHeight - (ignoreSheet ? 110 : Math.max(sheetH, 110))
-    return { x: 50, y: Math.max(160, ((top + bottom) / 2 - r.top) / zoomRef.current) }
+    const x = ((window.innerWidth / 2 - r.left) / zoomRef.current / Math.max(1, canvasWRef.current)) * 100
+    return { x: clamp(x, 8, 92), y: Math.max(160, ((top + bottom) / 2 - r.top) / zoomRef.current) }
   }, [sheetH])
 
   const addItem = useCallback((make: (z: number, c: { x: number; y: number }) => CanvasItem, opts: { record?: boolean; ignoreSheet?: boolean } = {}) => {
@@ -505,7 +526,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     setSheet(null)
     window.setTimeout(() => {
       addItem((z, c) => ({
-        id: '', type: 'map', zIndex: z, x: 50, y: c.y, width: w, height: Math.round(w * 0.78),
+        id: '', type: 'map', zIndex: z, x: c.x, y: c.y, width: w, height: Math.round(w * 0.78),
         rotation: Math.round(rnd(-3, 3) * 10) / 10, props: map,
       }))
     }, 120)
@@ -523,7 +544,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   const addLine = () => {
     const w = Math.round(clamp(canvasW * 0.86, 260, 380))
     const id = addItem((z, c) => ({
-      id: '', type: 'clothesline', zIndex: z, x: 50, y: c.y, width: w, height: Math.round(w * 0.64), rotation: 0,
+      id: '', type: 'clothesline', zIndex: z, x: c.x, y: c.y, width: w, height: Math.round(w * 0.64), rotation: 0,
       props: { photos: ['', '', ''] },
     }))
     slotTarget.current = { id, index: 0 }
@@ -549,7 +570,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
   const addDivider = () => {
     const n = itemsRef.current.filter((i) => i.type === 'divider').length + 1
     addItem((z, c) => ({
-      id: '', type: 'divider', zIndex: z, x: 50, y: c.y, width: Math.round(canvasW * 0.9), height: 44, rotation: 0,
+      id: '', type: 'divider', zIndex: z, x: c.x, y: c.y, width: Math.round(canvasW * 0.9), height: 44, rotation: 0,
       props: { label: `Stop ${n}`, color: theme.palette[1] ?? accent },
     }))
   }
@@ -570,7 +591,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     tour.emit('story-open')
     preStoryZoom.current = zoomRef.current
     fitFrame(y, size)
-    sc.scrollTo({ top: Math.max(0, sf.offsetTop + y * zoomRef.current - HEADER_H - 10), behavior: 'smooth' })
+    sc.scrollTo({ top: Math.max(0, (wrap.current?.offsetTop ?? 0) + y * zoomRef.current - HEADER_H - 10), behavior: 'smooth' })
     try { if (!localStorage.getItem('mt-story-hint')) { localStorage.setItem('mt-story-hint', '1'); toast('Keep titles and faces out of the shaded zones.') } } catch { /* ignore */ }
   }
   const leaveStory = () => { setStory(false); setStoryPreview(false); applyZoom(preStoryZoom.current); tour.emit('story-close') }
@@ -827,7 +848,12 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
                         <MenuItem icon={<Palette size={18} />} label="Change theme" onClick={run(onTheme)} />
                         <MenuItem icon={<Share2 size={18} />} label="Share" onClick={run(onShare)} />
                         {user && <MenuItem icon={<Users size={18} />} label="People" onClick={run(() => setPeopleOpen(true))} />}
-                        <MenuItem icon={zoom < 1 ? <ZoomIn size={18} /> : <ZoomOut size={18} />} label={zoom < 1 ? 'Fit to width' : 'Zoom out'} onClick={run(() => applyZoom(zoom < 1 ? 1 : 0.5))} />
+                        {Math.abs(zoom - 1) > 0.001
+                          ? <MenuItem icon={<ZoomOut size={18} />} label="Fit to width" onClick={run(() => applyZoom(1))} />
+                          : <>
+                              <MenuItem icon={<ZoomIn size={18} />} label="Zoom in" onClick={run(() => applyZoom(1.75))} />
+                              <MenuItem icon={<ZoomOut size={18} />} label="Zoom out" onClick={run(() => applyZoom(0.5))} />
+                            </>}
                         <MenuItem icon={<Download size={18} />} label="Download book" onClick={run(() => void downloadBook())} />
                         <MenuItem danger icon={<Trash2 size={18} />} label="Delete" onClick={run(onDelete)} />
                       </motion.div>
@@ -878,16 +904,17 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
           </header>
 
           {/* the infinite canvas surface */}
-          <div style={{ height: height * zoom }}>
+          <div ref={wrap} className="no-scrollbar" style={{ height: height * zoom, overflowX: 'auto', overflowY: 'hidden', touchAction: 'pan-x pan-y' }}>
+          <div style={{ position: 'relative', width: canvasW * Math.max(1, zoom), height: height * zoom }}>
           <div
             ref={surface}
-            className="relative isolate"
+            className="isolate"
             style={{
-              height,
-              transform: zoom < 1 ? `scale(${zoom})` : undefined, transformOrigin: 'top center',
+              position: 'absolute', top: 0, left: zoom < 1 ? (canvasW * (1 - zoom)) / 2 : 0, width: canvasW, height,
+              transform: zoom !== 1 ? `scale(${zoom})` : undefined, transformOrigin: 'top left',
               backgroundImage: `radial-gradient(${theme.dot} 1.5px, transparent 1.7px)`,
               backgroundSize: '22px 22px',
-              touchAction: 'pan-y',
+              touchAction: 'pan-x pan-y',
             }}
             onClick={(e) => {
               if ((e.target as HTMLElement).closest('[data-item],[data-ui]')) return
@@ -970,6 +997,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
             )}
           </div>
           </div>
+          </div>
         </div>
       </div>
 
@@ -1046,15 +1074,15 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       </AnimatePresence>
 
       <AnimatePresence>
-        {zoom < 0.999 && !drawing && !story && (
+        {Math.abs(zoom - 1) > 0.001 && !drawing && !story && (
           <motion.div
             key="zoom" data-ui className="fixed right-3 z-40 flex items-center rounded-full bg-white p-1"
             style={{ bottom: 'calc(var(--safe-bottom) + 96px)', boxShadow: '0 6px 22px rgba(20,24,40,.2), 0 0 0 1px rgba(20,24,40,.05)' }}
             initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
           >
-            <button type="button" aria-label="Zoom out" disabled={zoom <= ZMIN + 0.001} onClick={() => applyZoom(zoom - 0.15)} className="grid h-10 w-10 place-items-center rounded-full border-0 bg-transparent text-[#17171a] disabled:opacity-30"><Minus size={18} /></button>
+            <button type="button" aria-label="Zoom out" disabled={zoom <= ZMIN + 0.001} onClick={() => applyZoom(zoom - (zoom > 1.001 ? 0.25 : 0.15))} className="grid h-10 w-10 place-items-center rounded-full border-0 bg-transparent text-[#17171a] disabled:opacity-30"><Minus size={18} /></button>
             <button type="button" aria-label="Fit to width" onClick={() => applyZoom(1)} className="h-10 min-w-[48px] rounded-full border-0 bg-transparent px-1 text-[13px] font-extrabold text-[#17171a]">{Math.round(zoom * 100)}%</button>
-            <button type="button" aria-label="Zoom in" onClick={() => applyZoom(zoom + 0.15)} className="grid h-10 w-10 place-items-center rounded-full border-0 bg-transparent text-[#17171a]"><ZoomIn size={18} /></button>
+            <button type="button" aria-label="Zoom in" disabled={zoom >= ZMAX - 0.001} onClick={() => applyZoom(zoom + (zoom >= 1 ? 0.25 : 0.15))} className="grid h-10 w-10 place-items-center rounded-full border-0 bg-transparent text-[#17171a] disabled:opacity-30"><ZoomIn size={18} /></button>
           </motion.div>
         )}
       </AnimatePresence>

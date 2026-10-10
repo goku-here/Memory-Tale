@@ -107,7 +107,7 @@ export const CanvasItemView = memo(function CanvasItemView({ item, canvasW, sele
         left: 0, top: 0, width: item.width, height: item.type === 'text' ? 'auto' : item.height,
         marginLeft: -item.width / 2, marginTop: -item.height / 2,
         x: (item.x / 100) * canvasW, y: item.y, rotate: item.rotation, zIndex: item.zIndex,
-        touchAction: selected ? 'none' : 'pan-y', cursor: dragging ? 'grabbing' : 'grab', willChange: 'transform',
+        touchAction: selected ? 'none' : 'pan-x pan-y', cursor: dragging ? 'grabbing' : 'grab', willChange: 'transform',
       }}
       initial={{ scale: 0.5, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
