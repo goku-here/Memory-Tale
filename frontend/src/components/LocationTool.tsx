@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Bike, Car, Check, Footprints, Motorbike, Loader2, LocateFixed, MapPin, Search, X } from 'lucide-react'
+import { Bike, Car, Check, Footprints, Motorbike, Plus, Loader2, LocateFixed, MapPin, Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { MapProps, MapStyle, Place, TravelMode } from '../types'
 import { fetchRegion, fetchRouteInfo, searchPlaces, type PlaceHit } from '../lib/geo'
@@ -125,6 +125,9 @@ interface Props {
 export function LocationTool({ pins, accent, onAdd, initial }: Props) {
   const [from, setFrom] = useState<Place | null>(initial?.from ?? null)
   const [to, setTo] = useState<Place | null>(initial?.to ?? null)
+  const [stops, setStops] = useState<(Place | null)[]>(initial?.stops ?? [])
+  const via = stops.filter((s): s is Place => !!s)
+  const viaKey = JSON.stringify(via.map((s) => [s.lat, s.lng]))
   const [route, setRoute] = useState<[number, number][] | undefined>(initial?.route)
   const [seconds, setSeconds] = useState<number | undefined>(initial?.seconds)
   const [style, setStyle] = useState<MapStyle>(initial?.style ?? 'card')
@@ -142,7 +145,7 @@ export function LocationTool({ pins, accent, onAdd, initial }: Props) {
     if (firstArea.current) { firstArea.current = false; return }
     setRegion(undefined)
     setRegionFailed(false)
-  }, [from, to])
+  }, [from, to, viaKey])
   // new places or a different way of travelling: new route and time
   useEffect(() => {
     if (first.current) { first.current = false; return }
@@ -151,16 +154,16 @@ export function LocationTool({ pins, accent, onAdd, initial }: Props) {
     if (!from || !to) return
     let alive = true
     setRouting(true)
-    void fetchRouteInfo(from, to, mode).then((r) => { if (alive) { setRoute(r.coords); setSeconds(r.seconds); setRouting(false) } })
+    void fetchRouteInfo([from, ...via, to], mode).then((r) => { if (alive) { setRoute(r.coords); setSeconds(r.seconds); setRouting(false) } })
     return () => { alive = false }
-  }, [from, to, mode])
+  }, [from, to, viaKey, mode])
 
   // the area outline is looked up only when asked for
   useEffect(() => {
     if (style !== 'region' || region || regionFailed || !from || !to) return
     let alive = true
     setRegionBusy(true)
-    void fetchRegion(from, to).then((r) => {
+    void fetchRegion(from, to, via).then((r) => {
       if (!alive) return
       setRegionBusy(false)
       if (r) setRegion(r)
@@ -182,6 +185,21 @@ export function LocationTool({ pins, accent, onAdd, initial }: Props) {
   return (
     <div className="space-y-4 pb-2">
       <PlaceField label="Starting point" dot={pins[0]} value={from} onPick={setFrom} allowLocate />
+      {stops.map((s, i) => (
+        <div key={i} className="relative">
+          <PlaceField label={`Stop ${i + 1}`} dot="#8a8a96" value={s} onPick={(p) => setStops((l) => l.map((x, k) => (k === i ? p : x)))} />
+          <button type="button" aria-label={`Remove stop ${i + 1}`} onClick={() => setStops((l) => l.filter((_, k) => k !== i))}
+            className="absolute right-5 top-[-6px] h-8 rounded-full border-0 bg-transparent px-2 text-[12px] font-bold text-[#d6455d]">Remove</button>
+        </div>
+      ))}
+      {stops.length < 6 && (
+        <div className="px-5">
+          <button type="button" onClick={() => setStops((l) => [...l, null])}
+            className="flex h-11 items-center gap-2 rounded-full border-0 bg-neutral-100 px-4 text-[14px] font-bold text-[#17171a]">
+            <Plus size={17} strokeWidth={2.6} /> Add a stop
+          </button>
+        </div>
+      )}
       <PlaceField label="Destination" dot={pins[1]} value={to} onPick={setTo} />
 
       <div className="px-5">
@@ -196,7 +214,7 @@ export function LocationTool({ pins, accent, onAdd, initial }: Props) {
         </div>
         <div className="relative overflow-hidden rounded-3xl" style={{ height: cut ? 230 : 190, background: style === 'route' ? 'linear-gradient(160deg,#6c8a6a,#2f4a3a)' : '#f3f3f6' }}>
           {from && to ? (
-            <div className={`absolute inset-0 ${cut ? 'p-0.5' : 'p-1.5'}`}><MapCard key={style + (region ? 'r' : '')} map={{ from, to, route, style, color, seconds, region, mode }} /></div>
+            <div className={`absolute inset-0 ${cut ? 'p-0.5' : 'p-1.5'}`}><MapCard key={style + (region ? 'r' : '')} map={{ from, to, stops: via, route, style, color, seconds, region, mode }} /></div>
           ) : (
             <div className="grid h-full place-items-center px-8 text-center text-[14px] font-semibold text-neutral-400">
               <span><MapPin className="mx-auto mb-2" size={26} />Pick two places to see your route</span>
@@ -242,7 +260,7 @@ export function LocationTool({ pins, accent, onAdd, initial }: Props) {
       <div className="px-5">
         <motion.button
           type="button" whileTap={{ scale: 0.96 }} disabled={!ready || regionBusy}
-          onClick={() => ready && onAdd({ from, to, route, style, color, seconds, mode, region: style === 'region' ? region : undefined })}
+          onClick={() => ready && onAdd({ from, to, stops: via.length ? via : undefined, route, style, color, seconds, mode, region: style === 'region' ? region : undefined })}
           className="flex h-13 min-h-12 w-full items-center justify-center gap-2 rounded-full border-0 bg-[#17171a] text-[15px] font-semibold text-white disabled:opacity-35"
           style={ready ? { boxShadow: `0 8px 22px ${accent}55` } : undefined}
         >

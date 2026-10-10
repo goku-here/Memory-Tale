@@ -74,6 +74,8 @@ export interface PhotoProps {
   originalId?: string
   /** tiny blurred preview (data URL) shown while the photo loads */
   thumb?: string
+  /** used as a background: full canvas width, behind everything else, only moves up and down */
+  background?: boolean
 }
 export interface StickerProps {
   kind: 'emoji' | 'svg' | 'image'
@@ -116,6 +118,8 @@ export type MapStyle = 'card' | 'route' | 'around' | 'region'
 export interface MapProps {
   from: Place
   to: Place
+  /** places to pass through on the way, in order */
+  stops?: Place[]
   /** route polyline as [lat, lng] pairs (road route or a curved arc) */
   route?: [number, number][]
   style?: MapStyle

@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useMotionValue, useTransform, type MotionValue } from 'framer-motion'
-import { ArrowLeft, Check, ChevronDown, Clapperboard, ZoomOut, Download, Loader2, MoreHorizontal, Palette, PenLine, Redo2, Share2, Trash2, Undo2, Users, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, Clapperboard, Image as ImageIcon, ZoomOut, Download, Loader2, MoreHorizontal, Palette, PenLine, Redo2, Share2, Trash2, Undo2, Users, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../data/useAuth'
 import { useCanvas } from '../data/useCanvas'
@@ -12,7 +12,7 @@ import { reportError } from '../data/sync'
 import { downloadBookZip } from '../lib/zipBook'
 import { AssetCtx } from '../lib/assets'
 import { bookEase, clipAt } from '../lib/bookTransition'
-import { clamp, cloneItem, frameHeight, nextZ, rnd } from '../lib/items'
+import { clamp, cloneItem, frameHeight, isBg, nextZ, rnd, withBackground } from '../lib/items'
 import { placeInOrder } from '../lib/layout'
 import { useGestures } from '../lib/useGestures'
 import { tour, tourSeen } from '../lib/tour'
@@ -152,9 +152,11 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   const [scrollRoot, setScrollRoot] = useState<Element | null>(null)
   useEffect(() => { setScrollRoot(scroller.current) }, [])
   const assetCtx = useMemo(() => ({ memoryId: memory.id, root: scrollRoot }), [memory.id, scrollRoot])
-  const selected = useMemo(() => items.find((i) => i.id === selectedId && i.type !== 'thread'), [items, selectedId])
+  // backgrounds are sized to this device's canvas width when drawn (see withBackground)
+  const vItems = useMemo(() => withBackground(items, canvasW), [items, canvasW])
+  const selected = useMemo(() => vItems.find((i) => i.id === selectedId && i.type !== 'thread'), [vItems, selectedId])
   const selectedThread = useMemo(() => items.find((i): i is Extract<CanvasItem, { type: 'thread' }> => i.id === selectedId && i.type === 'thread'), [items, selectedId])
-  const visibleItems = useMemo(() => items.filter((i) => i.type !== 'thread'), [items])
+  const visibleItems = useMemo(() => vItems.filter((i) => i.type !== 'thread'), [vItems])
   const photoCount = useMemo(() => items.filter((i) => i.type === 'photo').length, [items])
   const drawing = sheet === 'draw'
   const drawingRef = useRef(false)
@@ -457,7 +459,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       // start under the header, at the top of what is visible, then flow downward in selection order
       const r = surface.current!.getBoundingClientRect()
       const startY = Math.max(140, (HEADER_H + 24 - r.top) / zoomRef.current)
-      const spots = placeInOrder(sizes, itemsRef.current, canvasW, startY)
+      const spots = placeInOrder(sizes, itemsRef.current.filter((i) => !isBg(i)), canvasW, startY)
       commit((cur) => {
         let z = nextZ(cur)
         return [...cur, ...imgs.map((img, i) => ({
@@ -535,6 +537,20 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       } else if (user && !driveConfigured) void uploadOriginal(file, `${user.uid}/${memory.id}`).then((path) => { if (path) patch(target.id, { props: { original: path } }) })
     } catch {
       toast("Couldn't read that photo")
+    }
+  }
+
+  /** photo <-> full-width background behind everything */
+  const setAsBackground = (on: boolean) => {
+    const t = itemsRef.current.find((i) => i.id === selectedId)
+    if (t?.type !== 'photo') return
+    const others = itemsRef.current.filter((i) => i.id !== t.id)
+    if (on) {
+      const low = others.reduce((m, i) => Math.min(m, i.zIndex), 1) - 1
+      patch(t.id, { x: 50, rotation: 0, width: canvasW, height: canvasW / (t.props.aspect || 1), zIndex: low, props: { background: true, frame: 'none', radius: 0, caption: '' } })
+    } else {
+      const w = Math.round(clamp(canvasW * 0.52, 140, 230))
+      patch(t.id, { x: 50, width: w, height: frameHeight('polaroid', w, t.props.aspect), zIndex: nextZ(others), props: { background: false, frame: 'polaroid', radius: 4 } })
     }
   }
 
@@ -729,9 +745,9 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   /* ---------- canvas growth, scroll-to-reveal ---------- */
 
   useEffect(() => {
-    const bottom = items.reduce((m, i) => Math.max(m, i.y + i.height / 2), 0)
+    const bottom = vItems.reduce((m, i) => Math.max(m, i.y + i.height / 2), 0)
     if (bottom > height - 500) setHeight(Math.ceil((bottom + 1400) / 100) * 100)
-  }, [items, height, setHeight])
+  }, [vItems, height, setHeight])
 
   useEffect(() => {
     if (!sheetH || !selected || sheet === 'draw' || !scroller.current || !surface.current) return
@@ -1002,7 +1018,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
               </svg>
             )}
             {story && (
-              <StoryOverlay surfaceRef={surface} scrollerRef={scroller} canvasW={canvasW} surfaceH={height} y={storyY} onY={setStoryY} items={items} accent={accent} headerH={HEADER_H} size={size} zoom={zoom} />
+              <StoryOverlay surfaceRef={surface} scrollerRef={scroller} canvasW={canvasW} surfaceH={height} y={storyY} onY={setStoryY} items={vItems} accent={accent} headerH={HEADER_H} size={size} zoom={zoom} />
             )}
             {selectedThread && !drawing && (() => {
               const m = threadMid(items, selectedThread, canvasW)
@@ -1034,11 +1050,22 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
             })()}
 
             {selected && actions && !drawing && editingId !== selected.id && draggingId !== selected.id && (
-              <SelectionOverlay item={selected} canvasW={canvasW} topLimit={((scroller.current?.scrollTop ?? 0) + 8) / zoom} accent={accent} actions={actions} hideToolbar={!!sheet} zoom={zoom} />
+              <SelectionOverlay item={selected} canvasW={canvasW} topLimit={((scroller.current?.scrollTop ?? 0) + 8) / zoom} accent={accent} actions={actions} hideToolbar={!!sheet} zoom={zoom} locked={isBg(selected)} />
             )}
             {selected && actions && draggingId === selected.id && (
-              <SelectionOverlay item={selected} canvasW={canvasW} topLimit={-9999} accent={accent} actions={{ ...actions, onFrame: undefined, onEdit: undefined }} hideToolbar zoom={zoom} />
+              <SelectionOverlay item={selected} canvasW={canvasW} topLimit={-9999} accent={accent} actions={{ ...actions, onFrame: undefined, onEdit: undefined }} hideToolbar zoom={zoom} locked={isBg(selected)} />
             )}
+
+            {/* a background does not catch taps; its tab is how to pick it up */}
+            {!drawing && vItems.filter((i) => isBg(i) && i.id !== selectedId).map((i) => (
+              <button
+                key={`bgtab${i.id}`} type="button" data-ui aria-label="Select the background photo" onClick={() => setSelectedId(i.id)}
+                className="absolute flex h-8 items-center gap-1.5 rounded-full border-0 bg-white/90 px-3 text-[12px] font-bold text-[#17171a] shadow-[0_2px_8px_rgba(20,24,40,.25)]"
+                style={{ left: 8, top: i.y - i.height / 2 + 8, zIndex: 8700, transform: `scale(${1 / zoom})`, transformOrigin: 'top left' }}
+              >
+                <ImageIcon size={14} /> Background
+              </button>
+            ))}
 
             {drawing && <DrawStrokes strokes={strokes} />}
 
@@ -1158,6 +1185,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
             onRadius={(radius) => patch(photoItem.id, { props: { radius } })}
             onCaption={(caption) => patch(photoItem.id, { props: { caption } })}
             onReplace={() => replaceInput.current?.click()}
+            onBackground={setAsBackground}
             onOriginal={photoItem.props.original || photoItem.props.originalId ? () => void saveOriginal(photoItem.props) : undefined}
           />
         )}

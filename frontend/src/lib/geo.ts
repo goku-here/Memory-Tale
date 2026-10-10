@@ -48,8 +48,9 @@ export function arcRoute(a: Place, b: Place, steps = 48): [number, number][] {
 export interface RouteInfo { coords: [number, number][]; seconds?: number }
 
 /** Road route (and travel time) from the public OSRM demo server; falls back to an arc. */
-export async function fetchRouteInfo(a: Place, b: Place, mode: TravelMode = 'car'): Promise<RouteInfo> {
-  const km = distanceKm(a, b)
+export async function fetchRouteInfo(points: Place[], mode: TravelMode = 'car'): Promise<RouteInfo> {
+  const a = points[0], b = points[points.length - 1]
+  const km = points.slice(1).reduce((n, p, i) => n + distanceKm(points[i], p), 0)
   // free routing servers for each way of travelling (FOSSGIS, built on OpenStreetMap); the OSRM demo is a car-only fallback
   // a motorbike uses the same roads as a car; a bicycle and walking have their own networks
   const profile = mode === 'walk' ? 'foot' : mode === 'cycle' ? 'bike' : 'car'
@@ -60,7 +61,7 @@ export async function fetchRouteInfo(a: Place, b: Place, mode: TravelMode = 'car
       try {
         const ctl = new AbortController()
         const t = setTimeout(() => ctl.abort(), 7000)
-        const res = await fetch(`${base}/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`, { signal: ctl.signal })
+        const res = await fetch(`${base}/${points.map((p) => `${p.lng},${p.lat}`).join(';')}?overview=full&geometries=geojson`, { signal: ctl.signal })
         clearTimeout(t)
         if (!res.ok) continue
         const data = (await res.json()) as { routes?: { duration?: number; geometry: { coordinates: [number, number][] } }[] }
@@ -71,10 +72,13 @@ export async function fetchRouteInfo(a: Place, b: Place, mode: TravelMode = 'car
       }
     }
   }
-  return { coords: arcRoute(a, b) }
+  // no road route: join the places with gentle curves
+  const coords: [number, number][] = []
+  for (let i = 1; i < points.length; i++) coords.push(...arcRoute(points[i - 1], points[i]).slice(i > 1 ? 1 : 0))
+  return { coords: coords.length ? coords : arcRoute(a, b) }
 }
 
-export const fetchRoute = async (a: Place, b: Place) => (await fetchRouteInfo(a, b)).coords
+export const fetchRoute = async (a: Place, b: Place) => (await fetchRouteInfo([a, b])).coords
 
 /** 4980 -> "1 hr 23 min" */
 export function formatDuration(sec: number) {
@@ -89,10 +93,12 @@ export function formatDuration(sec: number) {
  * Outline of the state / district around a route (Nominatim, OpenStreetMap), as simplified [lat, lng] rings.
  * Returns null when no outline is found.
  */
-export async function fetchRegion(a: Place, b: Place): Promise<[number, number][][] | null> {
+export async function fetchRegion(a: Place, b: Place, via: Place[] = []): Promise<[number, number][][] | null> {
   try {
-    const lat = (a.lat + b.lat) / 2, lon = (a.lng + b.lng) / 2
-    const zoom = distanceKm(a, b) > 40 ? 5 : 8
+    const all = [a, ...via, b]
+    const lat = (Math.min(...all.map((p) => p.lat)) + Math.max(...all.map((p) => p.lat))) / 2
+    const lon = (Math.min(...all.map((p) => p.lng)) + Math.max(...all.map((p) => p.lng))) / 2
+    const zoom = Math.max(...all.map((p) => distanceKm(p, { name: '', lat, lng: lon }))) > 20 ? 5 : 8
     const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=${zoom}&polygon_geojson=1&polygon_threshold=0.015&lat=${lat}&lon=${lon}`
     const res = await fetch(url, { headers: { Accept: 'application/json' } })
     if (!res.ok) return null

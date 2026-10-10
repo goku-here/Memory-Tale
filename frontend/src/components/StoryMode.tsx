@@ -47,7 +47,7 @@ export function StoryOverlay({ surfaceRef, scrollerRef, canvasW, surfaceH, y, on
   live.current.onY = onY
 
   const crossing = useMemo(() => items.filter((it) => {
-    if (it.type === 'thread') return false
+    if (it.type === 'thread' || (it.type === 'photo' && it.props.background)) return false
     const b = bounds(it, canvasW)
     if (b.b <= y || b.t >= y + fh) return false
     return b.t < y || b.b > y + fh || b.l < 0 || b.r > canvasW

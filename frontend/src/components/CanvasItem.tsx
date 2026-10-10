@@ -108,6 +108,8 @@ export const CanvasItemView = memo(function CanvasItemView({ item, canvasW, sele
         marginLeft: -item.width / 2, marginTop: -item.height / 2,
         x: (item.x / 100) * canvasW, y: item.y, rotate: item.rotation, zIndex: item.zIndex,
         touchAction: selected ? 'none' : 'pan-x pan-y', cursor: dragging ? 'grabbing' : 'grab', willChange: 'transform',
+        // a background does not catch taps until it is chosen (from its "Background" tab)
+        pointerEvents: item.type === 'photo' && item.props.background && !selected ? 'none' : undefined,
       }}
       initial={{ scale: 0.5, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
@@ -156,13 +158,13 @@ function TB({ label, onClick, children, danger }: { label: string; onClick: () =
 }
 
 export function SelectionOverlay({
-  item, canvasW, topLimit, accent, actions, hideToolbar, zoom = 1,
-}: { item: CanvasItem; canvasW: number; topLimit: number; accent: string; actions: SelectionActions; hideToolbar?: boolean; zoom?: number }) {
+  item, canvasW, topLimit, accent, actions, hideToolbar, zoom = 1, locked = false,
+}: { item: CanvasItem; canvasW: number; topLimit: number; accent: string; actions: SelectionActions; hideToolbar?: boolean; zoom?: number; locked?: boolean }) {
   const cx = (item.x / 100) * canvasW
   const rad = (item.rotation * Math.PI) / 180
   const hh = (Math.abs(item.width * Math.sin(rad)) + Math.abs(item.height * Math.cos(rad))) / 2
   const [colorsOpen, setColorsOpen] = useState(false)
-  const nButtons = 4 + (actions.onEdit ? 1 : 0) + (actions.onFrame ? 1 : 0) + (actions.onConnect ? 1 : 0) + (actions.onView ? 1 : 0) + (actions.onColor ? 1 : 0)
+  const nButtons = locked ? 2 : 4 + (actions.onEdit ? 1 : 0) + (actions.onFrame ? 1 : 0) + (actions.onConnect ? 1 : 0) + (actions.onView ? 1 : 0) + (actions.onColor ? 1 : 0)
   // the toolbar and handles keep their on-screen size however far the canvas is zoomed out
   const k = 1 / zoom
   const tbW = (nButtons * 44 + 16) * k
@@ -191,7 +193,7 @@ export function SelectionOverlay({
           />
         ))}
         {/* resize + rotate */}
-        <button
+        {!locked && <button
           type="button" data-ui aria-label="Resize and rotate"
           className="pointer-events-auto absolute grid h-11 w-11 touch-none place-items-center border-0 bg-transparent"
           style={{ right: -26, bottom: -26, transform: `scale(${k})` }}
@@ -200,17 +202,17 @@ export function SelectionOverlay({
           <span className="grid h-6 w-6 place-items-center rounded-full bg-white shadow" style={{ border: `2px solid ${accent}` }}>
             <RotateCw size={12} color={accent} strokeWidth={3} />
           </span>
-        </button>
+        </button>}
         {/* rotate only */}
-        <button
+        {!locked && <button
           type="button" data-ui aria-label="Rotate"
           className="pointer-events-auto absolute grid h-11 w-11 touch-none place-items-center border-0 bg-transparent"
           style={{ left: '50%', top: -30 * k - 22, marginLeft: -22, transform: `scale(${k})` }}
           onPointerDown={(e) => actions.onHandle(e, 'rotate')}
         >
           <span className="h-3 w-3 rounded-full bg-white" style={{ border: `2px solid ${accent}` }} />
-        </button>
-        <i className="absolute left-1/2 -ml-px w-0.5" style={{ top: -30 * k, height: 26 * k, background: accent, opacity: 0.6 }} />
+        </button>}
+        {!locked && <i className="absolute left-1/2 -ml-px w-0.5" style={{ top: -30 * k, height: 26 * k, background: accent, opacity: 0.6 }} />}
       </div>
 
       {/* mini toolbar */}
@@ -222,14 +224,14 @@ export function SelectionOverlay({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 500, damping: 30 }}
         >
-          {actions.onView && <TB label="View full size" onClick={actions.onView}><Maximize2 size={18} /></TB>}
+          {!locked && actions.onView && <TB label="View full size" onClick={actions.onView}><Maximize2 size={18} /></TB>}
           {actions.onFrame && <TB label="Frame" onClick={actions.onFrame}><Frame size={19} /></TB>}
-          {actions.onColor && <TB label="Note colour" onClick={() => setColorsOpen((v) => !v)}><Palette size={19} /></TB>}
-          {actions.onEdit && <TB label="Edit" onClick={actions.onEdit}><Pencil size={18} /></TB>}
-          {actions.onConnect && <TB label="Tie with thread" onClick={actions.onConnect}><Spline size={19} /></TB>}
-          <TB label="Duplicate" onClick={actions.onDuplicate}><Copy size={18} /></TB>
-          <TB label="Bring forward" onClick={actions.onForward}><BringToFront size={19} /></TB>
-          <TB label="Send backward" onClick={actions.onBackward}><SendToBack size={19} /></TB>
+          {!locked && actions.onColor && <TB label="Note colour" onClick={() => setColorsOpen((v) => !v)}><Palette size={19} /></TB>}
+          {!locked && actions.onEdit && <TB label="Edit" onClick={actions.onEdit}><Pencil size={18} /></TB>}
+          {!locked && actions.onConnect && <TB label="Tie with thread" onClick={actions.onConnect}><Spline size={19} /></TB>}
+          {!locked && <TB label="Duplicate" onClick={actions.onDuplicate}><Copy size={18} /></TB>}
+          {!locked && <TB label="Bring forward" onClick={actions.onForward}><BringToFront size={19} /></TB>}
+          {!locked && <TB label="Send backward" onClick={actions.onBackward}><SendToBack size={19} /></TB>}
           <TB label="Delete" onClick={actions.onDelete} danger><Trash2 size={18} /></TB>
         </motion.div></div>}
         {!hideToolbar && colorsOpen && actions.onColor && (

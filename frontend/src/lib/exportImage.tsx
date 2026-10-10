@@ -5,6 +5,7 @@ import { ItemBody } from '../components/CanvasItem'
 import { formatDate } from '../components/BookCard'
 import { getTheme } from '../components/ThemeEngine'
 import { resolveCanvas, shiftedCss } from './canvasStyle'
+import { withBackground } from './items'
 import { ThreadsSvg } from '../components/Threads'
 import { repo } from '../data/repo'
 import { resolveItemAssets } from '../data/sync'
@@ -12,7 +13,8 @@ import type { CanvasItem, Memory } from '../types'
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-function ExportView({ memory, items, width }: { memory: Memory; items: CanvasItem[]; width: number }) {
+function ExportView({ memory, items: raw, width }: { memory: Memory; items: CanvasItem[]; width: number }) {
+  const items = withBackground(raw, width)
   const theme = getTheme(memory.themeId)
   const rc = resolveCanvas(theme, memory.canvasStyle)
   const photos = items.filter((i) => i.type === 'photo').length

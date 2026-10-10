@@ -8,6 +8,7 @@ import { AssetCtx } from './assets'
 import { resolveItemAssets } from '../data/sync'
 import type { CanvasItem, Memory } from '../types'
 import { frameHeightFor, type StorySize } from './storySizes'
+import { withBackground } from './items'
 
 
 /* ---- settings (kept in one place so the watermark can become a premium option later) ---- */
@@ -26,7 +27,9 @@ export const storyPrefs = {
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-function StoryView({ memory, items, canvasW, frameY, dots, mark, size }: { memory: Memory; items: CanvasItem[]; canvasW: number; frameY: number; dots: boolean; mark: boolean; size: StorySize }) {
+function StoryView({ memory: m, items: raw, canvasW, frameY, dots, mark, size }: { memory: Memory; items: CanvasItem[]; canvasW: number; frameY: number; dots: boolean; mark: boolean; size: StorySize }) {
+  const memory = m
+  const items = withBackground(raw, canvasW)
   const theme = getTheme(memory.themeId)
   const h = frameHeightFor(canvasW, size)
   const rc = resolveCanvas(theme, memory.canvasStyle)

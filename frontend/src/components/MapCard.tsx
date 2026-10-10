@@ -23,6 +23,13 @@ const endIcon = L.divIcon({
   iconAnchor: [15, 38],
 })
 
+const stopIcon = (n: number) => L.divIcon({
+  className: 'keepsake-pin',
+  html: `<div style="width:20px;height:20px;border-radius:50%;background:#3a4150;border:2.5px solid #fff;box-shadow:0 2px 5px rgba(0,0,0,.35);box-sizing:border-box;color:#fff;font:800 10px/15px Manrope,sans-serif;text-align:center">${n}</div>`,
+  iconSize: [20, 20],
+  iconAnchor: [10, 10],
+})
+
 export function MapCard({ map }: { map: MapProps }) {
   const style = map.style ?? 'card'
   if (style === 'route') return <RouteOnly map={map} />
@@ -50,6 +57,7 @@ function CardMap({ map }: { map: MapProps }) {
     L.polyline(route, { weight: 11, color: '#fff', opacity: 0.95, lineCap: 'round', lineJoin: 'round' }).addTo(m)
     const line = L.polyline(route, { weight: 6.5, color: '#2F6BFF', lineCap: 'round', lineJoin: 'round' }).addTo(m)
     L.marker([map.from.lat, map.from.lng], { icon: startIcon, interactive: false }).addTo(m)
+    ;(map.stops ?? []).forEach((s, i) => L.marker([s.lat, s.lng], { icon: stopIcon(i + 1), interactive: false, zIndexOffset: 300 }).addTo(m))
     L.marker([map.to.lat, map.to.lng], { icon: endIcon, interactive: false, zIndexOffset: 500 }).addTo(m)
 
     const fit = () => {
@@ -76,6 +84,13 @@ function CardMap({ map }: { map: MapProps }) {
         >
           <i className="h-2.5 w-2.5 shrink-0 rounded-full bg-white" style={{ border: '2.5px solid #3a4150' }} />
           <span className="truncate">{map.from.name}</span>
+          {(map.stops ?? []).map((s, i) => (
+            <span key={i} className="flex min-w-0 items-center gap-1.5">
+              <span aria-hidden className="text-neutral-400">→</span>
+              <i className="grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full text-[8px] font-extrabold leading-none text-white" style={{ background: '#3a4150' }}>{i + 1}</i>
+              <span className="truncate">{s.name}</span>
+            </span>
+          ))}
           <span aria-hidden className="text-neutral-400">→</span>
           <i className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: '#EA4335' }} />
           <span className="truncate">{map.to.name}</span>
@@ -120,7 +135,7 @@ function thin(pts: Pt[], min = 1.2) {
   return out
 }
 
-function Art({ w, h, line, from, to, map, color, ink, showLine = true }: { w: number; h: number; line: Pt[]; from: Pt; to: Pt; map: MapProps; color: string; ink: 'light' | 'dark'; showLine?: boolean }) {
+function Art({ w, h, line, from, to, via = [], map, color, ink, showLine = true }: { w: number; h: number; line: Pt[]; from: Pt; to: Pt; via?: Pt[]; map: MapProps; color: string; ink: 'light' | 'dark'; showLine?: boolean }) {
   const d = path(thin(line))
   const mid = line[Math.floor(line.length / 2)] ?? from
   const text = ink === 'light' ? '#fff' : '#17171a'
@@ -143,6 +158,14 @@ function Art({ w, h, line, from, to, map, color, ink, showLine = true }: { w: nu
           <path d={d} fill="none" stroke={color} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
         </>
       )}
+      {/* places on the way */}
+      {via.map((p, i) => (
+        <g key={i}>
+          <circle cx={p.x} cy={p.y} r="9" fill="#3a4150" stroke="#fff" strokeWidth="2.4" style={{ filter: 'drop-shadow(0 2px 3px rgba(0,0,0,.35))' }} />
+          <text x={p.x} y={p.y + 3.6} textAnchor="middle" fontSize="10.5" fontWeight="800" fill="#fff" style={{ fontFamily: 'Manrope, sans-serif' }}>{i + 1}</text>
+          {label(map.stops?.[i]?.name ?? '', clampX(p.x, ((map.stops?.[i]?.name.length ?? 0) * 7.4) / 2), p.y + (i % 2 ? -16 : 27))}
+        </g>
+      ))}
       {/* start */}
       <circle cx={from.x} cy={from.y} r="7.5" fill="#fff" stroke="#3a4150" strokeWidth="4" style={{ filter: 'drop-shadow(0 2px 3px rgba(0,0,0,.35))' }} />
       {label(map.from.name, clampX(from.x, fromW / 2), from.y + 28)}
@@ -174,7 +197,7 @@ function RouteOnly({ map }: { map: MapProps }) {
       {proj && (
         <Art
           w={w} h={h} line={route.map(([la, lo]) => proj(la, lo))} from={proj(map.from.lat, map.from.lng)} to={proj(map.to.lat, map.to.lng)}
-          map={map} color={map.color ?? '#3B82F6'} ink="light"
+          map={map} color={map.color ?? '#3B82F6'} ink="light" via={(map.stops ?? []).map((s) => proj(s.lat, s.lng))}
         />
       )}
     </div>
@@ -190,7 +213,7 @@ function Cutout({ map }: { map: MapProps }) {
   const host = useRef<HTMLDivElement>(null)
   const mapEl = useRef<HTMLDivElement>(null)
   const { w, h } = useBox(host)
-  const [geo, setGeo] = useState<{ line: Pt[]; from: Pt; to: Pt; rings: Pt[][]; sw: number } | null>(null)
+  const [geo, setGeo] = useState<{ line: Pt[]; from: Pt; to: Pt; via: Pt[]; rings: Pt[][]; sw: number } | null>(null)
   const route = useMemo(() => (map.route?.length ? map.route : arcRoute(map.from, map.to)), [map.route, map.from, map.to])
   const region = map.style === 'region' && map.region?.length ? map.region : null
 
@@ -211,6 +234,7 @@ function Cutout({ map }: { map: MapProps }) {
       line: route.map(([la, lo]) => px(la, lo)),
       from: px(map.from.lat, map.from.lng),
       to: px(map.to.lat, map.to.lng),
+      via: (map.stops ?? []).map((s) => px(s.lat, s.lng)),
       rings: region ? region.map((r) => r.map(([la, lo]) => px(la, lo))) : [],
       sw,
     })
@@ -240,7 +264,7 @@ function Cutout({ map }: { map: MapProps }) {
         <div className="absolute inset-0 bg-white" style={edgeMask ? maskStyle(edgeMask) : undefined} />
         <div ref={mapEl} className="absolute inset-0" style={mapMask ? maskStyle(mapMask) : undefined} />
       </div>
-      {geo && w > 0 && <Art w={w} h={h} line={geo.line} from={geo.from} to={geo.to} map={map} color={map.color ?? '#2F6BFF'} ink="dark" />}
+      {geo && w > 0 && <Art w={w} h={h} line={geo.line} from={geo.from} to={geo.to} via={geo.via} map={map} color={map.color ?? '#2F6BFF'} ink="dark" />}
     </div>
   )
 }

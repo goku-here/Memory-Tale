@@ -116,6 +116,10 @@ export function useGestures(opts: GestureOptions) {
     const pts = [...st.pointers.values()]
     if (!pts.length) return
 
+    const mine = o.current.itemsRef.current.find((i) => i.id === st.id)
+    const locked = mine?.type === 'photo' && !!mine.props.background // a background only slides up and down
+    if (locked && st.mode !== 'drag') return
+
     if (st.mode === 'drag') {
       const sc = ((o.current.scrollerRef.current?.scrollTop ?? 0) - b.scrollTop) / z
       const nx = b.cx + (pts[0].x - b.p.x) / z
@@ -123,7 +127,7 @@ export function useGestures(opts: GestureOptions) {
       const item = o.current.itemsRef.current.find((i) => i.id === st.id)
       const sn = item && st.moved ? snapDrag(item, nx, ny, W, o.current.itemsRef.current) : null
       o.current.onGuides?.(sn && (sn.guides.v.length || sn.guides.h.length) ? sn.guides : null)
-      write(st.id, { x: clamp(((sn?.x ?? nx) / W) * 100, 0, 100), y: clamp(sn?.y ?? ny, 0, o.current.heightRef.current) })
+      write(st.id, { x: locked ? 50 : clamp(((sn?.x ?? nx) / W) * 100, 0, 100), y: clamp(locked ? ny : sn?.y ?? ny, 0, o.current.heightRef.current) })
       return
     }
 

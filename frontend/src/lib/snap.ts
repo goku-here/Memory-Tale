@@ -27,7 +27,7 @@ const ys = (b: Box) => [b.t, (b.t + b.b) / 2, b.b]
  */
 export function snapDrag(item: CanvasItem, nx: number, ny: number, W: number, items: CanvasItem[]): { x: number; y: number; guides: Guides } {
   const near = items
-    .filter((o) => o.id !== item.id && o.type !== 'thread' && Math.abs(o.y - ny) < 900)
+    .filter((o) => o.id !== item.id && o.type !== 'thread' && !(o.type === 'photo' && o.props.background) && Math.abs(o.y - ny) < 900)
     .map((o) => box(o, (o.x / 100) * W, o.y))
   const me = box(item, nx, ny)
 

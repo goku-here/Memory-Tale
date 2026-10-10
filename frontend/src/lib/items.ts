@@ -18,6 +18,19 @@ export function cloneItem(item: CanvasItem, z: number): CanvasItem {
   return { ...structuredClone(item), id: uid(), x: Math.min(95, item.x + 5), y: item.y + 36, zIndex: z }
 }
 
+/** a photo that was turned into a background */
+export const isBg = (i: CanvasItem) => i.type === 'photo' && !!i.props.background
+
+/**
+ * Backgrounds always span the canvas, whatever its width is on this device, so their size is worked out
+ * when drawing (never stored): that way phones with different widths cannot fight over it.
+ */
+export function withBackground(items: CanvasItem[], canvasW: number): CanvasItem[] {
+  return items.map((i) => (i.type === 'photo' && i.props.background
+    ? { ...i, x: 50, rotation: 0, width: canvasW, height: canvasW / (i.props.aspect || 1), props: { ...i.props, frame: 'none' as const, radius: 0, caption: '' } }
+    : i))
+}
+
 export const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 export const rnd = (a: number, b: number) => a + Math.random() * (b - a)
 
