@@ -1,4 +1,4 @@
-import type { Place } from '../types'
+import type { Place, TravelMode } from '../types'
 
 export interface PlaceHit extends Place {
   full: string
@@ -48,21 +48,25 @@ export function arcRoute(a: Place, b: Place, steps = 48): [number, number][] {
 export interface RouteInfo { coords: [number, number][]; seconds?: number }
 
 /** Road route (and travel time) from the public OSRM demo server; falls back to an arc. */
-export async function fetchRouteInfo(a: Place, b: Place): Promise<RouteInfo> {
-  if (distanceKm(a, b) < 1500) {
-    try {
-      const ctl = new AbortController()
-      const t = setTimeout(() => ctl.abort(), 5000)
-      const url = `https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`
-      const res = await fetch(url, { signal: ctl.signal })
-      clearTimeout(t)
-      if (res.ok) {
+export async function fetchRouteInfo(a: Place, b: Place, mode: TravelMode = 'car'): Promise<RouteInfo> {
+  const km = distanceKm(a, b)
+  // free routing servers for each way of travelling (FOSSGIS, built on OpenStreetMap); the OSRM demo is a car-only fallback
+  const servers = [`https://routing.openstreetmap.de/routed-${mode === 'walk' ? 'foot' : mode === 'bike' ? 'bike' : 'car'}/route/v1/driving`]
+  if (mode === 'car') servers.push('https://router.project-osrm.org/route/v1/driving')
+  if (km < (mode === 'car' ? 1500 : 600)) {
+    for (const base of servers) {
+      try {
+        const ctl = new AbortController()
+        const t = setTimeout(() => ctl.abort(), 7000)
+        const res = await fetch(`${base}/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`, { signal: ctl.signal })
+        clearTimeout(t)
+        if (!res.ok) continue
         const data = (await res.json()) as { routes?: { duration?: number; geometry: { coordinates: [number, number][] } }[] }
         const coords = data.routes?.[0]?.geometry.coordinates
         if (coords && coords.length > 1) return { coords: coords.map(([lng, lat]) => [lat, lng] as [number, number]), seconds: data.routes?.[0]?.duration }
+      } catch {
+        /* try the next server, then fall back to an arc */
       }
-    } catch {
-      /* fall through to the arc */
     }
   }
   return { coords: arcRoute(a, b) }
@@ -73,7 +77,9 @@ export const fetchRoute = async (a: Place, b: Place) => (await fetchRouteInfo(a,
 /** 4980 -> "1 hr 23 min" */
 export function formatDuration(sec: number) {
   const m = Math.max(1, Math.round(sec / 60))
-  const h = Math.floor(m / 60)
+  const d = Math.floor(m / 1440)
+  const h = Math.floor((m % 1440) / 60)
+  if (d) return `${d} d${h ? ` ${h} hr` : ''}`
   return h ? `${h} hr${m % 60 ? ` ${m % 60} min` : ''}` : `${m} min`
 }
 

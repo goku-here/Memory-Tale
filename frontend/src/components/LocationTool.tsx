@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
-import { Check, Loader2, LocateFixed, MapPin, Search, X } from 'lucide-react'
+import { Bike, Car, Check, Footprints, Loader2, LocateFixed, MapPin, Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import type { MapProps, MapStyle, Place } from '../types'
+import type { MapProps, MapStyle, Place, TravelMode } from '../types'
 import { fetchRegion, fetchRouteInfo, searchPlaces, type PlaceHit } from '../lib/geo'
 import { MapCard } from './MapCard'
 
@@ -128,6 +128,7 @@ export function LocationTool({ pins, accent, onAdd, initial }: Props) {
   const [route, setRoute] = useState<[number, number][] | undefined>(initial?.route)
   const [seconds, setSeconds] = useState<number | undefined>(initial?.seconds)
   const [style, setStyle] = useState<MapStyle>(initial?.style ?? 'card')
+  const [mode, setMode] = useState<TravelMode>(initial?.mode ?? 'car')
   const [color, setColor] = useState(initial?.color ?? '#3B82F6')
   const [region, setRegion] = useState(initial?.region)
   const [regionBusy, setRegionBusy] = useState(false)
@@ -135,18 +136,24 @@ export function LocationTool({ pins, accent, onAdd, initial }: Props) {
   const first = useRef(!!initial)
   const [routing, setRouting] = useState(false)
 
+  const firstArea = useRef(!!initial)
+  // new places: forget the old outline
+  useEffect(() => {
+    if (firstArea.current) { firstArea.current = false; return }
+    setRegion(undefined)
+    setRegionFailed(false)
+  }, [from, to])
+  // new places or a different way of travelling: new route and time
   useEffect(() => {
     if (first.current) { first.current = false; return }
     setRoute(undefined)
     setSeconds(undefined)
-    setRegion(undefined)
-    setRegionFailed(false)
     if (!from || !to) return
     let alive = true
     setRouting(true)
-    void fetchRouteInfo(from, to).then((r) => { if (alive) { setRoute(r.coords); setSeconds(r.seconds); setRouting(false) } })
+    void fetchRouteInfo(from, to, mode).then((r) => { if (alive) { setRoute(r.coords); setSeconds(r.seconds); setRouting(false) } })
     return () => { alive = false }
-  }, [from, to])
+  }, [from, to, mode])
 
   // the area outline is looked up only when asked for
   useEffect(() => {
@@ -178,9 +185,18 @@ export function LocationTool({ pins, accent, onAdd, initial }: Props) {
       <PlaceField label="Destination" dot={pins[1]} value={to} onPick={setTo} />
 
       <div className="px-5">
+        <div className="mb-3 grid grid-cols-3 gap-1.5 rounded-2xl bg-neutral-100 p-1" role="radiogroup" aria-label="Way of travelling">
+          {([['car', 'Car', Car], ['bike', 'Bike', Bike], ['walk', 'Walk', Footprints]] as const).map(([id, label, Icon]) => (
+            <button
+              key={id} type="button" role="radio" aria-checked={mode === id} onClick={() => setMode(id)}
+              className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border-0 text-[13.5px] font-bold"
+              style={mode === id ? { background: '#fff', color: '#17171a', boxShadow: '0 1px 4px rgba(0,0,0,.12)' } : { background: 'transparent', color: '#7a7a85' }}
+            ><Icon size={17} /> {label}</button>
+          ))}
+        </div>
         <div className="relative overflow-hidden rounded-3xl" style={{ height: cut ? 230 : 190, background: style === 'route' ? 'linear-gradient(160deg,#6c8a6a,#2f4a3a)' : '#f3f3f6' }}>
           {from && to ? (
-            <div className={`absolute inset-0 ${cut ? 'p-0.5' : 'p-1.5'}`}><MapCard key={style + (region ? 'r' : '')} map={{ from, to, route, style, color, seconds, region }} /></div>
+            <div className={`absolute inset-0 ${cut ? 'p-0.5' : 'p-1.5'}`}><MapCard key={style + (region ? 'r' : '')} map={{ from, to, route, style, color, seconds, region, mode }} /></div>
           ) : (
             <div className="grid h-full place-items-center px-8 text-center text-[14px] font-semibold text-neutral-400">
               <span><MapPin className="mx-auto mb-2" size={26} />Pick two places to see your route</span>
@@ -226,7 +242,7 @@ export function LocationTool({ pins, accent, onAdd, initial }: Props) {
       <div className="px-5">
         <motion.button
           type="button" whileTap={{ scale: 0.96 }} disabled={!ready || regionBusy}
-          onClick={() => ready && onAdd({ from, to, route, style, color, seconds, region: style === 'region' ? region : undefined })}
+          onClick={() => ready && onAdd({ from, to, route, style, color, seconds, mode, region: style === 'region' ? region : undefined })}
           className="flex h-13 min-h-12 w-full items-center justify-center gap-2 rounded-full border-0 bg-[#17171a] text-[15px] font-semibold text-white disabled:opacity-35"
           style={ready ? { boxShadow: `0 8px 22px ${accent}55` } : undefined}
         >

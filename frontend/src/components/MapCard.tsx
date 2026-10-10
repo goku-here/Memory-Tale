@@ -4,6 +4,9 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { MapProps } from '../types'
 import { arcRoute, fitProjector, formatDuration } from '../lib/geo'
 
+const MODE_ICON = { car: '🚗', bike: '🚲', walk: '🚶' } as const
+const timeText = (m: MapProps) => (m.seconds ? `${MODE_ICON[m.mode ?? 'car']} ${formatDuration(m.seconds)}` : '')
+
 const startIcon = L.divIcon({
   className: 'keepsake-pin',
   html: '<div style="width:20px;height:20px;border-radius:50%;background:#fff;border:5px solid #3a4150;box-shadow:0 2px 5px rgba(0,0,0,.35);box-sizing:border-box"></div>',
@@ -66,7 +69,7 @@ function CardMap({ map }: { map: MapProps }) {
     >
       <div className="relative h-full w-full overflow-hidden" style={{ borderRadius: 16 }}>
         <div ref={host} className="pointer-events-none h-full w-full" />
-        {map.seconds ? <Chip text={formatDuration(map.seconds)} /> : null}
+        {map.seconds ? <Chip text={timeText(map)} /> : null}
         <div
           className="pointer-events-none absolute bottom-2 left-1/2 z-[500] flex w-max max-w-[calc(100%-16px)] -translate-x-1/2 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-extrabold text-[#17171a]"
           style={{ background: 'rgba(255,255,255,.92)', boxShadow: '0 1px 4px rgba(0,0,0,.15)' }}
@@ -128,8 +131,8 @@ function Art({ w, h, line, from, to, map, color, ink, showLine = true }: { w: nu
   const clampX = (x: number, half: number) => Math.max(half + 4, Math.min(w - half - 4, x))
   const toW = Math.min(w - 8, to.x * 0 + map.to.name.length * 7.4)
   const fromW = Math.min(w - 8, map.from.name.length * 7.4)
-  const chipText = map.seconds ? formatDuration(map.seconds) : ''
-  const chipW = chipText.length * 7 + 18
+  const chipText = timeText(map)
+  const chipW = chipText.length * 7 + 24
   const chipX = Math.max(4, Math.min(w - chipW - 4, mid.x + 12))
   const chipY = Math.max(4, Math.min(h - 28, mid.y - 11))
   return (

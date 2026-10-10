@@ -110,6 +110,7 @@ export interface Place {
   lng: number
 }
 /** card = map in a frame; route = only the line and pins (no map); around = the map cut out along the route; region = the map cut out in the shape of the area */
+export type TravelMode = 'car' | 'bike' | 'walk'
 export type MapStyle = 'card' | 'route' | 'around' | 'region'
 export interface MapProps {
   from: Place
@@ -119,6 +120,8 @@ export interface MapProps {
   style?: MapStyle
   /** colour of the route line (route-only style) */
   color?: string
+  /** how the trip is made (the route and time follow it); car when missing */
+  mode?: TravelMode
   /** travel time in seconds, shown as a small chip */
   seconds?: number
   /** outline(s) of the surrounding area as [lat, lng] rings (region style) */
