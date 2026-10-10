@@ -34,11 +34,34 @@ export function withBackground(items: CanvasItem[], canvasW: number): CanvasItem
 export const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 export const rnd = (a: number, b: number) => a + Math.random() * (b - a)
 
+/** how many lines a polaroid caption takes (about 20 characters fit on a line), words kept whole */
+export function captionLines(caption: string, perLine = 20) {
+  if (!caption) return 1
+  let n = 0
+  for (const para of caption.split('\n')) {
+    let l = 1
+    let cur = 0
+    for (const word of para.split(' ')) {
+      let len = word.length
+      if (cur === 0) cur = 0
+      else if (cur + 1 + len <= perLine) { cur += 1 + len; continue }
+      else { l++; cur = 0 }
+      while (len > perLine) { l++; len -= perLine }
+      cur = len
+    }
+    n += l
+  }
+  return n
+}
+
+/** the white strip under a polaroid's picture, as a fraction of its width: one line, or room for up to four */
+export const polaroidBottom = (lines: number) => (lines <= 1 ? 0.2 : 0.075 + Math.min(4, lines) * 0.118)
+
 /** Height of a photo item for a frame at the given width. */
-export function frameHeight(frame: FrameId, w: number, aspect: number) {
+export function frameHeight(frame: FrameId, w: number, aspect: number, caption = '') {
   const a = clamp(aspect || 1, 0.66, 1.5)
   switch (frame) {
-    case 'polaroid': return w * (0.055 + 0.2) + (w * 0.89) / a
+    case 'polaroid': return w * (0.055 + polaroidBottom(captionLines(caption))) + (w * 0.89) / a
     case 'rounded': return w / a + w * 0.044
     case 'none': return w / a
     case 'circle':

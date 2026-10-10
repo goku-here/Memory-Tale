@@ -1,6 +1,6 @@
 import { useId, type CSSProperties } from 'react'
 import type { FrameId, PhotoProps } from '../types'
-import { clamp, frameHeight } from '../lib/items'
+import { captionLines, clamp, frameHeight, polaroidBottom } from '../lib/items'
 import { AssetImg } from '../lib/assets'
 
 export const FRAMES: { id: FrameId; label: string }[] = [
@@ -56,7 +56,7 @@ export function PhotoFrame({ photo, width }: { photo: PhotoProps; width: number 
   const { src, frame, caption } = photo
   const a = clamp(photo.aspect || 1, 0.66, 1.5)
   const r = (photo.radius * width) / 200
-  const h = frameHeight(frame, width, photo.aspect)
+  const h = frameHeight(frame, width, photo.aspect, caption)
   const wrap: CSSProperties = { containerType: 'inline-size', position: 'relative', width: '100%', height: '100%' }
 
   switch (frame) {
@@ -68,7 +68,7 @@ export function PhotoFrame({ photo, width }: { photo: PhotoProps; width: number 
           </div>
           <div
             className="absolute inset-x-0 flex items-center justify-center overflow-hidden px-[6cqw] text-center"
-            style={{ bottom: 0, height: '20cqw', fontFamily: "'Caveat', cursive", fontWeight: 700, fontSize: '10.5cqw', color: '#4a4a55', lineHeight: 1 }}
+            style={{ bottom: 0, height: `${polaroidBottom(captionLines(caption)) * 100}cqw`, fontFamily: "'Caveat', cursive", fontWeight: 700, fontSize: '10.5cqw', color: '#4a4a55', lineHeight: 1.08 }}
           >
             <span className="max-h-full overflow-hidden whitespace-pre-wrap break-words">{caption}</span>
           </div>

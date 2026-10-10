@@ -294,3 +294,16 @@ export const IcEraserTool = () => (
     <rect x="7" y="12" width="10" height="2.6" fill="#F7F8FC" />
   </S>
 )
+
+/** a clapperboard: "make a story" */
+export const IcClapper = () => (
+  <S size={20}>
+    <defs><G id="ic-clap" a="#9DB4FF" b="#4F6BFF" /></defs>
+    <rect x="3" y="10" width="18" height="11" rx="2.6" fill="url(#ic-clap)" />
+    <g transform="rotate(-9 4 9)">
+      <rect x="3.2" y="4.2" width="17.6" height="5" rx="1.5" fill="#FFC857" />
+      <path d="M7 4.2 9.6 9.2H6.2L4 4.2Z M13 4.2 15.6 9.2H12.2L10 4.2Z M19 4.2 20.8 8.4V9.2H18.2L16 4.2Z" fill="#2A2F3C" opacity=".85" />
+    </g>
+    <circle cx="12" cy="15.5" r="2" fill="#fff" opacity=".9" />
+  </S>
+)

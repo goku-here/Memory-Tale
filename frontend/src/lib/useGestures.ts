@@ -3,7 +3,7 @@ import type { CanvasItem, ItemPatch } from '../types'
 import { clamp } from './items'
 import { snapDrag, type Guides } from './snap'
 
-type Mode = 'drag' | 'pinch' | 'resize' | 'rotate'
+type Mode = 'drag' | 'pinch' | 'resize' | 'rotate' | 'scale'
 interface Pt { x: number; y: number }
 
 interface Base {
@@ -94,7 +94,7 @@ export function useGestures(opts: GestureOptions) {
       a: pts.length === 2 ? ang(pts[0], pts[1]) : 0,
       scrollTop: o.current.scrollerRef.current?.scrollTop ?? 0,
     }
-    if (mode === 'resize' || mode === 'rotate') {
+    if (mode === 'resize' || mode === 'rotate' || mode === 'scale') {
       const c = { x: left + cx * z, y: top + item.y * z }
       base.d = Math.max(8, dist(c, pts[0]))
       base.a = ang(c, pts[0])
@@ -141,10 +141,11 @@ export function useGestures(opts: GestureOptions) {
       const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 }
       cx = b.cx + (mid.x - b.p.x) / z
       cy = b.cy + (mid.y - b.p.y) / z
-    } else if (st.mode === 'resize') {
+    } else if (st.mode === 'resize' || st.mode === 'scale') {
       const c = { x: left + b.cx * z, y: top + b.cy * z }
       scale = dist(c, pts[0]) / b.d
-      rot = b.rot + (ang(c, pts[0]) - b.a)
+      // the bottom-right handle also turns the item; the other corners only make it bigger or smaller
+      rot = st.mode === 'resize' ? b.rot + (ang(c, pts[0]) - b.a) : b.rot
     } else if (st.mode === 'rotate') {
       const c = { x: left + b.cx * z, y: top + b.cy * z }
       rot = ang(c, pts[0]) + 90
@@ -324,6 +325,6 @@ export function useGestures(opts: GestureOptions) {
 
   return {
     startItem: (e: RPointerEvent, id: string) => start(e, id, 'drag'),
-    startHandle: (e: RPointerEvent, id: string, kind: 'resize' | 'rotate') => start(e, id, kind),
+    startHandle: (e: RPointerEvent, id: string, kind: 'resize' | 'rotate' | 'scale') => start(e, id, kind),
   }
 }

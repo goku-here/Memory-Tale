@@ -19,7 +19,7 @@ interface Props {
   canvasW: number
   offsetY?: number
   selectedId?: string | null
-  onSelect?: (id: string) => void
+  onSelect?: (id: string, e: React.MouseEvent) => void
 }
 
 /** Threads (with pins) tying items together. Re-computed from item positions, so they follow drags. */
@@ -54,7 +54,7 @@ export function ThreadsSvg({ items, canvasW, offsetY = 0, selectedId, onSelect }
               <line
                 data-ui x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth="26" strokeLinecap="round"
                 style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
-                onClick={() => onSelect(t.id)}
+                onClick={(e) => onSelect(t.id, e)}
               />
             )}
             {[a, b].map((p, i) => (

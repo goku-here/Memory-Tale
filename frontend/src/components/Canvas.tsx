@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useMotionValue, useTransform, type MotionValue } from 'framer-motion'
-import { ArrowLeft, Check, ChevronDown, Image as ImageIcon, Loader2, MoreHorizontal, Redo2, Trash2, Undo2, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, Image as ImageIcon, Loader2, MoreHorizontal, Redo2, Undo2, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../data/useAuth'
 import { useCanvas } from '../data/useCanvas'
@@ -39,7 +39,7 @@ import { LocationTool } from './LocationTool'
 import { PeopleSheet } from './PeopleSheet'
 import { mapAspect } from '../lib/geo'
 import { CanvasStyleSheet } from './CanvasStyleSheet'
-import { IcDone, IcDownload, IcEdit, IcPalette, IcPeople, IcShare, IcTrash } from './ToolIcons'
+import { IcClapper, IcDownload, IcEdit, IcPalette, IcPeople, IcShare, IcTrash } from './ToolIcons'
 import { resolveCanvas } from '../lib/canvasStyle'
 import { SizeSheet, StoryOverlay, StoryPreview } from './StoryMode'
 import { THREAD_COLORS, ThreadsSvg, threadMid } from './Threads'
@@ -159,6 +159,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   // backgrounds are sized to this device's canvas width when drawn (see withBackground)
   const vItems = useMemo(() => withBackground(items, canvasW), [items, canvasW])
   const selected = useMemo(() => vItems.find((i) => i.id === selectedId && i.type !== 'thread'), [vItems, selectedId])
+  const [threadTap, setThreadTap] = useState<{ id: string; x: number; y: number } | null>(null)
   const selectedThread = useMemo(() => items.find((i): i is Extract<CanvasItem, { type: 'thread' }> => i.id === selectedId && i.type === 'thread'), [items, selectedId])
   const visibleItems = useMemo(() => vItems.filter((i) => i.type !== 'thread'), [vItems])
   const photoCount = useMemo(() => items.filter((i) => i.type === 'photo').length, [items])
@@ -725,8 +726,26 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     })
   }
 
+  // "Bring up / Send down" only mean something when the item sits on or under another one
+  const overlapsOther = useMemo(() => {
+    if (!selected) return false
+    const box = (it: CanvasItem) => {
+      const r = (it.rotation * Math.PI) / 180
+      const w = Math.abs(it.width * Math.cos(r)) + Math.abs(it.height * Math.sin(r))
+      const h = Math.abs(it.width * Math.sin(r)) + Math.abs(it.height * Math.cos(r))
+      const cx = (it.x / 100) * canvasW
+      return { l: cx - w / 2, r: cx + w / 2, t: it.y - h / 2, b: it.y + h / 2 }
+    }
+    const a = box(selected)
+    return vItems.some((o) => {
+      if (o.id === selected.id || o.type === 'thread') return false
+      const c = box(o)
+      return a.l < c.r - 2 && a.r > c.l + 2 && a.t < c.b - 2 && a.b > c.t + 2
+    })
+  }, [selected, vItems, canvasW])
+
   const actions = selected && {
-    onHandle: (e: React.PointerEvent, kind: 'resize' | 'rotate') => startHandle(e, selected.id, kind),
+    onHandle: (e: React.PointerEvent, kind: 'resize' | 'rotate' | 'scale') => startHandle(e, selected.id, kind),
     onDuplicate: () => {
       let id = ''
       commit((list) => { const c = cloneItem(selected, nextZ(list)); id = c.id; return [...list, c] })
@@ -734,8 +753,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     },
     onDelete: () => { commit((l) => l.filter((x) => x.id !== selected.id && !(x.type === 'thread' && (x.props.a === selected.id || x.props.b === selected.id)))); setSelectedId(null) },
     onConnect: () => { if (connectFrom) setConnectFrom(null); else setConnectFrom(selected.id) },
-    onForward: () => reorder(1),
-    onBackward: () => reorder(-1),
+    onForward: overlapsOther ? () => reorder(1) : undefined,
+    onBackward: overlapsOther ? () => reorder(-1) : undefined,
     onView: selected.type === 'photo' && hasMouse() ? () => viewItem(selected.id) : undefined,
     onFrame: selected.type === 'photo' ? () => openFrame() : undefined,
     onColor: selected.type === 'note' ? (color: string) => patch(selected.id, { props: { color } }, true) : undefined,
@@ -952,7 +971,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
                   <motion.button
                     type="button" onClick={() => setStoryPreview(true)} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 460, damping: 28 }}
                     className="flex h-10 items-center gap-1.5 rounded-full border-0 bg-[#17171a] px-4 text-[14px] font-bold text-white"
-                  ><IcDone /> Done</motion.button>
+                  ><IcClapper /> Done</motion.button>
                   <motion.button
                     type="button" aria-label="Close story mode" onClick={leaveStory} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 460, damping: 28 }}
                     className="grid h-10 w-10 place-items-center rounded-full border-0 bg-white text-[#17171a] shadow-[0_2px_8px_rgba(20,24,40,.15)]"
@@ -1014,7 +1033,15 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
               ))}
             </AnimatePresence>
 
-            <ThreadsSvg items={items} canvasW={canvasW} selectedId={selectedId} onSelect={setSelectedId} />
+            <ThreadsSvg
+              items={items} canvasW={canvasW} selectedId={selectedId}
+              onSelect={(id, e) => {
+                // the colour bar opens where the thread was touched
+                const r = surface.current?.getBoundingClientRect()
+                if (r) setThreadTap({ id, x: (e.clientX - r.left) / zoom, y: (e.clientY - r.top) / zoom })
+                setSelectedId(id)
+              }}
+            />
             {guides && (
               <svg className="pointer-events-none absolute inset-0 h-full w-full" style={{ zIndex: 8600, overflow: 'visible' }} aria-hidden>
                 {guides.v.map((l) => <line key={`v${l.x}`} x1={l.x} x2={l.x} y1={l.y1} y2={l.y2} stroke="#ff3d81" strokeWidth={1.25} strokeDasharray="5 4" />)}
@@ -1025,7 +1052,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
               <StoryOverlay surfaceRef={surface} scrollerRef={scroller} canvasW={canvasW} surfaceH={height} y={storyY} onY={setStoryY} items={vItems} accent={accent} headerH={HEADER_H} size={size} zoom={zoom} />
             )}
             {selectedThread && !drawing && (() => {
-              const m = threadMid(items, selectedThread, canvasW)
+              const m = threadTap?.id === selectedThread.id ? threadTap : threadMid(items, selectedThread, canvasW)
               if (!m) return null
               return (
                 <motion.div
@@ -1047,7 +1074,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
                     type="button" aria-label="Remove thread" onClick={() => { commit((l) => l.filter((x) => x.id !== selectedThread.id)); setSelectedId(null) }}
                     className="grid h-11 w-11 place-items-center border-0 bg-transparent text-[#d6455d]"
                   >
-                    <Trash2 size={18} />
+                    <span className="[&_svg]:h-[22px] [&_svg]:w-[22px]"><IcTrash /></span>
                   </button>
                 </motion.div>
               )
@@ -1175,13 +1202,13 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       <AnimatePresence>
         {connectFrom && (
           <motion.div
-            key="thread-hint" data-ui className="fixed left-1/2 z-40 flex w-max max-w-[94vw] items-center gap-3 whitespace-nowrap rounded-full bg-[#17171a] py-1.5 pl-4 pr-1.5 text-[13.5px] font-bold text-white shadow-[0_10px_28px_rgba(20,24,40,.35)]"
+            key="thread-hint" data-ui className="fixed left-1/2 z-40 flex w-max max-w-[94vw] items-center gap-3 whitespace-nowrap rounded-full bg-white py-1.5 pl-4 pr-1.5 text-[13.5px] font-bold text-[#17171a] shadow-[0_10px_28px_rgba(20,24,40,.25),0_0_0_1px_rgba(20,24,40,.06)]"
             style={{ top: 'calc(var(--safe-top) + 138px)', x: '-50%' }}
             initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
           >
             <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-[#F97316]" />
             Tap another item to tie the thread
-            <button type="button" onClick={() => setConnectFrom(null)} className="h-9 rounded-full border-0 bg-white/15 px-3.5 text-[13px] font-bold text-white">Cancel</button>
+            <button type="button" onClick={() => setConnectFrom(null)} className="h-9 rounded-full border-0 bg-neutral-100 px-3.5 text-[13px] font-bold text-[#17171a]">Cancel</button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1194,15 +1221,15 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
 
       {/* ---- tool sheets ---- */}
       <ToolSheet
-        open={sheet === 'frame' && !!photoItem} onClose={closeSheet} title="Frame" snaps={[0.5, 0.88]} dim={0.18} z={55}
+        open={sheet === 'frame' && !!photoItem} onClose={closeSheet} title="Frame" snaps={[0.5, 0.88]} initialSnap={1} dim={0.18} z={55}
         onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, frame: h }))}
       >
         {photoItem && (
           <FramePicker
             photo={photoItem.props} width={photoItem.width} accent={accent} focusCaption={captionFocus}
-            onFrame={(frame) => patch(photoItem.id, { height: frameHeight(frame, photoItem.width, photoItem.props.aspect), props: { frame } })}
+            onFrame={(frame) => patch(photoItem.id, { height: frameHeight(frame, photoItem.width, photoItem.props.aspect, photoItem.props.caption), props: { frame } })}
             onRadius={(radius) => patch(photoItem.id, { props: { radius } })}
-            onCaption={(caption) => patch(photoItem.id, { props: { caption } })}
+            onCaption={(caption) => patch(photoItem.id, { height: frameHeight(photoItem.props.frame, photoItem.width, photoItem.props.aspect, caption), props: { caption } })}
             onReplace={() => replaceInput.current?.click()}
             onBackground={setAsBackground}
             onOriginal={photoItem.props.original || photoItem.props.originalId ? () => void saveOriginal(photoItem.props) : undefined}

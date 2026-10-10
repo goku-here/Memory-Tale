@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check, MapPin, RotateCw } from 'lucide-react'
+import { Check, MapPin } from 'lucide-react'
 import { memo, useLayoutEffect, useRef, useState, type PointerEvent as RPE } from 'react'
 import type { CanvasItem } from '../types'
 import { BubbleBody } from './Bubble'
@@ -134,11 +134,12 @@ export const CanvasItemView = memo(function CanvasItemView({ item, canvasW, sele
 /* ---------------- selection chrome ---------------- */
 
 export interface SelectionActions {
-  onHandle: (e: RPE, kind: 'resize' | 'rotate') => void
+  onHandle: (e: RPE, kind: 'resize' | 'rotate' | 'scale') => void
   onDuplicate: () => void
   onDelete: () => void
-  onForward: () => void
-  onBackward: () => void
+  /** only offered when the item overlaps another one */
+  onForward?: () => void
+  onBackward?: () => void
   onEdit?: () => void
   onFrame?: () => void
   onConnect?: () => void
@@ -168,7 +169,7 @@ export function SelectionOverlay({
   const rad = (item.rotation * Math.PI) / 180
   const hh = (Math.abs(item.width * Math.sin(rad)) + Math.abs(item.height * Math.cos(rad))) / 2
   const [colorsOpen, setColorsOpen] = useState(false)
-  const nButtons = locked ? 2 : 4 + (actions.onEdit ? 1 : 0) + (actions.onFrame ? 1 : 0) + (actions.onConnect ? 1 : 0) + (actions.onView ? 1 : 0) + (actions.onColor ? 1 : 0)
+  const nButtons = locked ? 2 : 2 + (actions.onForward ? 2 : 0) + (actions.onEdit ? 1 : 0) + (actions.onFrame ? 1 : 0) + (actions.onConnect ? 1 : 0) + (actions.onView ? 1 : 0) + (actions.onColor ? 1 : 0)
   // the toolbar and handles keep their on-screen size however far the canvas is zoomed out
   const k = 1 / zoom
   // a little more room between the buttons on wider screens; phones need the tighter fit
@@ -193,21 +194,28 @@ export function SelectionOverlay({
         }}
       >
         <div className="absolute -inset-1 rounded-[6px]" style={{ border: `1.5px solid ${accent}`, boxShadow: '0 0 0 1px rgba(255,255,255,.9)' }} />
-        {[[-1, -1], [1, -1], [-1, 1]].map(([sx, sy]) => (
-          <i
-            key={`${sx}${sy}`} className="absolute h-3 w-3 rounded-full bg-white"
-            style={{ left: sx < 0 ? -10 : 'auto', right: sx > 0 ? -10 : 'auto', top: sy < 0 ? -10 : 'auto', bottom: sy > 0 ? -10 : 'auto', border: `2px solid ${accent}` }}
-          />
+        {/* the other three corners: bigger / smaller */}
+        {!locked && [[-1, -1], [1, -1], [-1, 1]].map(([sx, sy]) => (
+          <button
+            key={`${sx}${sy}`} type="button" data-ui aria-label="Make bigger or smaller"
+            className="pointer-events-auto absolute grid h-11 w-11 touch-none place-items-center border-0 bg-transparent"
+            style={{ left: sx < 0 ? -26 : 'auto', right: sx > 0 ? -26 : 'auto', top: sy < 0 ? -26 : 'auto', bottom: sy > 0 ? -26 : 'auto', transform: `scale(${k})`, cursor: sx === sy ? 'nwse-resize' : 'nesw-resize' }}
+            onPointerDown={(e) => actions.onHandle(e, 'scale')}
+          >
+            <span className="h-3.5 w-3.5 rounded-full bg-white" style={{ border: `2px solid ${accent}`, boxShadow: '0 1px 3px rgba(0,0,0,.25)' }} />
+          </button>
         ))}
         {/* resize + rotate */}
         {!locked && <button
-          type="button" data-ui aria-label="Resize and rotate"
+          type="button" data-ui aria-label="Drag to resize and turn"
           className="pointer-events-auto absolute grid h-11 w-11 touch-none place-items-center border-0 bg-transparent"
           style={{ right: -26, bottom: -26, transform: `scale(${k})` }}
           onPointerDown={(e) => actions.onHandle(e, 'resize')}
         >
           <span className="grid h-6 w-6 place-items-center rounded-full bg-white shadow" style={{ border: `2px solid ${accent}` }}>
-            <RotateCw size={12} color={accent} strokeWidth={3} />
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M5 5l14 14M5 5v6M5 5h6M19 19v-6M19 19h-6" />
+            </svg>
           </span>
         </button>}
         {/* rotate only */}
@@ -237,8 +245,8 @@ export function SelectionOverlay({
           {!locked && actions.onEdit && <TB w={bw} label="Edit" caption="Edit" onClick={actions.onEdit}><IcEdit /></TB>}
           {!locked && actions.onConnect && <TB w={bw} label={connecting ? 'Cancel the thread' : 'Tie with thread'} caption={connecting ? 'Pick 2nd' : 'Thread'} active={connecting} onClick={actions.onConnect}>{connecting ? <IcThreadOn /> : <IcThread />}</TB>}
           {!locked && <TB w={bw} label="Duplicate" caption="Copy" onClick={actions.onDuplicate}><IcCopy /></TB>}
-          {!locked && <TB w={bw} label="Bring forward" caption="Bring up" onClick={actions.onForward}><IcUp /></TB>}
-          {!locked && <TB w={bw} label="Send backward" caption="Send down" onClick={actions.onBackward}><IcDown /></TB>}
+          {!locked && actions.onForward && <TB w={bw} label="Bring forward" caption="Bring up" onClick={actions.onForward}><IcUp /></TB>}
+          {!locked && actions.onBackward && <TB w={bw} label="Send backward" caption="Send down" onClick={actions.onBackward}><IcDown /></TB>}
           <TB w={bw} label="Delete" caption="Delete" onClick={actions.onDelete} danger><IcTrash /></TB>
         </motion.div></div>}
         {!hideToolbar && colorsOpen && actions.onColor && (

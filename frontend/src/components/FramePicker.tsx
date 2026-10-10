@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { Download, Replace } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import type { FrameId, PhotoProps } from '../types'
-import { frameHeight } from '../lib/items'
+import { captionLines, frameHeight } from '../lib/items'
 import { FRAMES, PhotoFrame, RADIUS_FRAMES } from './PhotoFrame'
 
 interface Props {
@@ -24,7 +24,7 @@ const PREVIEW_W = 92
 
 /** Frame chooser for the selected photo: previews, polaroid caption, corner radius. */
 export function FramePicker({ photo, focusCaption, accent, onFrame, onRadius, onCaption, onReplace, onBackground, onOriginal }: Props) {
-  const capRef = useRef<HTMLInputElement>(null)
+  const capRef = useRef<HTMLTextAreaElement>(null)
   useEffect(() => {
     if (focusCaption) setTimeout(() => capRef.current?.focus(), 350)
   }, [focusCaption])
@@ -35,7 +35,9 @@ export function FramePicker({ photo, focusCaption, accent, onFrame, onRadius, on
       <div className="no-scrollbar flex gap-3 overflow-x-auto px-5 pb-3 pt-1" style={{ touchAction: 'pan-x' }}>
         {FRAMES.map((f) => {
           const on = photo.frame === f.id
-          const h = frameHeight(f.id, PREVIEW_W, photo.aspect)
+          const cap = f.id === 'polaroid' ? photo.caption : ''
+          const nat = frameHeight(f.id, PREVIEW_W * 0.9, photo.aspect, cap)
+          const fit = Math.min(1, 116 / nat) // a tall picture is shrunk to fit the tile, never cropped
           return (
             <motion.button
               key={f.id} type="button" aria-pressed={on} aria-label={f.label} whileTap={{ scale: 0.94 }}
@@ -44,8 +46,8 @@ export function FramePicker({ photo, focusCaption, accent, onFrame, onRadius, on
               style={{ boxShadow: on ? `inset 0 0 0 2px ${accent}` : 'inset 0 0 0 1px rgba(0,0,0,.06)', background: on ? `${accent}14` : '#fafafa' }}
             >
               <div className="grid h-[122px] w-full place-items-center overflow-hidden">
-                <div style={{ width: PREVIEW_W * 0.9, height: Math.min(h, 122) * 0.9 }}>
-                  <PhotoFrame photo={{ ...photo, frame: f.id, caption: f.id === 'polaroid' ? photo.caption : '' }} width={PREVIEW_W * 0.9} />
+                <div style={{ width: PREVIEW_W * 0.9, height: nat, transform: `scale(${fit})`, flexShrink: 0 }}>
+                  <PhotoFrame photo={{ ...photo, frame: f.id, caption: cap }} width={PREVIEW_W * 0.9} />
                 </div>
               </div>
               <span className="text-[12px] font-bold text-neutral-600">{f.label}</span>
@@ -83,14 +85,16 @@ export function FramePicker({ photo, focusCaption, accent, onFrame, onRadius, on
         )}
         <label className="block">
           <span className="mb-1.5 block text-[12px] font-bold uppercase tracking-wider text-neutral-400">Caption</span>
-          <input
+          <textarea
             ref={capRef}
             value={photo.caption}
-            maxLength={40}
+            rows={Math.min(4, Math.max(1, captionLines(photo.caption)))}
+            maxLength={120}
             disabled={photo.frame !== 'polaroid'}
-            placeholder={photo.frame === 'polaroid' ? 'Write a little note…' : 'Captions live on the Polaroid frame'}
-            onChange={(e) => onCaption(e.target.value)}
-            className="h-12 w-full rounded-2xl border-0 bg-neutral-100 px-4 text-[17px] text-[#17171a] outline-none disabled:opacity-50"
+            placeholder={photo.frame === 'polaroid' ? 'Write a little note… (up to 4 lines)' : 'Captions live on the Polaroid frame'}
+            // the strip under the photo grows with the note, up to four lines
+            onChange={(e) => { if (captionLines(e.target.value) <= 4) onCaption(e.target.value) }}
+            className="block w-full resize-none rounded-2xl border-0 bg-neutral-100 px-4 py-3 text-[17px] leading-tight text-[#17171a] outline-none disabled:opacity-50"
             style={{ fontFamily: "'Caveat', cursive", fontWeight: 700 }}
           />
         </label>
