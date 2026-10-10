@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Camera, Image as ImageIcon, Images, MapPin, MessageCircle, MoreHorizontal, RectangleVertical, Smile, StickyNote, Type, Flag, Grid3x3 } from 'lucide-react'
+import { Camera, Image as ImageIcon } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
+import { IcBubble, IcDraw, IcFlag, IcGrid, IcLine, IcMore, IcNote, IcPhoto, IcPhone, IcPin, IcSticker, IcText } from './ToolIcons'
 
 export type ToolId = 'sticker' | 'draw' | 'text' | 'photo' | 'camera' | 'note' | 'location' | 'divider' | 'bubble' | 'line' | 'story' | 'canvas'
 
@@ -18,10 +19,13 @@ function Btn({ label, active, onClick, children, tour }: { label: string; active
       type="button" aria-label={label} title={label} aria-pressed={active} data-tour={tour} whileTap={{ scale: 0.9 }}
       transition={{ type: 'spring', stiffness: 500, damping: 28 }}
       onClick={onClick}
-      className="grid h-12 w-12 place-items-center rounded-full border-0 bg-transparent text-[#17171a]"
+      className="grid h-[58px] w-[56px] place-items-center rounded-2xl border-0 bg-transparent text-[#17171a]"
       style={active ? { background: 'rgba(23,23,26,.08)' } : undefined}
     >
-      {children}
+      <span className="flex flex-col items-center gap-1 leading-none">
+        {children}
+        <span className="text-[10px] font-extrabold tracking-tight text-neutral-500">{label}</span>
+      </span>
     </motion.button>
   )
 }
@@ -46,7 +50,7 @@ export function BottomToolbar({ visible, onTool, inStory }: Props) {
               {photoMenu && (
                 <motion.div
                   role="menu" aria-label="Add a photo"
-                  className="pointer-events-auto absolute bottom-[68px] right-12 w-56 origin-bottom rounded-3xl bg-white p-1.5"
+                  className="pointer-events-auto absolute bottom-[84px] right-12 w-56 origin-bottom rounded-3xl bg-white p-1.5"
                   style={{ boxShadow: '0 14px 40px rgba(20,24,40,.22), 0 0 0 1px rgba(20,24,40,.04)' }}
                   initial={{ opacity: 0, scale: 0.8, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.85, y: 6 }}
                   transition={{ type: 'spring', stiffness: 480, damping: 30 }}
@@ -67,19 +71,19 @@ export function BottomToolbar({ visible, onTool, inStory }: Props) {
               {more && (
                 <motion.div
                   role="menu"
-                  className="pointer-events-auto absolute bottom-[68px] right-0 w-56 origin-bottom-right rounded-3xl bg-white p-1.5"
+                  className="pointer-events-auto absolute bottom-[84px] right-0 w-56 origin-bottom-right rounded-3xl bg-white p-1.5"
                   style={{ boxShadow: '0 14px 40px rgba(20,24,40,.22), 0 0 0 1px rgba(20,24,40,.04)' }}
                   initial={{ opacity: 0, scale: 0.8, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.85, y: 6 }}
                   transition={{ type: 'spring', stiffness: 480, damping: 30 }}
                 >
                   {([
-                    ['note', 'Sticky note', <StickyNote size={19} key="n" />],
-                    ['bubble', 'Chat bubble', <MessageCircle size={19} key="b" />],
-                    ['line', 'Polaroid line', <Images size={19} key="p" />],
-                    ['location', 'Location', <MapPin size={19} key="l" />],
-                    ['divider', 'Stop divider', <Flag size={19} key="d" />],
-                    ['canvas', 'Canvas style', <Grid3x3 size={19} key="g" />],
-                    ['story', 'Story mode', <RectangleVertical size={19} key="s" />],
+                    ['note', 'Sticky note', <IcNote key="n" />],
+                    ['bubble', 'Chat bubble', <IcBubble key="b" />],
+                    ['line', 'Polaroid line', <IcLine key="p" />],
+                    ['location', 'Location', <IcPin key="l" />],
+                    ['divider', 'Stop divider', <IcFlag key="d" />],
+                    ['canvas', 'Canvas style', <IcGrid key="g" />],
+                    ['story', 'Story mode', <IcPhone key="s" />],
                   ] as [ToolId, string, ReactNode][]).filter(([id]) => !(inStory && id === 'story')).map(([id, label, icon]) => (
                     <motion.button
                       key={id} data-tour={id === 'story' ? 'story-item' : undefined} type="button" role="menuitem" whileTap={{ scale: 0.96 }} onClick={() => pick(id)}
@@ -95,16 +99,12 @@ export function BottomToolbar({ visible, onTool, inStory }: Props) {
               className="pointer-events-auto flex items-center gap-1 rounded-full bg-white p-2"
               style={{ boxShadow: '0 10px 34px rgba(20,24,40,.2), 0 2px 6px rgba(20,24,40,.08), 0 0 0 1px rgba(20,24,40,.04)' }}
             >
-              <Btn label="Sticker" tour="sticker" onClick={() => pick('sticker')}><Smile size={23} strokeWidth={1.9} /></Btn>
-              <Btn label="Draw" onClick={() => pick('draw')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M15.2 3.6a2.1 2.1 0 0 1 3 3L8.4 16.4 4.6 17.4l1-3.8Z" />
-                  <path d="m13.6 5.2 3 3" />
-                  <path d="M3 21c2.2-2.2 3.6 1.2 6 0s3.6-2.6 5.4-1.2 3.2.4 4.6-.8" />
-                </svg></Btn>
-              <Btn label="Text" onClick={() => pick('text')}><Type size={23} strokeWidth={1.9} /></Btn>
-              <Btn label="Photo" tour="photo" active={photoMenu} onClick={() => { setMore(false); setPhotoMenu((v) => !v) }}><ImageIcon size={23} strokeWidth={1.9} /></Btn>
+              <Btn label="Sticker" tour="sticker" onClick={() => pick('sticker')}><IcSticker /></Btn>
+              <Btn label="Draw" onClick={() => pick('draw')}><IcDraw /></Btn>
+              <Btn label="Text" onClick={() => pick('text')}><IcText /></Btn>
+              <Btn label="Photo" tour="photo" active={photoMenu} onClick={() => { setMore(false); setPhotoMenu((v) => !v) }}><IcPhoto /></Btn>
               <span className="mx-1 h-7 w-px bg-neutral-200" aria-hidden />
-              <Btn label="More" tour="more" active={more} onClick={() => { setPhotoMenu(false); setMore((v) => !v) }}><MoreHorizontal size={23} strokeWidth={1.9} /></Btn>
+              <Btn label="More" tour="more" active={more} onClick={() => { setPhotoMenu(false); setMore((v) => !v) }}><IcMore /></Btn>
             </div>
           </div>
         </motion.div>
