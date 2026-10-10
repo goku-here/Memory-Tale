@@ -6,7 +6,6 @@ import { getTheme } from './ThemeEngine'
 import { ToolSheet } from './ToolSheet'
 import type { Memory } from '../types'
 
-const SKY = '#4C93E6'
 const Label = ({ children }: { children: string }) => <div className="px-5 pb-2 pt-4 text-[12px] font-extrabold uppercase tracking-wider text-neutral-400">{children}</div>
 
 /** Pick the canvas pattern, the background colour (chosen for the mood of this kind of memory) and the pattern colour. */
@@ -28,10 +27,10 @@ export function CanvasStyleSheet({ open, onClose, memory, value, onChange, onHei
         <div className="no-scrollbar flex gap-3 overflow-x-auto px-5 pb-1" style={{ touchAction: 'pan-x' }}>
           {PATTERNS.map((p) => {
             const on = cur.pattern === p.id
-            const prev = resolveCanvas(theme, { ...value, pattern: p.id, ...(p.id === 'clouds' ? { bg: SKY } : {}) })
+            const prev = resolveCanvas(theme, { ...value, pattern: p.id })
             return (
               <motion.button
-                key={p.id} type="button" whileTap={{ scale: 0.94 }} aria-pressed={on} aria-label={p.name} onClick={() => pick(p.id === 'clouds' ? { pattern: p.id, bg: SKY } : { pattern: p.id })}
+                key={p.id} type="button" whileTap={{ scale: 0.94 }} aria-pressed={on} aria-label={p.name} onClick={() => pick({ pattern: p.id })}
                 className="flex w-[84px] shrink-0 flex-col items-center gap-1.5 border-0 bg-transparent p-0"
               >
                 <span className="block h-[84px] w-full rounded-2xl" style={{ ...prev.css, boxShadow: on ? `inset 0 0 0 2.5px ${theme.palette[0]}` : 'inset 0 0 0 1px rgba(0,0,0,.1)' }} />

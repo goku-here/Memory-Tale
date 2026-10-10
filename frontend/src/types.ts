@@ -25,7 +25,7 @@ export interface Cover {
   avg?: string
 }
 
-export type PatternId = 'dots' | 'grid' | 'graph' | 'cross' | 'lines' | 'plain' | 'paper' | 'crumple' | 'clouds'
+export type PatternId = 'dots' | 'grid' | 'graph' | 'cross' | 'lines' | 'plain'
 
 /** how the canvas of one memory looks; anything left out falls back to the theme */
 export interface CanvasStyle {

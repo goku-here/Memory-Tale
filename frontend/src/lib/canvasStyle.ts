@@ -2,7 +2,6 @@ import type { CSSProperties } from 'react'
 import type { CanvasStyle, CategoryId, PatternId } from '../types'
 import { alpha, luminance, shade } from './color'
 import type { Theme } from '../components/ThemeEngine'
-import { cloudsTile, crumpleTile } from './textures'
 
 export const PATTERNS: { id: PatternId; name: string; texture?: boolean }[] = [
   { id: 'dots', name: 'Dots' },
@@ -11,8 +10,6 @@ export const PATTERNS: { id: PatternId; name: string; texture?: boolean }[] = [
   { id: 'cross', name: 'Blueprint' },
   { id: 'lines', name: 'Ruled' },
   { id: 'plain', name: 'Plain' },
-  { id: 'crumple', name: 'Crumpled paper', texture: true },
-  { id: 'clouds', name: 'Blue sky', texture: true },
 ]
 export const isTexture = (p: PatternId) => !!PATTERNS.find((x) => x.id === p)?.texture
 
@@ -129,8 +126,7 @@ export interface ResolvedCanvas {
 
 export function resolveCanvas(theme: Theme, cs?: CanvasStyle): ResolvedCanvas {
   const pattern = cs?.pattern ?? 'dots'
-  // the sky pattern is a blue sky unless a colour was picked on purpose
-  const bg = cs?.bg ?? (pattern === 'clouds' ? '#4C93E6' : theme.canvasBg)
+  const bg = cs?.bg ?? theme.canvasBg
   const dark = isDark(bg)
   // untouched colours keep the theme's own dot colour; otherwise pick something readable on the new background
   const auto = cs?.bg ? (dark ? shade(bg, -0.5) : shade(bg, 0.14)) : theme.dot
@@ -164,14 +160,6 @@ export function resolveCanvas(theme: Theme, cs?: CanvasStyle): ResolvedCanvas {
     case 'lines':
       period = 30
       css = { backgroundImage: `linear-gradient(transparent 29px, ${a(0.7)} 29px, ${a(0.7)} 30px)`, backgroundSize: '100% 30px' }
-      break
-    case 'crumple':
-      period = 720
-      css = { backgroundImage: `url(${crumpleTile()})`, backgroundSize: '720px 720px', backgroundBlendMode: 'multiply' }
-      break
-    case 'clouds':
-      period = 960
-      css = { backgroundImage: `url(${cloudsTile()})`, backgroundSize: '640px 960px' }
       break
     default:
       css = {}
