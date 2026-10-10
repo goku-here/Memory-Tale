@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useMotionValue, useTransform, type MotionValue } from 'framer-motion'
-import { ArrowLeft, Check, ChevronDown, Clapperboard, Grid3x3, Minus, ZoomIn, ZoomOut, Download, Loader2, MoreHorizontal, Palette, PenLine, Redo2, Share2, Trash2, Undo2, Users, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, Clapperboard, ZoomOut, Download, Loader2, MoreHorizontal, Palette, PenLine, Redo2, Share2, Trash2, Undo2, Users, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../data/useAuth'
 import { useCanvas } from '../data/useCanvas'
@@ -900,15 +900,9 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
                       >
                         <MenuItem icon={<PenLine size={18} />} label="Edit book" onClick={run(onEdit)} />
                         <MenuItem icon={<Palette size={18} />} label="Change theme" onClick={run(onTheme)} />
-                        <MenuItem icon={<Grid3x3 size={18} />} label="Canvas style" onClick={run(() => setStyleOpen(true))} />
                         <MenuItem icon={<Share2 size={18} />} label="Share" onClick={run(onShare)} />
                         {user && <MenuItem icon={<Users size={18} />} label="People" onClick={run(() => setPeopleOpen(true))} />}
-                        {Math.abs(zoom - 1) > 0.001
-                          ? <MenuItem icon={<ZoomOut size={18} />} label="Fit to width" onClick={run(() => applyZoom(1))} />
-                          : <>
-                              <MenuItem icon={<ZoomIn size={18} />} label="Zoom in" onClick={run(() => applyZoom(1.75))} />
-                              <MenuItem icon={<ZoomOut size={18} />} label="Zoom out" onClick={run(() => applyZoom(0.5))} />
-                            </>}
+                        {Math.abs(zoom - 1) > 0.001 && <MenuItem icon={<ZoomOut size={18} />} label="Fit to width" onClick={run(() => applyZoom(1))} />}
                         <MenuItem icon={<Download size={18} />} label="Download book" onClick={run(() => void downloadBook())} />
                         <MenuItem danger icon={<Trash2 size={18} />} label="Delete" onClick={run(onDelete)} />
                       </motion.div>
@@ -1134,9 +1128,9 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
             style={{ bottom: 'calc(var(--safe-bottom) + 96px)', boxShadow: '0 6px 22px rgba(20,24,40,.2), 0 0 0 1px rgba(20,24,40,.05)' }}
             initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
           >
-            <button type="button" aria-label="Zoom out" disabled={zoom <= ZMIN + 0.001} onClick={() => applyZoom(zoom - (zoom > 1.001 ? 0.25 : 0.15))} className="grid h-10 w-10 place-items-center rounded-full border-0 bg-transparent text-[#17171a] disabled:opacity-30"><Minus size={18} /></button>
-            <button type="button" aria-label="Fit to width" onClick={() => applyZoom(1)} className="h-10 min-w-[48px] rounded-full border-0 bg-transparent px-1 text-[13px] font-extrabold text-[#17171a]">{Math.round(zoom * 100)}%</button>
-            <button type="button" aria-label="Zoom in" disabled={zoom >= ZMAX - 0.001} onClick={() => applyZoom(zoom + (zoom >= 1 ? 0.25 : 0.15))} className="grid h-10 w-10 place-items-center rounded-full border-0 bg-transparent text-[#17171a] disabled:opacity-30"><ZoomIn size={18} /></button>
+            <button type="button" aria-label="Fit to width" onClick={() => applyZoom(1)} className="flex h-10 items-center gap-2 rounded-full border-0 bg-transparent px-4 text-[13px] font-extrabold text-[#17171a]">
+              {Math.round(zoom * 100)}% <span className="font-semibold text-neutral-400">Fit to width</span>
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
