@@ -35,7 +35,10 @@ export function PeopleSheet({ open, onClose, memory }: { open: boolean; onClose:
       toast(`${t.name} was removed`)
     } catch (e) {
       reportError(e)
-      toast("Couldn't remove them. Check your connection and the cloud rules, then try again.")
+      const code = (e as { code?: string }).code
+      toast(code === 'permission-denied'
+        ? 'The cloud rules block this. Publish the latest backend/firestore.rules in Firebase, then try again.'
+        : "Couldn't remove them. Check your connection and try again.")
     } finally { setBusy(null) }
   }
 

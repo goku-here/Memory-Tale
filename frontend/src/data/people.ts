@@ -60,7 +60,8 @@ export async function removeMember(owner: { uid: string; name: string; photo: st
   const ref = doc(d, 'memories', memory.id)
   const cur = await getDoc(ref)
   const members = ((cur.data()?.members ?? []) as Member[]).filter((m) => m.id !== targetUid)
-  await updateDoc(ref, clean({ memberIds: arrayRemove(targetUid), banned: arrayUnion(targetUid), members, updatedAt: Date.now() }))
+  // (no clean() here: it would flatten the arrayRemove/arrayUnion markers)
+  await updateDoc(ref, { memberIds: arrayRemove(targetUid), banned: arrayUnion(targetUid), members: clean(members), updatedAt: Date.now() })
 }
 
 /** My new name on every book I am in (cloud and this device), so other members see it too. */
