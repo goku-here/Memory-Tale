@@ -712,23 +712,10 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
 
   /* ---------- selection actions ---------- */
 
-  const reorder = (dir: 1 | -1) => {
-    if (!selected) return
-    tour.emit('reorder')
-    commit((list) => {
-      const order = list.filter((x) => x.type !== 'thread').sort((a, b) => a.zIndex - b.zIndex)
-      const i = order.findIndex((x) => x.id === selected.id)
-      const j = i + dir
-      if (j < 0 || j >= order.length) return list
-      ;[order[i], order[j]] = [order[j], order[i]]
-      const z = new Map(order.map((x, k) => [x.id, k + 1]))
-      return list.map((x) => (z.has(x.id) ? { ...x, zIndex: z.get(x.id)! } : x))
-    })
-  }
-
-  // "Bring up / Send down" only mean something when the item sits on or under another one
-  const overlapsOther = useMemo(() => {
-    if (!selected) return false
+  /** ids of the items that overlap the selected one (backgrounds do not count: everything sits on them) */
+  const overlap = useMemo(() => {
+    const none = { ids: new Set<string>(), up: false, down: false }
+    if (!selected) return none
     const box = (it: CanvasItem) => {
       const r = (it.rotation * Math.PI) / 180
       const w = Math.abs(it.width * Math.cos(r)) + Math.abs(it.height * Math.sin(r))
@@ -737,12 +724,43 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       return { l: cx - w / 2, r: cx + w / 2, t: it.y - h / 2, b: it.y + h / 2 }
     }
     const a = box(selected)
-    return vItems.some((o) => {
-      if (o.id === selected.id || o.type === 'thread') return false
+    const ids = new Set<string>()
+    let up = false, down = false
+    for (const o of vItems) {
+      if (o.id === selected.id || o.type === 'thread' || isBg(o)) continue
       const c = box(o)
-      return a.l < c.r - 2 && a.r > c.l + 2 && a.t < c.b - 2 && a.b > c.t + 2
-    })
+      if (!(a.l < c.r - 2 && a.r > c.l + 2 && a.t < c.b - 2 && a.b > c.t + 2)) continue
+      ids.add(o.id)
+      if (o.zIndex > selected.zIndex) up = true
+      else down = true
+    }
+    return { ids, up, down }
   }, [selected, vItems, canvasW])
+
+  const lastReorder = useRef(0)
+  /** One tap: all the way above (or below) everything it overlaps. Quick repeat taps count once. */
+  const reorder = (dir: 1 | -1) => {
+    if (!selected) return
+    const now = performance.now()
+    if (now - lastReorder.current < 350) return
+    lastReorder.current = now
+    tour.emit('reorder')
+    const ids = overlap.ids
+    commit((list) => {
+      const order = list.filter((x) => x.type !== 'thread').sort((a, b) => a.zIndex - b.zIndex)
+      const i = order.findIndex((x) => x.id === selected.id)
+      if (i < 0) return list
+      const me = order[i]
+      let at = -1
+      if (dir === 1) { for (let k = order.length - 1; k > i; k--) if (ids.has(order[k].id)) { at = k; break } }
+      else { for (let k = 0; k < i; k++) if (ids.has(order[k].id)) { at = k; break } }
+      if (at < 0) return list
+      order.splice(i, 1)
+      order.splice(dir === 1 ? at : at, 0, me) // above the top overlapping item, or just below the lowest one
+      const z = new Map(order.map((x, k) => [x.id, k + 1]))
+      return list.map((x) => (z.has(x.id) ? { ...x, zIndex: z.get(x.id)! } : x))
+    })
+  }
 
   const actions = selected && {
     onHandle: (e: React.PointerEvent, kind: 'resize' | 'rotate' | 'scale') => startHandle(e, selected.id, kind),
@@ -753,8 +771,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     },
     onDelete: () => { commit((l) => l.filter((x) => x.id !== selected.id && !(x.type === 'thread' && (x.props.a === selected.id || x.props.b === selected.id)))); setSelectedId(null) },
     onConnect: () => { if (connectFrom) setConnectFrom(null); else setConnectFrom(selected.id) },
-    onForward: overlapsOther ? () => reorder(1) : undefined,
-    onBackward: overlapsOther ? () => reorder(-1) : undefined,
+    onForward: overlap.up ? () => reorder(1) : undefined,
+    onBackward: overlap.down ? () => reorder(-1) : undefined,
     onView: selected.type === 'photo' && hasMouse() ? () => viewItem(selected.id) : undefined,
     onFrame: selected.type === 'photo' ? () => openFrame() : undefined,
     onColor: selected.type === 'note' ? (color: string) => patch(selected.id, { props: { color } }, true) : undefined,

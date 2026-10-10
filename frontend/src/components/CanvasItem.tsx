@@ -169,7 +169,7 @@ export function SelectionOverlay({
   const rad = (item.rotation * Math.PI) / 180
   const hh = (Math.abs(item.width * Math.sin(rad)) + Math.abs(item.height * Math.cos(rad))) / 2
   const [colorsOpen, setColorsOpen] = useState(false)
-  const nButtons = locked ? 2 : 2 + (actions.onForward ? 2 : 0) + (actions.onEdit ? 1 : 0) + (actions.onFrame ? 1 : 0) + (actions.onConnect ? 1 : 0) + (actions.onView ? 1 : 0) + (actions.onColor ? 1 : 0)
+  const nButtons = locked ? 2 : 2 + (actions.onForward ? 1 : 0) + (actions.onBackward ? 1 : 0) + (actions.onEdit ? 1 : 0) + (actions.onFrame ? 1 : 0) + (actions.onConnect ? 1 : 0) + (actions.onView ? 1 : 0) + (actions.onColor ? 1 : 0)
   // the toolbar and handles keep their on-screen size however far the canvas is zoomed out
   const k = 1 / zoom
   // a little more room between the buttons on wider screens; phones need the tighter fit
