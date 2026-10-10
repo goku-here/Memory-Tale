@@ -233,3 +233,64 @@ export const IcDownload = () => (
     <path d="M12 3.4v11M7.4 10.2 12 14.8l4.6-4.6" stroke="#2F62F0" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
   </S>
 )
+
+export const IcDone = () => (
+  <S size={20}>
+    <defs><G id="ic-done" a="#7BEFAE" b="#1FB864" /></defs>
+    <circle cx="12" cy="12" r="10" fill="url(#ic-done)" />
+    <path d="M7.4 12.4l3.3 3.3 6-7" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+  </S>
+)
+
+/** the thread button while a thread is being tied: warm colours, a moving dashed line, a ring waiting for the second item */
+export const IcThreadOn = () => (
+  <S>
+    <path d="M5.5 17.5C5.8 10 10 6.8 17 6.2" stroke="#F97316" strokeWidth="2.4" strokeLinecap="round" strokeDasharray="3.2 3.2">
+      <animate attributeName="stroke-dashoffset" from="12.8" to="0" dur="0.9s" repeatCount="indefinite" />
+    </path>
+    <circle cx="5.5" cy="18.5" r="3.4" fill="#F97316" /><circle cx="5.5" cy="18.5" r="1.3" fill="#FFE2C4" />
+    <circle cx="18" cy="6" r="3.2" fill="none" stroke="#F97316" strokeWidth="2" strokeDasharray="2.6 2">
+      <animate attributeName="r" values="3.2;4.4;3.2" dur="1.1s" repeatCount="indefinite" />
+    </circle>
+  </S>
+)
+
+/* ---- drawing tools (upright, like real ones) ---- */
+export const IcPenTool = () => (
+  <S size={30}>
+    <path d="M8.2 9 12 1.6 15.8 9Z" fill="#8FD8F5" />
+    <rect x="8" y="8.6" width="8" height="13.4" rx="2.2" fill="#F5F7FC" stroke="#D8DEEC" strokeWidth=".8" />
+    <rect x="8" y="12.4" width="8" height="3.2" fill="#9FE0F5" />
+  </S>
+)
+export const IcMarkerTool = () => (
+  <S size={30}>
+    <rect x="11" y="1.6" width="2" height="3.8" rx=".8" fill="#2A2F3C" />
+    <path d="M9.6 9.4 10.6 5.4h2.8l1 4Z" fill="#E4E6EE" />
+    <rect x="8.4" y="9" width="7.2" height="13" rx="1.8" fill="#F5F7FC" stroke="#D8DEEC" strokeWidth=".8" />
+    <rect x="8.4" y="16.6" width="7.2" height="4.4" fill="#1F2430" />
+  </S>
+)
+export const IcHighlighterTool = () => (
+  <S size={30}>
+    <path d="M8.6 9.4 10.2 3.6 15.4 2.4 15.4 9.4Z" fill="#F6D96B" />
+    <rect x="8.2" y="9" width="7.6" height="13" rx="2" fill="#F7F8FC" stroke="#D8DEEC" strokeWidth=".8" />
+    <rect x="8.2" y="15" width="7.6" height="4.6" fill="#F2D673" />
+  </S>
+)
+export const IcPencilTool = () => (
+  <S size={30}>
+    <rect x="8.4" y="2" width="7.2" height="3.4" rx="1.2" fill="#F2A0A8" />
+    <rect x="8.4" y="5" width="7.2" height="12" fill="#FFD25F" />
+    <rect x="8.4" y="5" width="2.6" height="12" fill="#F5BE3A" />
+    <path d="M8.4 17 12 22.6 15.6 17Z" fill="#F5D3A8" />
+    <path d="M11 20.6 12 22.6 13 20.6Z" fill="#3A4358" />
+  </S>
+)
+export const IcEraserTool = () => (
+  <S size={30}>
+    <rect x="7" y="3" width="10" height="19" rx="2.6" fill="#F7B8B8" />
+    <rect x="7" y="12" width="10" height="10" rx="2.6" fill="#F7F8FC" stroke="#E0E5F0" strokeWidth=".8" />
+    <rect x="7" y="12" width="10" height="2.6" fill="#F7F8FC" />
+  </S>
+)

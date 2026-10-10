@@ -95,9 +95,13 @@ export interface NoteProps {
   text: string
   color: string
 }
+/** how a stroke looks */
+export type BrushId = 'pen' | 'marker' | 'highlighter' | 'pencil'
 export interface Stroke {
   color: string
   size: number
+  /** pen when missing */
+  brush?: BrushId
   points: [number, number][]
 }
 export interface DrawProps {

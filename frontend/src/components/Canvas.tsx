@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useMotionValue, useTransform, type MotionValue } from 'framer-motion'
-import { ArrowLeft, Check, ChevronDown, Clapperboard, Image as ImageIcon, Loader2, MoreHorizontal, Redo2, Trash2, Undo2, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, Image as ImageIcon, Loader2, MoreHorizontal, Redo2, Trash2, Undo2, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../data/useAuth'
 import { useCanvas } from '../data/useCanvas'
@@ -18,7 +18,7 @@ import { useGestures } from '../lib/useGestures'
 import { tour, tourSeen } from '../lib/tour'
 import type { Guides } from '../lib/snap'
 import { frameHeightFor, getSize, ratioLabel, type StorySize } from '../lib/storySizes'
-import type { CanvasStyle, PhotoProps, BubbleProps, CanvasItem, FrameId, ItemPatch, MapProps, Stroke, StickerProps, TextProps } from '../types'
+import type { BrushId, CanvasStyle, PhotoProps, BubbleProps, CanvasItem, FrameId, ItemPatch, MapProps, Stroke, StickerProps, TextProps } from '../types'
 import { formatDate } from './BookCard'
 import { BottomToolbar, type ToolId } from './BottomToolbar'
 import { CanvasItemView, SelectionOverlay } from './CanvasItem'
@@ -39,7 +39,7 @@ import { LocationTool } from './LocationTool'
 import { PeopleSheet } from './PeopleSheet'
 import { mapAspect } from '../lib/geo'
 import { CanvasStyleSheet } from './CanvasStyleSheet'
-import { IcDownload, IcEdit, IcPalette, IcPeople, IcShare, IcTrash } from './ToolIcons'
+import { IcDone, IcDownload, IcEdit, IcPalette, IcPeople, IcShare, IcTrash } from './ToolIcons'
 import { resolveCanvas } from '../lib/canvasStyle'
 import { SizeSheet, StoryOverlay, StoryPreview } from './StoryMode'
 import { THREAD_COLORS, ThreadsSvg, threadMid } from './Threads'
@@ -146,7 +146,10 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   const slotInput = useRef<HTMLInputElement>(null)
   const slotTarget = useRef<{ id: string; index: number } | null>(null)
   const [strokes, setStrokes] = useState<Stroke[]>([])
-  const [pen, setPen] = useState({ color: accent, size: 6 })
+  const [pen, setPen] = useState<{ color: string; size: number; brush: BrushId; erase: boolean }>({ color: accent, size: 6, brush: 'pen', erase: false })
+  const [strokeHist, setStrokeHist] = useState<Stroke[][]>([])
+  const strokesRef = useRef<Stroke[]>([])
+  strokesRef.current = strokes
   const sheetH = Math.max(0, ...Object.values(sheetHs))
 
   selectedIdRef.current = selectedId
@@ -695,7 +698,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       case 'camera': setCameraOpen(true); break
       case 'sticker': setSheet('sticker'); break
       case 'text': addText(); break
-      case 'draw': setStrokes([]); setPen((p) => ({ ...p })); setSheet('draw'); break
+      case 'draw': setStrokes([]); setStrokeHist([]); setPen((p) => ({ ...p, erase: false })); setSheet('draw'); break
       case 'note': addNote(); break
       case 'divider': addDivider(); break
       case 'location': setSheet('location'); break
@@ -730,7 +733,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       setSelectedId(id)
     },
     onDelete: () => { commit((l) => l.filter((x) => x.id !== selected.id && !(x.type === 'thread' && (x.props.a === selected.id || x.props.b === selected.id)))); setSelectedId(null) },
-    onConnect: () => { setConnectFrom(selected.id); toast('Tap another item to tie the thread') },
+    onConnect: () => { if (connectFrom) setConnectFrom(null); else setConnectFrom(selected.id) },
     onForward: () => reorder(1),
     onBackward: () => reorder(-1),
     onView: selected.type === 'photo' && hasMouse() ? () => viewItem(selected.id) : undefined,
@@ -949,7 +952,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
                   <motion.button
                     type="button" onClick={() => setStoryPreview(true)} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 460, damping: 28 }}
                     className="flex h-10 items-center gap-1.5 rounded-full border-0 bg-[#17171a] px-4 text-[14px] font-bold text-white"
-                  ><Clapperboard size={16} /> Done</motion.button>
+                  ><IcDone /> Done</motion.button>
                   <motion.button
                     type="button" aria-label="Close story mode" onClick={leaveStory} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 460, damping: 28 }}
                     className="grid h-10 w-10 place-items-center rounded-full border-0 bg-white text-[#17171a] shadow-[0_2px_8px_rgba(20,24,40,.15)]"
@@ -1051,7 +1054,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
             })()}
 
             {selected && actions && !drawing && editingId !== selected.id && draggingId !== selected.id && (
-              <SelectionOverlay item={selected} canvasW={canvasW} topLimit={((scroller.current?.scrollTop ?? 0) + 8) / zoom} accent={accent} actions={actions} hideToolbar={!!sheet} zoom={zoom} locked={isBg(selected)} />
+              <SelectionOverlay item={selected} canvasW={canvasW} topLimit={((scroller.current?.scrollTop ?? 0) + 8) / zoom} accent={accent} actions={actions} hideToolbar={!!sheet} zoom={zoom} locked={isBg(selected)} connecting={!!connectFrom} />
             )}
             {selected && actions && draggingId === selected.id && (
               <SelectionOverlay item={selected} canvasW={canvasW} topLimit={-9999} accent={accent} actions={{ ...actions, onFrame: undefined, onEdit: undefined }} hideToolbar zoom={zoom} locked={isBg(selected)} />
@@ -1084,7 +1087,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
 
       {drawing && (
         <DrawLayer
-          surfaceRef={surface} strokes={strokes} color={pen.color} size={pen.size} onChange={setStrokes}
+          surfaceRef={surface} strokes={strokes} color={pen.color} size={pen.size} brush={pen.brush} erase={pen.erase} onChange={setStrokes}
+          onBegin={() => setStrokeHist((h) => [...h.slice(-30), strokesRef.current])}
           bottomInset={sheetH} zoom={zoom}
         />
       )}
@@ -1168,6 +1172,20 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {connectFrom && (
+          <motion.div
+            key="thread-hint" data-ui className="fixed left-1/2 z-40 flex items-center gap-3 rounded-full bg-[#17171a] py-1.5 pl-4 pr-1.5 text-[13.5px] font-bold text-white shadow-[0_10px_28px_rgba(20,24,40,.35)]"
+            style={{ top: 'calc(var(--safe-top) + 138px)', x: '-50%' }}
+            initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+          >
+            <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-[#F97316]" />
+            Tap another item to tie the thread
+            <button type="button" onClick={() => setConnectFrom(null)} className="h-9 rounded-full border-0 bg-white/15 px-3.5 text-[13px] font-bold text-white">Cancel</button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <BottomToolbar visible={!sheet && !editingId} inStory={story} accent={accent} onTool={onTool} />
       <CanvasStyleSheet open={styleOpen} onClose={() => setStyleOpen(false)} memory={memory} value={cstyle} onChange={changeStyle} onHeight={(h) => setSheetHs((s) => ({ ...s, style: h }))} />
       {user && <PeopleSheet open={peopleOpen} onClose={() => setPeopleOpen(false)} memory={memory} />}
@@ -1202,7 +1220,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       </ToolSheet>
 
       <ToolSheet
-        open={sheet === 'sticker'} onClose={closeSheet} title="Stickers" snaps={[0.5, 0.88]} dim={0.18} z={55}
+        open={sheet === 'sticker'} onClose={closeSheet} title="Stickers" snaps={[0.5, 0.88]} initialSnap={1} dim={0.18} z={55}
         onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, sticker: h }))}
       >
         <StickerTray accent={accent} onPick={addSticker} />
@@ -1221,22 +1239,23 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       </ToolSheet>
 
       <ToolSheet
-        open={sheet === 'location'} onClose={() => { setEditMapId(null); closeSheet() }} title="Location" snaps={[0.62, 0.92]} dim={0.18} z={55}
+        open={sheet === 'location'} onClose={() => { setEditMapId(null); closeSheet() }} title="Location" snaps={[0.62, 0.92]} initialSnap={1} dim={0.18} z={55}
         onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, location: h }))}
       >
         <LocationTool key={editMapId ?? 'new'} initial={editMap?.type === 'map' ? editMap.props : undefined} pins={['#3a4150', '#EA4335']} accent={accent} onAdd={addMap} />
       </ToolSheet>
 
       <ToolSheet
-        open={drawing} onClose={closeSheet} title="Draw" snaps={[0.3]} dim={0} passThrough z={55}
+        open={drawing} onClose={closeSheet} title="Draw" snaps={[0.5]} dim={0} passThrough z={55}
         onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, draw: h }))}
       >
         <DrawTool
-          colors={theme.palette} color={pen.color} size={pen.size} strokeCount={strokes.length} accent={accent}
+          colors={theme.palette} color={pen.color} size={pen.size} brush={pen.brush} erase={pen.erase} strokeCount={Math.max(strokes.length, strokeHist.length)} accent={accent}
+          onBrush={(brush) => setPen((p) => ({ ...p, brush }))} onErase={(erase) => setPen((p) => ({ ...p, erase }))}
           onColor={(color) => setPen((p) => ({ ...p, color }))}
           onSize={(size) => setPen((p) => ({ ...p, size }))}
-          onUndo={() => setStrokes((s) => s.slice(0, -1))}
-          onClear={() => setStrokes([])}
+          onUndo={() => { const prev = strokeHist[strokeHist.length - 1]; if (prev) { setStrokes(prev); setStrokeHist((h) => h.slice(0, -1)) } else setStrokes((s) => s.slice(0, -1)) }}
+          onClear={() => { setStrokeHist((h) => [...h.slice(-30), strokes]); setStrokes([]) }}
           onDone={closeSheet}
         />
       </ToolSheet>

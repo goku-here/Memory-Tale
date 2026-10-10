@@ -6,7 +6,7 @@ import { BubbleBody } from './Bubble'
 import { ClotheslineBody } from './Clothesline'
 import { DrawItem } from './DrawLayer'
 import { MapCard } from './MapCard'
-import { IcCopy, IcDown, IcEdit, IcExpand, IcFrame, IcPalette, IcThread, IcTrash, IcUp } from './ToolIcons'
+import { IcCopy, IcDown, IcEdit, IcExpand, IcFrame, IcPalette, IcThread, IcThreadOn, IcTrash, IcUp } from './ToolIcons'
 import { PhotoFrame } from './PhotoFrame'
 import { StickerArt } from './stickers'
 import { NOTE_COLORS, StickyNote } from './StickyNote'
@@ -146,12 +146,12 @@ export interface SelectionActions {
   onColor?: (color: string) => void
 }
 
-function TB({ label, onClick, children, danger, caption, w = 42 }: { label: string; onClick: () => void; children: React.ReactNode; danger?: boolean; caption: string; w?: number }) {
+function TB({ label, onClick, children, danger, caption, w = 42, active }: { label: string; onClick: () => void; children: React.ReactNode; danger?: boolean; caption: string; w?: number; active?: boolean }) {
   return (
     <motion.button
       type="button" aria-label={label} title={label} whileTap={{ scale: 0.9 }} onClick={onClick}
       onPointerDown={(e) => e.stopPropagation()}
-      style={{ width: w }} className={`grid h-[54px] place-items-center rounded-2xl border-0 bg-transparent ${danger ? 'text-[#d6455d]' : 'text-[#17171a]'}`}
+      style={{ width: w, ...(active ? { background: '#FFF0DF', boxShadow: 'inset 0 0 0 1.5px #F97316' } : {}) }} className={`grid h-[54px] place-items-center rounded-2xl border-0 bg-transparent ${danger ? 'text-[#d6455d]' : 'text-[#17171a]'}`}
     >
       <span className="flex flex-col items-center gap-1 leading-none">
         {children}
@@ -162,8 +162,8 @@ function TB({ label, onClick, children, danger, caption, w = 42 }: { label: stri
 }
 
 export function SelectionOverlay({
-  item, canvasW, topLimit, accent, actions, hideToolbar, zoom = 1, locked = false,
-}: { item: CanvasItem; canvasW: number; topLimit: number; accent: string; actions: SelectionActions; hideToolbar?: boolean; zoom?: number; locked?: boolean }) {
+  item, canvasW, topLimit, accent, actions, hideToolbar, zoom = 1, locked = false, connecting = false,
+}: { item: CanvasItem; canvasW: number; topLimit: number; accent: string; actions: SelectionActions; hideToolbar?: boolean; zoom?: number; locked?: boolean; connecting?: boolean }) {
   const cx = (item.x / 100) * canvasW
   const rad = (item.rotation * Math.PI) / 180
   const hh = (Math.abs(item.width * Math.sin(rad)) + Math.abs(item.height * Math.cos(rad))) / 2
@@ -235,7 +235,7 @@ export function SelectionOverlay({
           {actions.onFrame && <TB w={bw} label="Frame" caption="Frame" onClick={actions.onFrame}><IcFrame /></TB>}
           {!locked && actions.onColor && <TB w={bw} label="Note colour" caption="Colour" onClick={() => setColorsOpen((v) => !v)}><IcPalette /></TB>}
           {!locked && actions.onEdit && <TB w={bw} label="Edit" caption="Edit" onClick={actions.onEdit}><IcEdit /></TB>}
-          {!locked && actions.onConnect && <TB w={bw} label="Tie with thread" caption="Thread" onClick={actions.onConnect}><IcThread /></TB>}
+          {!locked && actions.onConnect && <TB w={bw} label={connecting ? 'Cancel the thread' : 'Tie with thread'} caption={connecting ? 'Pick 2nd' : 'Thread'} active={connecting} onClick={actions.onConnect}>{connecting ? <IcThreadOn /> : <IcThread />}</TB>}
           {!locked && <TB w={bw} label="Duplicate" caption="Copy" onClick={actions.onDuplicate}><IcCopy /></TB>}
           {!locked && <TB w={bw} label="Bring forward" caption="Bring up" onClick={actions.onForward}><IcUp /></TB>}
           {!locked && <TB w={bw} label="Send backward" caption="Send down" onClick={actions.onBackward}><IcDown /></TB>}
