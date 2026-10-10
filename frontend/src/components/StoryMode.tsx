@@ -212,7 +212,7 @@ export function StoryPreview({ open, onClose, memory, accent, getItems, frameY, 
               <div className="flex flex-col items-center gap-2 text-[13px] font-semibold text-neutral-500"><Loader2 className="animate-spin" size={26} style={{ color: accent }} />Rendering your story…</div>
             )}
         </div>
-        <Switch label="Show dots" on={dots} set={(v) => { storyPrefs.setDots(v); setDots(v) }} />
+        <Switch label="Show dots / grid lines" on={dots} set={(v) => { storyPrefs.setDots(v); setDots(v) }} />
         <Switch label="“Made with Memory Tale” mark" on={mark} set={(v) => { if (storyPrefs.locked) return; storyPrefs.setMark(v); setMark(v) }} />
         <div className="flex gap-2">
           <button type="button" disabled={!state} onClick={() => state && downloadBlob(state.blob, storyFileName(memory.title, size))}

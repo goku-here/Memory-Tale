@@ -111,6 +111,9 @@ export default function App() {
       m = { ...m, order: Math.min(0, ...memories.map((x) => x.order ?? 0)) - 1 }
       if (user) m = { ...m, members: [{ id: user.uid, name: user.name, color: getTheme(m.themeId).palette[0], photo: user.photo ?? undefined }] }
     }
+    // a new theme brings its own colours: keep the pattern, drop the old background and pattern colour
+    const before = !isNew ? byId(m.id) : undefined
+    if (before && before.themeId !== m.themeId && m.canvasStyle) m = { ...m, canvasStyle: { pattern: m.canvasStyle.pattern } }
     await save(m)
     setSheet(null)
     if (isNew) {
@@ -157,6 +160,7 @@ export default function App() {
             onTheme={() => setSheet({ mode: 'theme', id: openMemory.id })}
             onShare={() => setShareId(openMemory.id)}
             onDelete={() => setConfirmDelete(openMemory)}
+            onCanvasStyle={(cs) => void save({ ...openMemory, canvasStyle: cs })}
           />
         )}
       </AnimatePresence>

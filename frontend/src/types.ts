@@ -25,6 +25,17 @@ export interface Cover {
   avg?: string
 }
 
+export type PatternId = 'dots' | 'grid' | 'graph' | 'cross' | 'lines' | 'plain' | 'paper' | 'crumple' | 'clouds'
+
+/** how the canvas of one memory looks; anything left out falls back to the theme */
+export interface CanvasStyle {
+  pattern?: PatternId
+  /** background colour */
+  bg?: string
+  /** colour of dots / lines (undefined = chosen automatically) */
+  ink?: string
+}
+
 export interface Memory {
   id: string
   title: string
@@ -42,6 +53,7 @@ export interface Memory {
   ownerId?: string
   memberIds?: string[]
   members?: Member[]
+  canvasStyle?: CanvasStyle
 }
 
 /* ---------------- canvas items ---------------- */

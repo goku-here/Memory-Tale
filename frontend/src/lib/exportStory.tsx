@@ -2,6 +2,7 @@ import { toBlob } from 'html-to-image'
 import { createRoot } from 'react-dom/client'
 import { ItemBody } from '../components/CanvasItem'
 import { getTheme } from '../components/ThemeEngine'
+import { isTexture, resolveCanvas, shiftedCss } from './canvasStyle'
 import { ThreadsSvg } from '../components/Threads'
 import { AssetCtx } from './assets'
 import { resolveItemAssets } from '../data/sync'
@@ -28,14 +29,14 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 function StoryView({ memory, items, canvasW, frameY, dots, mark, size }: { memory: Memory; items: CanvasItem[]; canvasW: number; frameY: number; dots: boolean; mark: boolean; size: StorySize }) {
   const theme = getTheme(memory.themeId)
   const h = frameHeightFor(canvasW, size)
+  const rc = resolveCanvas(theme, memory.canvasStyle)
+  // dots, grids and lines follow the "Show dots" switch; paper, crumpled and cloud textures are part of the look
+  const pattern = dots || isTexture(rc.pattern) ? shiftedCss(rc, frameY) : { backgroundColor: rc.bg }
   return (
     <div
       style={{
-        width: canvasW, height: h, background: theme.canvasBg, position: 'relative', overflow: 'hidden', fontFamily: 'Manrope, sans-serif',
+        width: canvasW, height: h, ...pattern, position: 'relative', overflow: 'hidden', fontFamily: 'Manrope, sans-serif',
         ['--t-pin' as string]: theme.palette[0], ['--t-pin2' as string]: theme.palette[1],
-        backgroundImage: dots ? `radial-gradient(${theme.dot} 1.5px, transparent 1.7px)` : undefined,
-        backgroundSize: dots ? '22px 22px' : undefined,
-        backgroundPosition: dots ? `0 ${-(frameY % 22)}px` : undefined,
       }}
     >
       {[...items].filter((i) => i.type !== 'thread').sort((a, b) => a.zIndex - b.zIndex).map((it) => (
@@ -155,7 +156,7 @@ export async function exportStoryPng(memory: Memory, current: CanvasItem[], o: S
     await wait(items.some((i) => i.type === 'map') ? 2200 : 350)
     await imagesReady(node)
     const fontEmbedCSS = await embeddedFontCSS(node)
-    const opts = { pixelRatio: o.size.w / o.canvasW, cacheBust: true, backgroundColor: getTheme(memory.themeId).canvasBg, ...(fontEmbedCSS ? { fontEmbedCSS } : {}) }
+    const opts = { pixelRatio: o.size.w / o.canvasW, cacheBust: true, backgroundColor: resolveCanvas(getTheme(memory.themeId), memory.canvasStyle).bg, ...(fontEmbedCSS ? { fontEmbedCSS } : {}) }
     // iOS Safari often paints the first pass blank or without images: render once and throw it away
     if (isIOS() || isSafari()) { await toBlob(node, opts).catch(() => null); await wait(120) }
     const blob = await toBlob(node, opts)

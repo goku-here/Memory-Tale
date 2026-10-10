@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useMotionValue, useTransform, type MotionValue } from 'framer-motion'
-import { ArrowLeft, Check, ChevronDown, Clapperboard, Minus, ZoomIn, ZoomOut, Download, Loader2, MoreHorizontal, Palette, PenLine, Redo2, Share2, Trash2, Undo2, Users, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, Clapperboard, Grid3x3, Minus, ZoomIn, ZoomOut, Download, Loader2, MoreHorizontal, Palette, PenLine, Redo2, Share2, Trash2, Undo2, Users, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../data/useAuth'
 import { useCanvas } from '../data/useCanvas'
@@ -18,7 +18,7 @@ import { useGestures } from '../lib/useGestures'
 import { tour, tourSeen } from '../lib/tour'
 import type { Guides } from '../lib/snap'
 import { frameHeightFor, getSize, ratioLabel, type StorySize } from '../lib/storySizes'
-import type { PhotoProps, BubbleProps, CanvasItem, FrameId, ItemPatch, MapProps, Stroke, StickerProps, TextProps } from '../types'
+import type { CanvasStyle, PhotoProps, BubbleProps, CanvasItem, FrameId, ItemPatch, MapProps, Stroke, StickerProps, TextProps } from '../types'
 import { formatDate } from './BookCard'
 import { BottomToolbar, type ToolId } from './BottomToolbar'
 import { CanvasItemView, SelectionOverlay } from './CanvasItem'
@@ -37,6 +37,8 @@ import { Lightbox, type ViewerImage } from './Lightbox'
 import { ToolSheet as Sheet } from './ToolSheet'
 import { LocationTool } from './LocationTool'
 import { PeopleSheet } from './PeopleSheet'
+import { CanvasStyleSheet } from './CanvasStyleSheet'
+import { resolveCanvas } from '../lib/canvasStyle'
 import { SizeSheet, StoryOverlay, StoryPreview } from './StoryMode'
 import { THREAD_COLORS, ThreadsSvg, threadMid } from './Threads'
 import { IconButton, toast } from './ui'
@@ -49,6 +51,7 @@ interface CanvasProps {
   onTheme: () => void
   onShare: () => void
   onDelete: () => void
+  onCanvasStyle: (cs: CanvasStyle) => void
   /** while the book opens/closes the canvas shows through a window shaped like the book */
   reveal?: { p: MotionValue<number>; rect: DOMRect }
 }
@@ -74,8 +77,20 @@ const ZMAX = 3
 /** phones open photos with a tap; the expand button is only for mouse users */
 const hasMouse = () => typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches && !window.matchMedia('(pointer: coarse)').matches
 
-export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, reveal }: CanvasProps) {
+export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onCanvasStyle, reveal }: CanvasProps) {
   const theme = getTheme(memory.themeId)
+  const [cstyle, setCstyle] = useState<CanvasStyle | undefined>(memory.canvasStyle)
+  const [styleOpen, setStyleOpen] = useState(false)
+  const styleKey = JSON.stringify(memory.canvasStyle ?? null)
+  // another device (or the theme being changed) updated the look
+  useEffect(() => { setCstyle(memory.canvasStyle) }, [styleKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const rc = useMemo(() => resolveCanvas(theme, cstyle), [theme, cstyle])
+  const styleSave = useRef(0)
+  const changeStyle = (v: CanvasStyle) => {
+    setCstyle(v)
+    window.clearTimeout(styleSave.current)
+    styleSave.current = window.setTimeout(() => onCanvasStyle(v), 500)
+  }
   const accent = theme.palette[0]
   const scroller = useRef<HTMLDivElement>(null)
   const surface = useRef<HTMLDivElement>(null)
@@ -841,7 +856,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
     <motion.div
       className="fixed inset-0 z-40"
       onPointerDownCapture={(e) => { lastPointer.current = e.pointerType; suppressClick.current = false }}
-      style={{ ...themeVars(theme), background: theme.canvasBg, pointerEvents: reveal ? 'none' : undefined, clipPath: clip }}
+      style={{ ...themeVars(theme), background: rc.bg, pointerEvents: reveal ? 'none' : undefined, clipPath: clip }}
       initial={{ opacity: reveal ? 1 : 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.06 } }}
       transition={{ duration: 0.22 }}
     >
@@ -856,7 +871,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
             className="sticky top-0 z-30 px-4"
             style={{
               height: HEADER_H, paddingTop: 'calc(var(--safe-top) + 12px)', boxSizing: 'content-box',
-              background: `linear-gradient(${theme.canvasBg} 78%, ${theme.canvasBg}00)`,
+              background: `linear-gradient(${rc.bg} 78%, ${rc.bg}00)`,
+              color: rc.dark ? '#f4f4f6' : undefined,
             }}
           >
             <div className="relative flex items-center justify-between">
@@ -883,6 +899,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
                       >
                         <MenuItem icon={<PenLine size={18} />} label="Edit book" onClick={run(onEdit)} />
                         <MenuItem icon={<Palette size={18} />} label="Change theme" onClick={run(onTheme)} />
+                        <MenuItem icon={<Grid3x3 size={18} />} label="Canvas style" onClick={run(() => setStyleOpen(true))} />
                         <MenuItem icon={<Share2 size={18} />} label="Share" onClick={run(onShare)} />
                         {user && <MenuItem icon={<Users size={18} />} label="People" onClick={run(() => setPeopleOpen(true))} />}
                         {Math.abs(zoom - 1) > 0.001
@@ -902,11 +919,11 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
             <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center">
               <div className="flex gap-1">
                 <button type="button" aria-label="Undo" disabled={!cv.canUndo} onClick={cv.undo}
-                  className="grid h-11 w-11 place-items-center rounded-full border-0 bg-transparent text-[#17171a] active:scale-95 disabled:opacity-25">
+                  className="grid h-11 w-11 place-items-center rounded-full border-0 bg-transparent text-current active:scale-95 disabled:opacity-25">
                   <Undo2 size={20} />
                 </button>
                 <button type="button" aria-label="Redo" disabled={!cv.canRedo} onClick={cv.redo}
-                  className="grid h-11 w-11 place-items-center rounded-full border-0 bg-transparent text-[#17171a] active:scale-95 disabled:opacity-25">
+                  className="grid h-11 w-11 place-items-center rounded-full border-0 bg-transparent text-current active:scale-95 disabled:opacity-25">
                   <Redo2 size={20} />
                 </button>
               </div>
@@ -949,8 +966,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
             style={{
               position: 'absolute', top: 0, left: zoom < 1 ? (canvasW * (1 - zoom)) / 2 : 0, width: canvasW, height,
               transform: zoom !== 1 ? `scale(${zoom})` : undefined, transformOrigin: 'top left',
-              backgroundImage: `radial-gradient(${theme.dot} 1.5px, transparent 1.7px)`,
-              backgroundSize: '22px 22px',
+              ...rc.css,
               touchAction: 'pan-x pan-y',
             }}
             onClick={(e) => {
@@ -1125,6 +1141,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, rev
       </AnimatePresence>
 
       <BottomToolbar visible={!sheet && !editingId} inStory={story} accent={accent} onTool={onTool} />
+      <CanvasStyleSheet open={styleOpen} onClose={() => setStyleOpen(false)} memory={memory} value={cstyle} onChange={changeStyle} onHeight={(h) => setSheetHs((s) => ({ ...s, style: h }))} />
       {user && <PeopleSheet open={peopleOpen} onClose={() => setPeopleOpen(false)} memory={memory} />}
       <StoryPreview open={storyPreview} onClose={() => setStoryPreview(false)} memory={memory} accent={accent} getItems={() => itemsRef.current} frameY={storyY} canvasW={canvasW} size={size} />
       <SizeSheet open={sizeOpen} onClose={() => setSizeOpen(false)} value={size} onPick={pickSize} accent={accent} />
