@@ -679,6 +679,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       case 'bubble': addBubble(); break
       case 'line': addLine(); break
       case 'story': if (!story) enterStory(); break
+      case 'canvas': setStyleOpen(true); break
     }
   }
 

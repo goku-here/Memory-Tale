@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Camera, Image as ImageIcon, Images, MapPin, MessageCircle, MoreHorizontal, RectangleVertical, Smile, StickyNote, Type, Flag } from 'lucide-react'
+import { Camera, Image as ImageIcon, Images, MapPin, MessageCircle, MoreHorizontal, RectangleVertical, Smile, StickyNote, Type, Flag, Grid3x3 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 
-export type ToolId = 'sticker' | 'draw' | 'text' | 'photo' | 'camera' | 'note' | 'location' | 'divider' | 'bubble' | 'line' | 'story'
+export type ToolId = 'sticker' | 'draw' | 'text' | 'photo' | 'camera' | 'note' | 'location' | 'divider' | 'bubble' | 'line' | 'story' | 'canvas'
 
 interface Props {
   visible: boolean
@@ -79,6 +79,7 @@ export function BottomToolbar({ visible, onTool, inStory }: Props) {
                     ['location', 'Location', <MapPin size={19} key="l" />],
                     ['divider', 'Stop divider', <Flag size={19} key="d" />],
                     ['story', 'Story mode', <RectangleVertical size={19} key="s" />],
+                    ['canvas', 'Canvas style', <Grid3x3 size={19} key="g" />],
                   ] as [ToolId, string, ReactNode][]).filter(([id]) => !(inStory && id === 'story')).map(([id, label, icon]) => (
                     <motion.button
                       key={id} data-tour={id === 'story' ? 'story-item' : undefined} type="button" role="menuitem" whileTap={{ scale: 0.96 }} onClick={() => pick(id)}
