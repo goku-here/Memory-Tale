@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { BringToFront, Check, Copy, Frame, Maximize2, MapPin, Palette, Pencil, RotateCw, SendToBack, Spline, Trash2 } from 'lucide-react'
+import { Check, Copy, Frame, Maximize2, MapPin, Palette, Pencil, RotateCw, Spline, Trash2 } from 'lucide-react'
 import { memo, useLayoutEffect, useRef, useState, type PointerEvent as RPE } from 'react'
 import type { CanvasItem } from '../types'
 import { BubbleBody } from './Bubble'
@@ -145,14 +145,40 @@ export interface SelectionActions {
   onColor?: (color: string) => void
 }
 
-function TB({ label, onClick, children, danger }: { label: string; onClick: () => void; children: React.ReactNode; danger?: boolean }) {
+/** layers with an arrow: the item goes up through the stack */
+function UpIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M12 13 L20 17 L12 21 L4 17 Z" fill="#BCCBF2" stroke="#BCCBF2" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M12 9 L20 13 L12 17 L4 13 Z" fill="#2F62F0" stroke="#2F62F0" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M12 10.5V3M8.6 6.4 12 3l3.4 3.4" stroke="#1D4ED8" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+/** layers with an arrow: the item goes down, behind the others */
+function DownIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M12 9 L20 13 L12 17 L4 13 Z" fill="#F59A23" stroke="#F59A23" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M12 3 L20 7 L12 11 L4 7 Z" fill="#D5D8DD" stroke="#D5D8DD" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M12 15.5V22M8.6 18.6 12 22l3.4-3.4" stroke="#EA7C0B" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function TB({ label, onClick, children, danger, caption }: { label: string; onClick: () => void; children: React.ReactNode; danger?: boolean; caption?: string }) {
   return (
     <motion.button
       type="button" aria-label={label} title={label} whileTap={{ scale: 0.9 }} onClick={onClick}
       onPointerDown={(e) => e.stopPropagation()}
-      className={`grid h-11 w-11 place-items-center rounded-full border-0 bg-transparent ${danger ? 'text-[#d6455d]' : 'text-[#17171a]'}`}
+      className={`grid place-items-center border-0 bg-transparent ${caption ? 'h-12 w-14 rounded-2xl' : 'h-11 w-11 rounded-full'} ${danger ? 'text-[#d6455d]' : 'text-[#17171a]'}`}
     >
-      {children}
+      {caption ? (
+        <span className="flex flex-col items-center gap-0.5 leading-none">
+          {children}
+          <span className="text-[9.5px] font-extrabold tracking-tight text-neutral-500">{caption}</span>
+        </span>
+      ) : children}
     </motion.button>
   )
 }
@@ -167,7 +193,7 @@ export function SelectionOverlay({
   const nButtons = locked ? 2 : 4 + (actions.onEdit ? 1 : 0) + (actions.onFrame ? 1 : 0) + (actions.onConnect ? 1 : 0) + (actions.onView ? 1 : 0) + (actions.onColor ? 1 : 0)
   // the toolbar and handles keep their on-screen size however far the canvas is zoomed out
   const k = 1 / zoom
-  const tbW = (nButtons * 44 + 16) * k
+  const tbW = (nButtons * 44 + 16 + (locked ? 0 : 32)) * k
   const bottomEdge = item.y - hh - 18 * k
   const placeAbove = bottomEdge - 44 * k > topLimit
   const tbY = placeAbove ? bottomEdge - 44 : item.y + hh + 16 * k
@@ -230,8 +256,8 @@ export function SelectionOverlay({
           {!locked && actions.onEdit && <TB label="Edit" onClick={actions.onEdit}><Pencil size={18} /></TB>}
           {!locked && actions.onConnect && <TB label="Tie with thread" onClick={actions.onConnect}><Spline size={19} /></TB>}
           {!locked && <TB label="Duplicate" onClick={actions.onDuplicate}><Copy size={18} /></TB>}
-          {!locked && <TB label="Bring forward" onClick={actions.onForward}><BringToFront size={19} /></TB>}
-          {!locked && <TB label="Send backward" onClick={actions.onBackward}><SendToBack size={19} /></TB>}
+          {!locked && <TB label="Bring forward" caption="Bring up" onClick={actions.onForward}><UpIcon /></TB>}
+          {!locked && <TB label="Send backward" caption="Send down" onClick={actions.onBackward}><DownIcon /></TB>}
           <TB label="Delete" onClick={actions.onDelete} danger><Trash2 size={18} /></TB>
         </motion.div></div>}
         {!hideToolbar && colorsOpen && actions.onColor && (
