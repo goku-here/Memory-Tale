@@ -141,23 +141,22 @@ export const IcBubble = () => (
 )
 
 const Snap = ({ x, y, r, a, b, c }: { x: number; y: number; r: number; a: string; b: string; c: string }) => (
-  <g transform={`translate(${x} ${y}) rotate(${r} 3.5 4.5)`}>
-    <rect width="7.2" height="9.2" rx="1.3" fill="#fff" stroke="#E4E8F2" strokeWidth=".5" />
+  <g transform={`translate(${x} ${y}) rotate(${r} 4.7 6) scale(1.32)`}>
+    <rect width="7.2" height="9.2" rx="1.3" fill="#fff" stroke="#DCE2F0" strokeWidth=".45" />
     <rect x=".9" y=".9" width="5.4" height="5.6" rx=".8" fill={a} />
-    <circle cx="2.7" cy="2.6" r=".85" fill={b} />
+    <circle cx="2.7" cy="2.6" r=".9" fill={b} />
     <path d="M.9 6.5 3.1 4.1 4.1 5.2 5 4 6.3 5.4V6.5Z" fill={c} />
   </g>
 )
-const Peg = ({ x, y }: { x: number; y: number }) => <rect x={x} y={y} width="2" height="3.2" rx=".8" fill="#E9A23B" />
+const Peg = ({ x, y }: { x: number; y: number }) => <rect x={x} y={y} width="2.4" height="3.6" rx=".9" fill="#E9A23B" />
 
-/** a string of three little photos pegged to a line */
+/** two little photos pegged to a line */
 export const IcLine = () => (
   <S>
-    <path d="M1.6 5.2Q12 9.4 22.4 5.2" stroke="#B07A4A" strokeWidth="1.5" strokeLinecap="round" />
-    <Snap x={2.2} y={8.2} r={-9} a="#CFE0FF" b="#8FB0FF" c="#5C8DF2" />
-    <Snap x={8.4} y={9.4} r={0} a="#FFE2C4" b="#FFBE85" c="#F29B4D" />
-    <Snap x={14.6} y={8.4} r={9} a="#D4F3DF" b="#9ADBB1" c="#5DB683" />
-    <Peg x={4.6} y={5.6} /><Peg x={11.2} y={7.2} /><Peg x={17.6} y={5.8} />
+    <path d="M1 3.6Q12 8.2 23 3.6" stroke="#B07A4A" strokeWidth="1.7" strokeLinecap="round" />
+    <Snap x={1.6} y={7.2} r={-8} a="#CFE0FF" b="#8FB0FF" c="#4F86F0" />
+    <Snap x={12.8} y={7.6} r={8} a="#FFE2C4" b="#FFBE85" c="#F29B4D" />
+    <Peg x={5.2} y={3.6} /><Peg x={16.4} y={4.6} />
   </S>
 )
 
