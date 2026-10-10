@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react'
 import type { CanvasStyle, CategoryId, PatternId } from '../types'
 import { alpha, luminance, shade } from './color'
 import type { Theme } from '../components/ThemeEngine'
+import { cloudsTile, crumpleTile } from './textures'
 
 export const PATTERNS: { id: PatternId; name: string; texture?: boolean }[] = [
   { id: 'dots', name: 'Dots' },
@@ -10,9 +11,8 @@ export const PATTERNS: { id: PatternId; name: string; texture?: boolean }[] = [
   { id: 'cross', name: 'Blueprint' },
   { id: 'lines', name: 'Ruled' },
   { id: 'plain', name: 'Plain' },
-  { id: 'paper', name: 'Paper', texture: true },
-  { id: 'crumple', name: 'Crumpled', texture: true },
-  { id: 'clouds', name: 'Clouds', texture: true },
+  { id: 'crumple', name: 'Crumpled paper', texture: true },
+  { id: 'clouds', name: 'Blue sky', texture: true },
 ]
 export const isTexture = (p: PatternId) => !!PATTERNS.find((x) => x.id === p)?.texture
 
@@ -116,19 +116,6 @@ export function inkChoices(theme: Theme): { value: string | undefined; name: str
 const svg = (body: string, w: number, h: number) =>
   `url("data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'>${body}</svg>`)}")`
 
-const PAPER = svg(
-  "<filter id='n' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' seed='4' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .35  0 0 0 0 .32  0 0 0 0 .28  0 0 0 .8 -.2'/></filter><rect width='100%' height='100%' filter='url(#n)'/>",
-  240, 240,
-)
-const CRUMPLE = svg(
-  "<filter id='c' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='.011' numOctaves='4' seed='7' stitchTiles='stitch' result='n'/><feDiffuseLighting in='n' lighting-color='#fff' surfaceScale='4' diffuseConstant='1.1'><feDistantLight azimuth='225' elevation='56'/></feDiffuseLighting></filter><rect width='100%' height='100%' filter='url(#c)'/>",
-  480, 480,
-)
-const CLOUDS = svg(
-  "<filter id='k' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='.007 .011' numOctaves='5' seed='11' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  3.4 0 0 0 -1.45'/></filter><rect width='100%' height='100%' filter='url(#k)'/>",
-  640, 640,
-)
-
 export interface ResolvedCanvas {
   bg: string
   pattern: PatternId
@@ -142,7 +129,8 @@ export interface ResolvedCanvas {
 
 export function resolveCanvas(theme: Theme, cs?: CanvasStyle): ResolvedCanvas {
   const pattern = cs?.pattern ?? 'dots'
-  const bg = cs?.bg ?? theme.canvasBg
+  // the sky pattern is a blue sky unless a colour was picked on purpose
+  const bg = cs?.bg ?? (pattern === 'clouds' ? '#4C93E6' : theme.canvasBg)
   const dark = isDark(bg)
   // untouched colours keep the theme's own dot colour; otherwise pick something readable on the new background
   const auto = cs?.bg ? (dark ? shade(bg, -0.5) : shade(bg, 0.14)) : theme.dot
@@ -177,17 +165,13 @@ export function resolveCanvas(theme: Theme, cs?: CanvasStyle): ResolvedCanvas {
       period = 30
       css = { backgroundImage: `linear-gradient(transparent 29px, ${a(0.7)} 29px, ${a(0.7)} 30px)`, backgroundSize: '100% 30px' }
       break
-    case 'paper':
-      period = 240
-      css = { backgroundImage: PAPER, backgroundSize: '240px 240px' }
-      break
     case 'crumple':
-      period = 480
-      css = { backgroundImage: CRUMPLE, backgroundSize: '480px 480px', backgroundBlendMode: 'multiply' }
+      period = 720
+      css = { backgroundImage: `url(${crumpleTile()})`, backgroundSize: '720px 720px', backgroundBlendMode: 'multiply' }
       break
     case 'clouds':
-      period = 640
-      css = { backgroundImage: CLOUDS, backgroundSize: '640px 640px' }
+      period = 960
+      css = { backgroundImage: `url(${cloudsTile()})`, backgroundSize: '640px 960px' }
       break
     default:
       css = {}
