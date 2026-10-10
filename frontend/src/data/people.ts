@@ -22,6 +22,8 @@ export interface RemovalNotice {
   memoryId: string
   title: string
   themeId?: Memory['themeId']
+  date?: string
+  cover?: Memory['cover']
   ownerName: string
   ownerPhoto?: string
   at: number
@@ -52,7 +54,9 @@ export async function removeMember(owner: { uid: string; name: string; photo: st
   // copies of photos somebody else added; the person's own uploads stay theirs
   const theirs = records.filter((r) => r.copies[targetUid] && r.uploaderUid !== targetUid)
   await setDoc(doc(d, 'removals', `${targetUid}_${memory.id}`), clean({
-    uid: targetUid, memoryId: memory.id, title: memory.title, themeId: memory.themeId,
+    uid: targetUid, memoryId: memory.id, title: memory.title, themeId: memory.themeId, date: memory.date,
+    // the book as they knew it, so they recognise it (a huge photo falls back to its average colour to fit the notice)
+    cover: memory.cover.type === 'image' && memory.cover.value.length > 380_000 ? { type: 'color', value: memory.cover.avg ?? '#9DB7D5', tone: memory.cover.tone } : memory.cover,
     ownerName: owner.name, ownerPhoto: owner.photo ?? undefined, at: Date.now(),
     fileIds: theirs.map((r) => r.copies[targetUid].fileId),
   }))
