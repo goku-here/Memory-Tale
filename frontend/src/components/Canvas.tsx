@@ -349,6 +349,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     if (connectFrom) {
       e.preventDefault()
       e.stopPropagation()
+      suppressClick.current = true // the tap that picks the second item must not also open the photo
       const from = connectFrom
       setConnectFrom(null)
       if (id === from) return
