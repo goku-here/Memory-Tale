@@ -52,6 +52,12 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
   const [shadeAt, setShadeAt] = useState(3)
   const [size, setSize] = useState(SIZES[1].size)
   const [opacity, setOpacity] = useState(1)
+  /** the page grows as you draw towards its bottom, and follows your finger when you reach an edge */
+  const scroller = useRef<HTMLDivElement>(null)
+  const [extra, setExtra] = useState(0)
+  const touch = useRef<{ y: number } | null>(null)
+  const raf = useRef(0)
+  const shelfRef = useRef(150)
   const [pop, setPop] = useState<null | 'tune' | 'color'>(null)
 
   const color = shade(base, SHADES[shadeAt])
@@ -75,6 +81,30 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
     setShelfH(el.offsetHeight)
     return () => ro.disconnect()
   }, [])
+
+  shelfRef.current = shelfH
+  const tick = () => {
+    const el = scroller.current, t = touch.current
+    if (!el || !t) { raf.current = 0; return }
+    const r = el.getBoundingClientRect()
+    const low = r.bottom - shelfRef.current - 70, high = r.top + 80
+    let v = 0
+    if (t.y > low) v = Math.min(9, (t.y - low) * 0.12 + 1.5)
+    else if (t.y < high && el.scrollTop > 0) v = -Math.min(9, (high - t.y) * 0.12 + 1.5)
+    if (v) {
+      if (v > 0 && el.scrollTop + el.clientHeight > el.scrollHeight - 300) setExtra((x) => x + 600)
+      el.scrollTop += v
+    }
+    raf.current = requestAnimationFrame(tick)
+  }
+  const track_ = (e: React.PointerEvent) => { if (touch.current) touch.current.y = e.clientY }
+  const startTrack = (e: React.PointerEvent) => {
+    if (e.button > 0) return
+    touch.current = { y: e.clientY }
+    if (!raf.current) raf.current = requestAnimationFrame(tick)
+  }
+  const stopTrack = () => { touch.current = null }
+  useEffect(() => () => cancelAnimationFrame(raf.current), [])
 
   const begin = () => { setPop(null); setPast((p) => [...p.slice(-40), strokesRef.current]); setFuture([]) }
   const undo = () => { const prev = past[past.length - 1]; if (!prev) return; setFuture((f) => [...f, strokesRef.current]); setPast((p) => p.slice(0, -1)); setStrokes(prev) }
@@ -100,6 +130,8 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
     <motion.div
       className="fixed inset-0 z-[62]" role="dialog" aria-label="Draw"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}
+      onPointerDown={startTrack} onPointerMove={track_} onPointerUp={stopTrack} onPointerCancel={stopTrack}
+      onWheel={(e) => { const el = scroller.current; if (!el) return; if (e.deltaY > 0 && el.scrollTop + el.clientHeight > el.scrollHeight - 300) setExtra((x) => x + 600); el.scrollTop += e.deltaY }}
     >
       <div className="absolute inset-0 bg-black/35" aria-hidden />
       <motion.div
@@ -108,8 +140,10 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
         initial={{ y: 60 }} animate={{ y: 0 }} transition={{ type: 'spring', stiffness: 320, damping: 32 }}
       >
         {/* the page: your canvas look, strokes on top */}
-        <div ref={page} className="absolute inset-0" style={look.css}>
-          <DrawStrokes strokes={strokes} />
+        <div ref={scroller} className="no-scrollbar absolute inset-0 overflow-y-auto" style={{ touchAction: 'none', overscrollBehavior: 'contain' }}>
+          <div ref={page} className="relative" style={{ ...look.css, minHeight: `calc(100% + ${extra}px)` }}>
+            <DrawStrokes strokes={strokes} />
+          </div>
         </div>
         <DrawLayer
           surfaceRef={page} strokes={strokes} color={color} size={size} brush={eraser ? 'pen' : tool} opacity={opacity} erase={eraser}
