@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Brush, Check, Eraser, Loader2, MousePointerClick, Paintbrush, Pentagon, Slash, Sparkles, Undo2, X } from 'lucide-react'
+import { Brush, Check, Eraser, Hand, Loader2, Maximize, MousePointerClick, Paintbrush, Pentagon, Plus, Minus, Slash, Sparkles, Undo2, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { cleanMask, composite, cutout, exportSticker, removePieceAt, type CutoutResult } from '../lib/cutout'
 
@@ -10,7 +10,7 @@ interface Props {
 }
 
 type Stage = 'model' | 'analyzing' | 'ready' | 'error'
-type Tool = 'brush' | 'line' | 'shape' | 'piece'
+type Tool = 'brush' | 'line' | 'shape' | 'piece' | 'move'
 interface Pt { x: number; y: number }
 
 const CHECKER = 'conic-gradient(#e6e6ea 25%, #f7f7f9 0 50%, #e6e6ea 0 75%, #f7f7f9 0) 0 0 / 22px 22px'
@@ -20,7 +20,10 @@ const TOOLS: { id: Tool; label: string; icon: typeof Brush }[] = [
   { id: 'line', label: 'Line', icon: Slash },
   { id: 'shape', label: 'Shape', icon: Pentagon },
   { id: 'piece', label: 'Piece', icon: MousePointerClick },
+  { id: 'move', label: 'Move', icon: Hand },
 ]
+
+const ZMAX = 8
 
 /** Cut the subject out of a photo, touch it up with brushes, straight lines or outlined shapes, and save it as a sticker. */
 export function StickerMaker({ file, onClose, onSave }: Props) {
@@ -41,6 +44,70 @@ export function StickerMaker({ file, onClose, onSave }: Props) {
   const history = useRef<ImageData[]>([])
   const drawing = useRef<{ x: number; y: number } | null>(null)
   const lineStart = useRef<Pt | null>(null)
+
+  /* ---- zoom and move, so small details can be cut accurately ---- */
+  const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const stage_ = useRef<HTMLDivElement>(null)
+  const box = useRef<HTMLDivElement>(null)
+  const touches = useRef(new Map<number, Pt>())
+  const pinch = useRef<{ d: number; z: number; mx: number; my: number; p: Pt } | null>(null)
+  /** after a pinch, ignore the finger that is still down until everything is lifted */
+  const ignore = useRef(false)
+  const panDrag = useRef<{ x: number; y: number; p: Pt } | null>(null)
+
+  const clampPan = (p: Pt, z: number): Pt => {
+    const w = box.current?.offsetWidth ?? 0, h = box.current?.offsetHeight ?? 0
+    const mx = (z * w - w) / 2 + w * 0.3, my = (z * h - h) / 2 + h * 0.3
+    return { x: Math.max(-mx, Math.min(mx, p.x)), y: Math.max(-my, Math.min(my, p.y)) }
+  }
+  /** change the zoom keeping the point under (mx, my) where it is */
+  const zoomAt = (nz: number, mx: number, my: number, from?: { z: number; p: Pt; mx: number; my: number }) => {
+    const st = stage_.current?.getBoundingClientRect()
+    if (!st) return
+    const z0 = from?.z ?? zoom, p0 = from?.p ?? pan
+    const z = Math.max(1, Math.min(ZMAX, nz))
+    const cx = st.left + st.width / 2, cy = st.top + st.height / 2
+    const m0x = from?.mx ?? mx, m0y = from?.my ?? my
+    const k = z / z0
+    setZoom(z)
+    setPan(clampPan({ x: mx - cx - k * (m0x - cx - p0.x), y: my - cy - k * (m0y - cy - p0.y) }, z))
+  }
+  const zoomBy = (f: number) => {
+    const st = stage_.current?.getBoundingClientRect()
+    if (st) zoomAt(zoom * f, st.left + st.width / 2, st.top + st.height / 2)
+  }
+  const fit = () => { setZoom(1); setPan({ x: 0, y: 0 }) }
+
+  const onStageDown = (e: React.PointerEvent) => {
+    touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (touches.current.size === 2) {
+      // a second finger: this is a pinch, so drop whatever the first finger had started
+      if (drawing.current) { drawing.current = null; undo() }
+      lineStart.current = null
+      setLine(null)
+      const [a, b] = [...touches.current.values()]
+      pinch.current = { d: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), z: zoom, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, p: pan }
+      ignore.current = true
+    }
+  }
+  const onStageMove = (e: React.PointerEvent) => {
+    if (!touches.current.has(e.pointerId)) return
+    touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    const pc = pinch.current
+    if (pc && touches.current.size >= 2) {
+      const [a, b] = [...touches.current.values()]
+      zoomAt(pc.z * (Math.hypot(a.x - b.x, a.y - b.y) / pc.d), (a.x + b.x) / 2, (a.y + b.y) / 2, pc)
+    }
+  }
+  const onStageUp = (e: React.PointerEvent) => {
+    touches.current.delete(e.pointerId)
+    if (touches.current.size < 2) pinch.current = null
+    if (touches.current.size === 0) ignore.current = false
+  }
+  const onWheel = (e: React.WheelEvent) => {
+    zoomAt(zoom * Math.exp(-e.deltaY * 0.0018), e.clientX, e.clientY)
+  }
 
   const render = useCallback(() => {
     const r = res.current
@@ -135,7 +202,12 @@ export function StickerMaker({ file, onClose, onSave }: Props) {
   }
 
   const down = (e: React.PointerEvent) => {
-    if (stage !== 'ready' || !res.current) return
+    if (stage !== 'ready' || !res.current || ignore.current || touches.current.size > 1) return
+    if (tool === 'move') {
+      e.currentTarget.setPointerCapture(e.pointerId)
+      panDrag.current = { x: e.clientX, y: e.clientY, p: pan }
+      return
+    }
     const p = toCanvas(e)
     if (tool === 'shape') {
       if (closed) return
@@ -161,8 +233,14 @@ export function StickerMaker({ file, onClose, onSave }: Props) {
     stroke(p.x, p.y, p.scale)
   }
   const move = (e: React.PointerEvent) => {
+    if (ignore.current || touches.current.size > 1) return
     if (!(e.buttons & 1) && e.pointerType === 'mouse') return
     if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+    if (tool === 'move') {
+      const d = panDrag.current
+      if (d) setPan(clampPan({ x: d.p.x + e.clientX - d.x, y: d.p.y + e.clientY - d.y }, zoom))
+      return
+    }
     const p = toCanvas(e)
     if (tool === 'line') {
       const a = lineStart.current
@@ -173,6 +251,8 @@ export function StickerMaker({ file, onClose, onSave }: Props) {
   }
   const up = (e: React.PointerEvent) => {
     drawing.current = null
+    panDrag.current = null
+    if (ignore.current) { lineStart.current = null; setLine(null); return }
     if (tool === 'line' && line && lineStart.current) {
       const { a, b } = line
       lineStart.current = null
@@ -262,12 +342,18 @@ export function StickerMaker({ file, onClose, onSave }: Props) {
         </motion.button>
       </header>
 
-      <div className="relative grid min-h-0 flex-1 place-items-center px-4 py-3">
-        <div className="relative max-h-full max-w-full" style={{ background: CHECKER, borderRadius: 14, visibility: stage === 'ready' ? 'visible' : 'hidden' }}>
+      <div
+        ref={stage_} className="relative grid min-h-0 flex-1 touch-none place-items-center overflow-hidden px-4 py-3"
+        onPointerDownCapture={onStageDown} onPointerMoveCapture={onStageMove} onPointerUpCapture={onStageUp} onPointerCancelCapture={onStageUp} onWheel={onWheel}
+      >
+        <div
+          ref={box} className="relative max-h-full max-w-full"
+          style={{ background: CHECKER, borderRadius: 14, visibility: stage === 'ready' ? 'visible' : 'hidden', transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center', willChange: 'transform' }}
+        >
           <canvas
             ref={view}
             className="block max-h-[56vh] max-w-full touch-none select-none"
-            style={{ cursor: tool === 'piece' ? 'pointer' : 'crosshair', background: 'transparent', filter: outline ? 'url(#mt-outline)' : undefined }}
+            style={{ cursor: tool === 'piece' ? 'pointer' : tool === 'move' ? 'grab' : 'crosshair', background: 'transparent', filter: outline ? 'url(#mt-outline)' : undefined }}
             onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
           />
           {/* guides while drawing a line or outlining a shape (same coordinates as the picture) */}
@@ -287,6 +373,14 @@ export function StickerMaker({ file, onClose, onSave }: Props) {
             )}
           </svg>
         </div>
+
+        {stage === 'ready' && (
+          <div className="absolute bottom-3 right-3 z-10 flex items-center rounded-full bg-black/55 p-1 backdrop-blur" onPointerDown={(e) => e.stopPropagation()}>
+            <button type="button" aria-label="Zoom out" disabled={zoom <= 1.001} onClick={() => zoomBy(1 / 1.5)} className="grid h-10 w-10 place-items-center rounded-full border-0 bg-transparent text-white disabled:opacity-30"><Minus size={18} /></button>
+            <button type="button" aria-label="Fit the picture" onClick={fit} className="flex h-10 min-w-[52px] items-center justify-center gap-1 rounded-full border-0 bg-transparent px-1 text-[12.5px] font-extrabold text-white">{zoom > 1.001 ? `${Math.round(zoom * 100)}%` : <Maximize size={15} />}</button>
+            <button type="button" aria-label="Zoom in" disabled={zoom >= ZMAX - 0.001} onClick={() => zoomBy(1.5)} className="grid h-10 w-10 place-items-center rounded-full border-0 bg-transparent text-white disabled:opacity-30"><Plus size={18} /></button>
+          </div>
+        )}
 
         {busy && (
           <div className="absolute inset-0 grid place-items-center">
@@ -317,7 +411,7 @@ export function StickerMaker({ file, onClose, onSave }: Props) {
 
       <div className="space-y-2.5 px-4 pt-2" style={{ paddingBottom: 'calc(var(--safe-bottom) + 14px)', opacity: stage === 'ready' ? 1 : 0.35, pointerEvents: stage === 'ready' ? 'auto' : 'none' }}>
         {/* how to touch it up */}
-        <div className="grid grid-cols-4 gap-1.5 rounded-2xl bg-white/10 p-1" role="radiogroup" aria-label="Tool">
+        <div className="grid grid-cols-5 gap-1 rounded-2xl bg-white/10 p-1" role="radiogroup" aria-label="Tool">
           {TOOLS.map(({ id, label, icon: Icon }) => (
             <button
               key={id} type="button" role="radio" aria-checked={tool === id} onClick={() => { setTool(id); setLine(null); if (id !== 'shape') { setPoly([]); setClosed(false) } }}
@@ -346,9 +440,10 @@ export function StickerMaker({ file, onClose, onSave }: Props) {
           </div>
         )}
         {tool === 'piece' && <p className="m-0 text-center text-[12.5px] leading-snug text-white/70">Tap any leftover bit to remove the whole piece.</p>}
+        {tool === 'move' && <p className="m-0 text-center text-[12.5px] leading-snug text-white/70">Drag to move around. You can also pinch with two fingers to zoom while using any tool.</p>}
 
         <div className="flex items-center justify-center gap-2">
-          {tool !== 'piece' && tool !== 'shape' && ([['erase', 'Erase', Eraser], ['restore', 'Restore', Paintbrush]] as const).map(([id, label, Icon]) => (
+          {tool !== 'piece' && tool !== 'shape' && tool !== 'move' && ([['erase', 'Erase', Eraser], ['restore', 'Restore', Paintbrush]] as const).map(([id, label, Icon]) => (
             <motion.button
               key={id} type="button" whileTap={{ scale: 0.95 }} aria-pressed={mode === id} onClick={() => setMode(id)}
               className="flex h-11 items-center gap-2 rounded-full border-0 px-5 text-[14.5px] font-semibold"
