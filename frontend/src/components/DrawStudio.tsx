@@ -8,14 +8,14 @@ import { DrawLayer, DrawStrokes } from './DrawLayer'
 import { IcCalligraphyTool, IcCrayonTool, IcEraserTool, IcHighlighterTool, IcMarkerTool, IcPenTool, IcPencilTool } from './ToolIcons'
 
 type ToolId = BrushId | 'eraser'
-const TOOLS: { id: ToolId; label: string; icon: ReactNode }[] = [
-  { id: 'pen', label: 'Pen', icon: <IcPenTool /> },
-  { id: 'marker', label: 'Marker', icon: <IcMarkerTool /> },
-  { id: 'highlighter', label: 'Highlighter', icon: <IcHighlighterTool /> },
-  { id: 'pencil', label: 'Pencil', icon: <IcPencilTool /> },
-  { id: 'crayon', label: 'Crayon', icon: <IcCrayonTool /> },
-  { id: 'calligraphy', label: 'Calligraphy', icon: <IcCalligraphyTool /> },
-  { id: 'eraser', label: 'Eraser', icon: <IcEraserTool /> },
+const TOOLS: { id: ToolId; label: string; icon: (c: string) => ReactNode }[] = [
+  { id: 'pen', label: 'Pen', icon: (c) => <IcPenTool c={c} /> },
+  { id: 'marker', label: 'Marker', icon: (c) => <IcMarkerTool c={c} /> },
+  { id: 'highlighter', label: 'Highlighter', icon: (c) => <IcHighlighterTool c={c} /> },
+  { id: 'pencil', label: 'Pencil', icon: (c) => <IcPencilTool c={c} /> },
+  { id: 'crayon', label: 'Crayon', icon: (c) => <IcCrayonTool c={c} /> },
+  { id: 'calligraphy', label: 'Calligraphy', icon: (c) => <IcCalligraphyTool c={c} /> },
+  { id: 'eraser', label: 'Eraser', icon: () => <IcEraserTool /> },
 ]
 
 /** thickness presets: the dot shown, and the pen size it stands for */
@@ -176,7 +176,7 @@ export function DrawStudio({ palette, accent, look, onDone }: Props) {
         )}
 
         {/* tools along the bottom */}
-        <div ref={shelf} className="absolute inset-x-0 bottom-0 z-[50] flex items-end bg-white/92 pl-3 backdrop-blur" style={{ paddingBottom: 'var(--safe-bottom)', boxShadow: '0 -8px 24px rgba(20,24,40,.08)' }}>
+        <div ref={shelf} className="absolute inset-x-0 bottom-0 z-[50] flex items-end pl-3" style={{ paddingBottom: 'var(--safe-bottom)' }}>
           <button
             type="button" aria-label="Colour" aria-pressed={pop === 'color'} disabled={eraser} onClick={() => setPop((p) => (p === 'color' ? null : 'color'))}
             className="mb-5 grid h-12 w-12 shrink-0 place-items-center rounded-full border-0 bg-transparent disabled:opacity-30"
@@ -189,13 +189,13 @@ export function DrawStudio({ palette, accent, look, onDone }: Props) {
               return (
                 <button
                   key={t.id} type="button" role="radio" aria-checked={on} aria-label={t.label} onClick={() => pickTool(t.id)}
-                  className="relative h-[112px] w-[66px] shrink-0 overflow-hidden border-0 bg-transparent p-0"
+                  className="relative h-[124px] w-[66px] shrink-0 overflow-hidden border-0 bg-transparent p-0"
                 >
                   <span
-                    className="absolute inset-x-0 top-0 flex justify-center [&_svg]:h-[128px] [&_svg]:w-[128px]"
-                    style={{ transform: `translateY(${on ? -2 : 18}px)`, transition: 'transform .18s ease' }}
-                  >{t.icon}</span>
-                  <span className="absolute inset-x-0 bottom-1 text-center text-[10.5px] font-extrabold text-neutral-500" style={{ textShadow: '0 0 6px #fff, 0 0 6px #fff' }}>{t.label}</span>
+                    className="absolute inset-x-0 top-0 flex justify-center [&_svg]:h-[112px] [&_svg]:w-[112px]"
+                    style={{ transform: `translateY(${on ? 0 : 12}px)`, transition: 'transform .18s ease' }}
+                  >{t.icon(color)}</span>
+                  <span className="absolute inset-x-0 bottom-1 text-center text-[10.5px] font-extrabold" style={{ color: look.dark ? '#d8d8de' : '#6b6b73', opacity: on ? 1 : 0.8 }}>{t.label}</span>
                 </button>
               )
             })}
