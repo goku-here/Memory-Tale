@@ -19,34 +19,59 @@ export const BRUSHES: { id: BrushId; label: string }[] = [
   { id: 'marker', label: 'Marker' },
   { id: 'highlighter', label: 'Highlight' },
   { id: 'pencil', label: 'Pencil' },
+  { id: 'crayon', label: 'Crayon' },
+  { id: 'calligraphy', label: 'Calligraphy' },
 ]
 
 /** how a stroke of this brush is drawn */
-export function brushLook(s: { size: number; brush?: BrushId }) {
+export function brushLook(s: { size: number; brush?: BrushId; opacity?: number }) {
+  const o = s.opacity ?? 1
   switch (s.brush) {
-    case 'marker': return { width: s.size * 1.9, opacity: 0.88, cap: 'round' as const, filter: undefined, blend: undefined }
-    case 'highlighter': return { width: s.size * 3.2, opacity: 0.38, cap: 'square' as const, filter: undefined, blend: 'multiply' as const }
-    case 'pencil': return { width: Math.max(1.4, s.size * 0.62), opacity: 0.82, cap: 'round' as const, filter: 'url(#mt-pencil)', blend: undefined }
-    default: return { width: s.size, opacity: 1, cap: 'round' as const, filter: undefined, blend: undefined }
+    case 'marker': return { width: s.size * 1.9, opacity: 0.88 * o, cap: 'round' as const, filter: undefined, blend: undefined }
+    case 'highlighter': return { width: s.size * 3.2, opacity: 0.38 * o, cap: 'square' as const, filter: undefined, blend: 'multiply' as const }
+    case 'pencil': return { width: Math.max(1.4, s.size * 0.62), opacity: 0.82 * o, cap: 'round' as const, filter: 'url(#mt-pencil)', blend: undefined }
+    case 'crayon': return { width: s.size * 1.8, opacity: 0.92 * o, cap: 'round' as const, filter: 'url(#mt-crayon)', blend: undefined }
+    case 'calligraphy': return { width: s.size * 1.5, opacity: o, cap: 'round' as const, filter: undefined, blend: undefined }
+    default: return { width: s.size, opacity: o, cap: 'round' as const, filter: undefined, blend: undefined }
   }
 }
 
-/** a grainy edge for the pencil */
-const PencilFilter = () => (
+/** grainy edges for pencil and crayon */
+const BrushFilters = () => (
   <defs>
     <filter id="mt-pencil" x="-5%" y="-5%" width="110%" height="110%">
       <feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="3" result="n" />
       <feDisplacementMap in="SourceGraphic" in2="n" scale="2.2" />
     </filter>
+    <filter id="mt-crayon" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="8" result="n" />
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 2.4 -0.6" result="m" />
+      <feComposite in="SourceGraphic" in2="m" operator="in" />
+    </filter>
   </defs>
 )
+
+/** a flat nib held at 45 degrees: every step of the line is a thin slanted slab, so strokes get thick and thin */
+function nibPath(pts: [number, number][], width: number) {
+  const nx = Math.cos(Math.PI / 4) * (width / 2), ny = -Math.sin(Math.PI / 4) * (width / 2)
+  if (pts.length === 1) { const [x, y] = pts[0]; return `M${x - nx} ${y - ny}L${x + nx} ${y + ny}l.01 .01Z` }
+  let d = ''
+  for (let i = 1; i < pts.length; i++) {
+    const [px, py] = pts[i - 1], [qx, qy] = pts[i]
+    d += `M${px - nx} ${py - ny}L${px + nx} ${py + ny}L${qx + nx} ${qy + ny}L${qx - nx} ${qy - ny}Z`
+  }
+  return d
+}
 
 function Strokes({ strokes }: { strokes: Stroke[] }) {
   return (
     <>
-      <PencilFilter />
+      <BrushFilters />
       {strokes.map((s, i) => {
         const l = brushLook(s)
+        if (s.brush === 'calligraphy') {
+          return <path key={i} d={nibPath(s.points, l.width)} fill={s.color} fillOpacity={l.opacity} stroke={s.color} strokeOpacity={l.opacity} strokeWidth=".6" strokeLinejoin="round" />
+        }
         return (
           <path
             key={i} d={strokePath(s.points)} stroke={s.color} strokeWidth={l.width} strokeOpacity={l.opacity} fill="none"
@@ -82,6 +107,7 @@ interface Props {
   color: string
   size: number
   brush: BrushId
+  opacity?: number
   /** rub strokes out instead of drawing */
   erase: boolean
   onChange: (s: Stroke[]) => void
@@ -111,7 +137,7 @@ function rub(strokes: Stroke[], x: number, y: number, radius: number): Stroke[] 
 }
 
 /** Transparent pointer-capture layer for freehand drawing (page scroll is locked while active). */
-export function DrawLayer({ surfaceRef, strokes, color, size, brush, erase, onChange, onBegin, bottomInset, zoom = 1 }: Props) {
+export function DrawLayer({ surfaceRef, strokes, color, size, brush, opacity = 1, erase, onChange, onBegin, bottomInset, zoom = 1 }: Props) {
   const drawing = useRef(false)
   const lastRub = useRef<[number, number] | null>(null)
   const live = useRef<Stroke[]>(strokes)
@@ -136,7 +162,7 @@ export function DrawLayer({ surfaceRef, strokes, color, size, brush, erase, onCh
         onBegin()
         const p = pos(e)
         if (erase) { lastRub.current = p; const next = rub(live.current, p[0], p[1], rubRadius); if (next !== live.current) onChange(next); return }
-        onChange([...live.current, { color, size, brush, points: [p] }])
+        onChange([...live.current, { color, size, brush, opacity, points: [p] }])
       }}
       onPointerMove={(e) => {
         if (!drawing.current) return

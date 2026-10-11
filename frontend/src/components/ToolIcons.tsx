@@ -307,3 +307,21 @@ export const IcClapper = () => (
     <circle cx="12" cy="15.5" r="2" fill="#fff" opacity=".9" />
   </S>
 )
+
+export const IcCrayonTool = () => (
+  <S size={30}>
+    <path d="M9 8.4 12 2l3 6.4Z" fill="#F25F5C" />
+    <rect x="8.4" y="8" width="7.2" height="14" rx="1.2" fill="#F25F5C" />
+    <rect x="8.4" y="11" width="7.2" height="6.4" fill="#FFE1A8" />
+    <rect x="8.4" y="12.6" width="7.2" height="1" fill="#F25F5C" opacity=".6" /><rect x="8.4" y="14.8" width="7.2" height="1" fill="#F25F5C" opacity=".6" />
+  </S>
+)
+export const IcCalligraphyTool = () => (
+  <S size={30}>
+    <path d="M12 1.8 14.4 8H9.6Z" fill="#2A2F3C" />
+    <path d="M9.4 8h5.2l-.4 2.2H9.8Z" fill="#B8BDC9" />
+    <rect x="8.6" y="10" width="6.8" height="12" rx="2.2" fill="#F5F7FC" stroke="#D8DEEC" strokeWidth=".8" />
+    <rect x="8.6" y="14" width="6.8" height="3.4" fill="#3FBF8A" />
+    <circle cx="12" cy="6.2" r=".8" fill="#fff" />
+  </S>
+)

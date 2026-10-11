@@ -18,12 +18,12 @@ import { useGestures } from '../lib/useGestures'
 import { tour, tourSeen } from '../lib/tour'
 import type { Guides } from '../lib/snap'
 import { frameHeightFor, getSize, ratioLabel, type StorySize } from '../lib/storySizes'
-import type { BrushId, CanvasStyle, PhotoProps, BubbleProps, CanvasItem, FrameId, ItemPatch, MapProps, Stroke, StickerProps, TextProps } from '../types'
+import type { CanvasStyle, PhotoProps, BubbleProps, CanvasItem, FrameId, ItemPatch, MapProps, Stroke, StickerProps, TextProps } from '../types'
 import { formatDate } from './BookCard'
 import { BottomToolbar, type ToolId } from './BottomToolbar'
 import { CanvasItemView, SelectionOverlay } from './CanvasItem'
-import { DrawLayer, DrawStrokes, strokesToItem } from './DrawLayer'
-import { DrawTool } from './DrawTool'
+import { strokesToItem } from './DrawLayer'
+import { DrawStudio } from './DrawStudio'
 import { FramePicker } from './FramePicker'
 import { NOTE_COLORS } from './StickyNote'
 import { StickerTray } from './StickerTray'
@@ -145,11 +145,6 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   const [connectFrom, setConnectFrom] = useState<string | null>(null)
   const slotInput = useRef<HTMLInputElement>(null)
   const slotTarget = useRef<{ id: string; index: number } | null>(null)
-  const [strokes, setStrokes] = useState<Stroke[]>([])
-  const [pen, setPen] = useState<{ color: string; size: number; brush: BrushId; erase: boolean }>({ color: accent, size: 6, brush: 'pen', erase: false })
-  const [strokeHist, setStrokeHist] = useState<Stroke[][]>([])
-  const strokesRef = useRef<Stroke[]>([])
-  strokesRef.current = strokes
   const sheetH = Math.max(0, ...Object.values(sheetHs))
 
   selectedIdRef.current = selectedId
@@ -411,8 +406,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   /* ---------- sheets ---------- */
 
   const closeSheet = useCallback(() => {
-    if (sheet === 'draw') finishDrawing()
-    else if (sheet === 'text') {
+    if (sheet === 'text') {
       const it = itemsRef.current.find((i) => i.id === selectedId)
       if (it?.type === 'text' && !it.props.text.trim()) live((l) => l.filter((x) => x.id !== it.id))
       end()
@@ -422,7 +416,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     setSheet(null)
     setCaptionFocus(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sheet, selectedId, strokes, end, live])
+  }, [sheet, selectedId, end, live])
 
   const openFrame = (focusCaption = false) => {
     begin()
@@ -432,16 +426,18 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   const openText = () => { begin(); setSheet('text') }
   const openBubble = () => { begin(); setSheet('bubble') }
 
-  function finishDrawing() {
-    if (strokes.length) {
-      const r = strokesToItem(strokes, canvasW)
-      const id = uid()
-      commit((list) => [...list, {
-        id, type: 'draw', x: r.x, y: r.y, width: r.width, height: r.height, rotation: 0, zIndex: nextZ(list), props: r.draw,
-      }])
-      setSelectedId(id)
-    }
-    setStrokes([])
+  /** the drawing from the drawing page becomes one item, placed in the middle of what is on screen */
+  function addDrawing(strokes: Stroke[], pageW: number) {
+    setSheet(null)
+    if (!strokes.length) return
+    const r = strokesToItem(strokes, pageW)
+    const c = viewCenter(true)
+    const s = Math.min(1, (canvasW * 0.92) / r.width)
+    const id = uid()
+    commit((list) => [...list, {
+      id, type: 'draw', x: c.x, y: c.y, width: r.width * s, height: r.height * s, rotation: 0, zIndex: nextZ(list), props: r.draw,
+    }])
+    setSelectedId(id)
   }
 
   /* ---------- adding things ---------- */
@@ -699,7 +695,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       case 'camera': setCameraOpen(true); break
       case 'sticker': setSheet('sticker'); break
       case 'text': addText(); break
-      case 'draw': setStrokes([]); setStrokeHist([]); setPen((p) => ({ ...p, erase: false })); setSheet('draw'); break
+      case 'draw': setSheet('draw'); break
       case 'note': addNote(); break
       case 'divider': addDivider(); break
       case 'location': setSheet('location'); break
@@ -1116,7 +1112,6 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
               </button>
             ))}
 
-            {drawing && <DrawStrokes strokes={strokes} />}
 
             {cv.loaded && items.length === 0 && !drawing && (
               <div className="pointer-events-none absolute inset-x-0 top-[180px] px-10 text-center">
@@ -1130,13 +1125,9 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
         </div>
       </div>
 
-      {drawing && (
-        <DrawLayer
-          surfaceRef={surface} strokes={strokes} color={pen.color} size={pen.size} brush={pen.brush} erase={pen.erase} onChange={setStrokes}
-          onBegin={() => setStrokeHist((h) => [...h.slice(-30), strokesRef.current])}
-          bottomInset={sheetH} zoom={zoom}
-        />
-      )}
+      <AnimatePresence>
+        {drawing && <DrawStudio key="draw" palette={theme.palette} accent={accent} look={rc} onDone={(strokes, w) => addDrawing(strokes, w)} />}
+      </AnimatePresence>
 
       <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => { void addPhotos(e.target.files); e.target.value = '' }} />
 
@@ -1290,20 +1281,6 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
         <LocationTool key={editMapId ?? 'new'} initial={editMap?.type === 'map' ? editMap.props : undefined} pins={['#3a4150', '#EA4335']} accent={accent} onAdd={addMap} />
       </ToolSheet>
 
-      <ToolSheet
-        open={drawing} onClose={closeSheet} title="Draw" snaps={[0.5]} dim={0} passThrough z={55}
-        onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, draw: h }))}
-      >
-        <DrawTool
-          colors={theme.palette} color={pen.color} size={pen.size} brush={pen.brush} erase={pen.erase} strokeCount={Math.max(strokes.length, strokeHist.length)} accent={accent}
-          onBrush={(brush) => setPen((p) => ({ ...p, brush }))} onErase={(erase) => setPen((p) => ({ ...p, erase }))}
-          onColor={(color) => setPen((p) => ({ ...p, color }))}
-          onSize={(size) => setPen((p) => ({ ...p, size }))}
-          onUndo={() => { const prev = strokeHist[strokeHist.length - 1]; if (prev) { setStrokes(prev); setStrokeHist((h) => h.slice(0, -1)) } else setStrokes((s) => s.slice(0, -1)) }}
-          onClear={() => { setStrokeHist((h) => [...h.slice(-30), strokes]); setStrokes([]) }}
-          onDone={closeSheet}
-        />
-      </ToolSheet>
     </motion.div>
     </AssetCtx.Provider>
   )

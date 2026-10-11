@@ -96,12 +96,14 @@ export interface NoteProps {
   color: string
 }
 /** how a stroke looks */
-export type BrushId = 'pen' | 'marker' | 'highlighter' | 'pencil'
+export type BrushId = 'pen' | 'marker' | 'highlighter' | 'pencil' | 'crayon' | 'calligraphy'
 export interface Stroke {
   color: string
   size: number
   /** pen when missing */
   brush?: BrushId
+  /** 0..1, fully solid when missing */
+  opacity?: number
   points: [number, number][]
 }
 export interface DrawProps {
