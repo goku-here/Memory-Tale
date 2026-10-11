@@ -159,6 +159,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   const visibleItems = useMemo(() => vItems.filter((i) => i.type !== 'thread'), [vItems])
   const photoCount = useMemo(() => items.filter((i) => i.type === 'photo').length, [items])
   const drawing = sheet === 'draw'
+  const [editDrawId, setEditDrawId] = useState<string | null>(null)
   const drawingRef = useRef(false)
   drawingRef.current = drawing
   const draggingRef = useRef<string | null>(null)
@@ -428,7 +429,16 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
 
   /** the drawing from the drawing page becomes one item, placed in the middle of what is on screen */
   function addDrawing(strokes: Stroke[], pageW: number) {
+    const editId = editDrawId
     setSheet(null)
+    setEditDrawId(null)
+    if (editId) {
+      // edited drawing: it keeps its place, turn and layer; only the strokes (and so the size) change
+      if (!strokes.length) { commit((l) => l.filter((x) => x.id !== editId)); setSelectedId(null); return }
+      const e = strokesToItem(strokes, pageW)
+      commit((list) => list.map((x) => (x.id === editId && x.type === 'draw' ? { ...x, width: e.width, height: e.height, props: e.draw } : x)))
+      return
+    }
     if (!strokes.length) return
     const r = strokesToItem(strokes, pageW)
     const c = viewCenter(true)
@@ -776,6 +786,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       selected.type === 'map' ? () => { setEditMapId(selected.id); setSheet('location') }
       : selected.type === 'text' ? openText
       : selected.type === 'bubble' ? openBubble
+      : selected.type === 'draw' ? () => { setEditDrawId(selected.id); setSheet('draw') }
       : selected.type === 'note' || selected.type === 'divider' ? () => { begin(); setEditingId(selected.id) }
       : undefined,
   }
@@ -1126,7 +1137,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       </div>
 
       <AnimatePresence>
-        {drawing && <DrawStudio key="draw" palette={theme.palette} accent={accent} look={rc} onDone={(strokes, w) => addDrawing(strokes, w)} />}
+        {drawing && <DrawStudio key="draw" seed={editDrawId ? (() => { const it = items.find((x) => x.id === editDrawId); return it && it.type === 'draw' ? { draw: it.props, scale: it.width / it.props.w } : undefined })() : undefined} palette={theme.palette} accent={accent} look={rc} onDone={(strokes, w) => addDrawing(strokes, w)} />}
       </AnimatePresence>
 
       <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => { void addPhotos(e.target.files); e.target.value = '' }} />

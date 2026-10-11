@@ -3,7 +3,7 @@ import { Check, Redo2, Trash2, Undo2 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { shade } from '../lib/color'
 import type { ResolvedCanvas } from '../lib/canvasStyle'
-import type { BrushId, Stroke } from '../types'
+import type { BrushId, DrawProps, Stroke } from '../types'
 import { DrawLayer, DrawStrokes } from './DrawLayer'
 import { IcCalligraphyTool, IcCrayonTool, IcEraserTool, IcHighlighterTool, IcMarkerTool, IcPenTool, IcPencilTool } from './ToolIcons'
 
@@ -32,11 +32,13 @@ interface Props {
   accent: string
   /** the book's own canvas look, so the drawing page matches it */
   look: ResolvedCanvas
+  /** a drawing being edited: its strokes, and how much bigger it is on the page than when it was made */
+  seed?: { draw: DrawProps; scale: number }
   onDone: (strokes: Stroke[], pageW: number, pageH: number) => void
 }
 
 /** A page of its own for drawing: tools along the bottom, thickness and opacity, and the theme's colours with their shades. */
-export function DrawStudio({ palette, accent, look, onDone }: Props) {
+export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
   const page = useRef<HTMLDivElement>(null)
   const shelf = useRef<HTMLDivElement>(null)
   const [shelfH, setShelfH] = useState(150)
@@ -55,6 +57,15 @@ export function DrawStudio({ palette, accent, look, onDone }: Props) {
   const color = shade(base, SHADES[shadeAt])
   const eraser = tool === 'eraser'
   const hues = [...new Set([EXTRA[0], ...palette.filter((c) => c.toUpperCase() !== '#FFFFFF'), ...EXTRA.slice(1)].map((c) => c.toUpperCase()))].slice(0, 12)
+
+  /** an edited drawing is laid out in the middle of the page at the size it has on the canvas */
+  useEffect(() => {
+    const r = page.current?.getBoundingClientRect()
+    if (!seed || !r) return
+    const k = seed.scale, ox = r.width / 2 - (seed.draw.w * k) / 2, oy = r.height / 2 - (seed.draw.h * k) / 2
+    setStrokes(seed.draw.strokes.map((s) => ({ ...s, size: s.size * k, points: s.points.map(([x, y]) => [Math.round((x * k + ox) * 10) / 10, Math.round((y * k + oy) * 10) / 10] as [number, number]) })))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     const el = shelf.current
