@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { shade } from '../lib/color'
 
 /**
  * The app's tool icons: soft blue/purple tones for editing, warm colours for places and decorations.
@@ -255,52 +256,83 @@ export const IcThreadOn = () => (
   </S>
 )
 
-/* ---- drawing tools: flat, upright, white bodies; the tip and the little dot take the picked colour ---- */
+/* ---- drawing tools: upright 3D pieces with glossy white bodies; the tip and the little detail take the picked colour ---- */
 type TP = { c?: string }
-const BODY = '#F3F5F9', EDGE = '#DDE2EC', BAND = '#C9CFDB'
+/** the round, shiny white body: soft at the edges, bright in the middle, with a highlight strip */
+const Body = ({ id, x, y, w, h, r = 2 }: { id: string; x: number; y: number; w: number; h: number; r?: number }) => (
+  <>
+    <defs>
+      <linearGradient id={id} x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stopColor="#C9D0DE" /><stop offset=".22" stopColor="#F4F6FA" /><stop offset=".55" stopColor="#FFFFFF" /><stop offset="1" stopColor="#BFC7D6" />
+      </linearGradient>
+    </defs>
+    <rect x={x} y={y} width={w} height={h} rx={r} fill={`url(#${id})`} />
+    <rect x={x + w * 0.2} y={y + 1} width={w * 0.12} height={h - 2} rx={w * 0.06} fill="#fff" opacity=".85" />
+  </>
+)
+/** a metal ring between the tip and the body */
+const Ring = ({ id, x, y, w, h = 1.6 }: { id: string; x: number; y: number; w: number; h?: number }) => (
+  <>
+    <defs>
+      <linearGradient id={id} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#8E97AA" /><stop offset=".35" stopColor="#E6EAF2" /><stop offset="1" stopColor="#8A93A6" /></linearGradient>
+    </defs>
+    <rect x={x} y={y} width={w} height={h} rx=".5" fill={`url(#${id})`} />
+  </>
+)
+/** a glossy coloured piece (tip, dot, stripe) */
+const Gem = ({ id, c }: { id: string; c: string }) => (
+  <defs>
+    <linearGradient id={id} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={shade(c, 0.45)} /><stop offset=".55" stopColor={c} /><stop offset="1" stopColor={shade(c, -0.32)} /></linearGradient>
+  </defs>
+)
 export const IcPenTool = ({ c = '#2F8FD0' }: TP) => (
   <S size={30}>
-    <path d="M9 9.4 12 1.6 15 9.4Z" fill="#2A2F3C" />
-    <path d="M9 9.4 12 1.6v7.8Z" fill="#000" opacity=".15" />
-    <rect x="8.2" y="8.6" width="7.6" height="2" fill={BAND} />
-    <rect x="8" y="10.4" width="8" height="14" rx="2" fill={BODY} stroke={EDGE} strokeWidth=".6" />
-    <rect x="11.2" y="13.4" width="1.6" height="7.4" rx=".8" fill={c} />
+    <defs><linearGradient id="t3-pn" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#555C70" /><stop offset=".4" stopColor="#8D95AA" /><stop offset="1" stopColor="#2A2F3C" /></linearGradient></defs>
+    <path d="M9.2 9.6 12 1.4l2.8 8.2Z" fill="url(#t3-pn)" />
+    <Ring id="t3-pr" x={8.4} y={9.2} w={7.2} />
+    <Body id="t3-pb" x={8} y={10.8} w={8} h={14} />
+    <Gem id="t3-pg" c={c} />
+    <rect x="11.1" y="13.6" width="1.8" height="8" rx=".9" fill="url(#t3-pg)" />
   </S>
 )
 export const IcMarkerTool = ({ c = '#2F8FD0' }: TP) => (
   <S size={30}>
-    <path d="M12 1.4C14.6 5 15.6 7.6 14.6 9.6H9.4C8.4 7.6 9.4 5 12 1.4Z" fill={c} />
-    <path d="M12 1.4C14.6 5 15.6 7.6 14.6 9.6H12Z" fill="#fff" opacity=".22" />
-    <rect x="8.6" y="9.4" width="6.8" height="1.8" fill={BAND} />
-    <path d="M8.8 11.2h6.4l.6 13H8.2Z" fill={BODY} stroke={EDGE} strokeWidth=".6" />
-    <circle cx="12" cy="15.4" r="1.2" fill={c} />
+    <Gem id="t3-mg" c={c} />
+    <path d="M12 1.2C14.8 4.8 15.8 7.6 14.8 9.8H9.2C8.2 7.6 9.2 4.8 12 1.2Z" fill="url(#t3-mg)" />
+    <path d="M11 3.8C10 5.6 9.9 7.4 10.4 8.8" stroke="#fff" strokeOpacity=".55" strokeWidth=".8" strokeLinecap="round" />
+    <Ring id="t3-mr" x={8.6} y={9.6} w={6.8} />
+    <Body id="t3-mb" x={8.2} y={11.2} w={7.6} h={14} r={1.8} />
+    <circle cx="12" cy="15.6" r="1.3" fill="url(#t3-mg)" />
   </S>
 )
 export const IcHighlighterTool = ({ c = '#FFB020' }: TP) => (
   <S size={30}>
-    <path d="M8.6 8.6 9 4.2 14.4 1.8 15 8.6Z" fill={c} />
-    <path d="M12.2 3.1 15 1.8l.2 6.8h-3Z" fill="#fff" opacity=".22" />
-    <path d="M9.4 8.6h5.6l.8 3H8.6Z" fill={BODY} stroke={EDGE} strokeWidth=".5" />
-    <rect x="8" y="11.2" width="8" height="1.6" fill={BAND} />
-    <rect x="7.2" y="12.8" width="9.6" height="12" rx="1.6" fill={BODY} stroke={EDGE} strokeWidth=".6" />
-    <circle cx="12" cy="17.4" r="1.2" fill={c} />
+    <Gem id="t3-hg" c={c} />
+    <path d="M8.6 8.8 9 4 14.4 1.4 15.2 8.8Z" fill="url(#t3-hg)" />
+    <path d="M9.6 4.6 14 2.6" stroke="#fff" strokeOpacity=".55" strokeWidth=".8" strokeLinecap="round" />
+    <path d="M9.2 8.8h6.2l.9 2.8H8.4Z" fill="#EDF0F6" />
+    <Ring id="t3-hr" x={8} y={11.4} w={8} />
+    <Body id="t3-hb" x={7.4} y={13} w={9.2} h={12} r={1.8} />
+    <circle cx="12" cy="17.8" r="1.3" fill="url(#t3-hg)" />
   </S>
 )
 export const IcPencilTool = ({ c = '#2A2F3C' }: TP) => (
   <S size={30}>
-    <path d="M10.4 5.4 12 1.6l1.6 3.8Z" fill={c} />
-    <path d="M8.2 10.6 10.4 5.4h3.2l2.2 5.2Z" fill="#F6C98F" />
-    <path d="M8.2 10.6 10.4 5.4 12 5.4v5.2Z" fill="#fff" opacity=".25" />
-    <path d="M8 10.6c1.3-.9 2.6-.9 4 0 1.4-.9 2.7-.9 4 0V25H8Z" fill={BODY} stroke={EDGE} strokeWidth=".6" />
-    <path d="M12 11.4V25" stroke={EDGE} strokeWidth=".6" />
+    <defs><linearGradient id="t3-wd" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#E8B67A" /><stop offset=".5" stopColor="#FFDDB0" /><stop offset="1" stopColor="#D9A15F" /></linearGradient></defs>
+    <Gem id="t3-pcg" c={c} />
+    <path d="M8.2 10.8 10.5 5.4h3l2.3 5.4Z" fill="url(#t3-wd)" />
+    <path d="M10.5 5.4 12 1.6l1.5 3.8Z" fill="url(#t3-pcg)" />
+    <Body id="t3-pcb" x={8} y={10.6} w={8} h={14.4} r={1.2} />
+    <path d="M12 11.6V25" stroke="#B9C1D1" strokeWidth=".5" opacity=".7" />
   </S>
 )
 export const IcEraserTool = () => (
   <S size={30}>
-    <rect x="6.6" y="4" width="10.8" height="21" rx="3" fill="#F1F3F8" stroke={EDGE} strokeWidth=".6" />
-    <rect x="6.6" y="12.6" width="10.8" height="12.4" rx="2.2" fill="#DCE1EA" />
-    <circle cx="11.4" cy="15.4" r=".7" fill="#9AA3B5" /><circle cx="12.8" cy="16.6" r=".7" fill="#9AA3B5" /><circle cx="11.2" cy="17.6" r=".7" fill="#9AA3B5" />
-    <path d="M12 19.2c1.2.8-.2 1.6.4 2.8" stroke="#9AA3B5" strokeWidth=".8" fill="none" strokeLinecap="round" />
+    <Body id="t3-eb" x={6.6} y={4.4} w={10.8} h={20.6} r={3} />
+    <defs><linearGradient id="t3-eg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#B4BBCB" /><stop offset=".4" stopColor="#E3E7EF" /><stop offset="1" stopColor="#A7AFC0" /></linearGradient></defs>
+    <rect x="6.6" y="12.8" width="10.8" height="12.2" rx="2.4" fill="url(#t3-eg)" />
+    <circle cx="11.4" cy="15.6" r=".7" fill="#8A93A6" /><circle cx="12.8" cy="16.8" r=".7" fill="#8A93A6" /><circle cx="11.2" cy="17.8" r=".7" fill="#8A93A6" />
+    <path d="M12 19.4c1.2.8-.2 1.6.4 2.8" stroke="#8A93A6" strokeWidth=".8" fill="none" strokeLinecap="round" />
   </S>
 )
 
@@ -319,19 +351,23 @@ export const IcClapper = () => (
 
 export const IcCrayonTool = ({ c = '#E5486F' }: TP) => (
   <S size={30}>
-    <path d="M9 8.6 12 1.8l3 6.8Z" fill={c} />
-    <path d="M12 1.8l3 6.8h-3Z" fill="#fff" opacity=".2" />
-    <rect x="7.8" y="8.4" width="8.4" height="16.6" rx="1.6" fill={BODY} stroke={EDGE} strokeWidth=".6" />
-    <rect x="7.8" y="12" width="8.4" height="5.4" fill={c} opacity=".85" />
+    <Gem id="t3-cg" c={c} />
+    <path d="M9 8.8 12 1.6l3 7.2Z" fill="url(#t3-cg)" />
+    <path d="M10.8 6.4 12 3.4" stroke="#fff" strokeOpacity=".5" strokeWidth=".8" strokeLinecap="round" />
+    <Body id="t3-cb" x={7.8} y={8.6} w={8.4} h={16.4} r={1.6} />
+    <rect x="7.8" y="12.4" width="8.4" height="5.2" fill="url(#t3-cg)" />
+    <rect x="9.4" y="12.6" width="1" height="4.8" rx=".5" fill="#fff" opacity=".45" />
   </S>
 )
 export const IcCalligraphyTool = ({ c = '#3FA84E' }: TP) => (
   <S size={30}>
-    <path d="M12 1.8c1.2 2.4 3.4 4.2 4.4 6.4-1 1.2-2.4 2-4.4 2.4-2-.4-3.4-1.2-4.4-2.4C8.6 6 10.8 4.2 12 1.8Z" fill="#E9ECF2" stroke={BAND} strokeWidth=".5" />
-    <path d="M12 3v7.6" stroke="#8A93A6" strokeWidth=".7" />
-    <circle cx="12" cy="7.6" r="1.1" fill={c} />
-    <rect x="8.6" y="10.6" width="6.8" height="1.8" fill={BAND} />
-    <rect x="8.2" y="12.2" width="7.6" height="12.8" rx="2" fill={BODY} stroke={EDGE} strokeWidth=".6" />
-    <rect x="11.2" y="15" width="1.6" height="8.6" rx=".8" fill={c} />
+    <defs><linearGradient id="t3-nb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#9AA3B5" /><stop offset=".45" stopColor="#F1F3F8" /><stop offset="1" stopColor="#8A93A6" /></linearGradient></defs>
+    <path d="M12 1.6c1.2 2.4 3.6 4.2 4.6 6.6-1 1.4-2.5 2.2-4.6 2.6-2.1-.4-3.6-1.2-4.6-2.6C8.4 5.8 10.8 4 12 1.6Z" fill="url(#t3-nb)" />
+    <path d="M12 2.6v8" stroke="#2A2F3C" strokeWidth=".6" />
+    <Gem id="t3-ng" c={c} />
+    <circle cx="12" cy="7.4" r="1.2" fill="url(#t3-ng)" />
+    <Ring id="t3-nr" x={8.4} y={10.6} w={7.2} />
+    <Body id="t3-nbd" x={8} y={12.2} w={8} h={12.8} />
+    <rect x="11.1" y="15" width="1.8" height="8.4" rx=".9" fill="url(#t3-ng)" />
   </S>
 )

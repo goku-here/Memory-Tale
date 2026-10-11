@@ -65,7 +65,7 @@ export function DrawStudio({ palette, accent, look, onDone }: Props) {
     return () => ro.disconnect()
   }, [])
 
-  const begin = () => { setPast((p) => [...p.slice(-40), strokesRef.current]); setFuture([]) }
+  const begin = () => { setPop(null); setPast((p) => [...p.slice(-40), strokesRef.current]); setFuture([]) }
   const undo = () => { const prev = past[past.length - 1]; if (!prev) return; setFuture((f) => [...f, strokesRef.current]); setPast((p) => p.slice(0, -1)); setStrokes(prev) }
   const redo = () => { const next = future[future.length - 1]; if (!next) return; setPast((p) => [...p, strokesRef.current]); setFuture((f) => f.slice(0, -1)); setStrokes(next) }
   const clear = () => { if (!strokes.length) return; setPast((p) => [...p.slice(-40), strokes]); setFuture([]); setStrokes([]) }
@@ -147,36 +147,45 @@ export function DrawStudio({ palette, accent, look, onDone }: Props) {
           </motion.div>
         )}
 
-        {/* the theme's colours and their shades */}
+        {/* the theme's colours and their shades: the tools step out of the way while this is open */}
         {pop === 'color' && !eraser && (
           <motion.div
-            className="absolute inset-x-3 z-[55] mx-auto max-w-[400px]" style={{ bottom: shelfH + 10 }}
-            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} onPointerDown={(e) => e.stopPropagation()}
+            className="absolute inset-x-3 z-[55] mx-auto max-w-[360px]" style={{ bottom: 'calc(var(--safe-bottom) + 18px)' }}
+            initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} onPointerDown={(e) => e.stopPropagation()}
           >
-            <div className={`${card} flex items-center justify-between px-3 py-3`}>
-              {SHADES.map((amt, i) => {
-                const c = shade(base, amt)
-                const on = i === shadeAt
-                return (
-                  <button key={amt} type="button" aria-label={`Shade ${i + 1}`} aria-pressed={on} onClick={() => setShadeAt(i)} className="grid h-11 w-11 place-items-center rounded-full border-0 bg-transparent">
-                    <span className="h-8 w-8 rounded-full" style={{ background: c, boxShadow: on ? `0 0 0 3px #fff, 0 0 0 4.5px ${accent}` : 'inset 0 0 0 1px rgba(0,0,0,.14)' }} />
-                  </button>
-                )
-              })}
-            </div>
-            <div className="mt-2 flex h-11 overflow-hidden rounded-full bg-white p-1 shadow-[0_10px_34px_rgba(20,24,40,.2),0_0_0_1px_rgba(20,24,40,.05)]">
-              {hues.map((h) => {
-                const on = h === base.toUpperCase()
-                return (
-                  <button key={h} type="button" aria-label={`Colour ${h}`} aria-pressed={on} onClick={() => { setBase(h); setShadeAt(3) }} className="h-full flex-1 border-0 p-0" style={{ background: h, boxShadow: on ? 'inset 0 0 0 3px rgba(255,255,255,.95), inset 0 0 0 4.5px #17171a' : 'inset 0 0 0 .5px rgba(0,0,0,.1)', borderRadius: on ? 18 : 0 }} />
-                )
-              })}
+            <div className={`${card} px-4 pb-4 pt-3.5`}>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[12px] font-extrabold uppercase tracking-wider text-neutral-400">Shade</span>
+                <button type="button" aria-label="Close colours" onClick={() => setPop(null)} className="grid h-8 w-8 place-items-center rounded-full border-0 bg-neutral-100 text-neutral-600"><Check size={16} strokeWidth={3} /></button>
+              </div>
+              <div className="flex items-center justify-between">
+                {SHADES.map((amt, i) => {
+                  const c = shade(base, amt)
+                  const on = i === shadeAt
+                  return (
+                    <button key={amt} type="button" aria-label={`Shade ${i + 1}`} aria-pressed={on} onClick={() => setShadeAt(i)} className="grid h-10 w-10 place-items-center rounded-full border-0 bg-transparent">
+                      <span className="h-8 w-8 rounded-full" style={{ background: c, boxShadow: on ? `0 0 0 2.5px #fff, 0 0 0 4.5px ${accent}` : 'inset 0 0 0 1px rgba(0,0,0,.14)' }} />
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="mb-2 mt-3 text-[12px] font-extrabold uppercase tracking-wider text-neutral-400">Colour</div>
+              <div className="grid grid-cols-6 justify-items-center gap-y-2">
+                {hues.map((h) => {
+                  const on = h === base.toUpperCase()
+                  return (
+                    <button key={h} type="button" aria-label={`Colour ${h}`} aria-pressed={on} onClick={() => { setBase(h); setShadeAt(3) }} className="grid h-10 w-10 place-items-center rounded-full border-0 bg-transparent">
+                      <span className="h-8 w-8 rounded-full" style={{ background: h, boxShadow: on ? `0 0 0 2.5px #fff, 0 0 0 4.5px ${accent}` : 'inset 0 0 0 1px rgba(0,0,0,.14)' }} />
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </motion.div>
         )}
 
         {/* tools along the bottom */}
-        <div ref={shelf} className="absolute inset-x-0 bottom-0 z-[50] flex items-end pl-3" style={{ paddingBottom: 'var(--safe-bottom)' }}>
+        <div ref={shelf} className="absolute inset-x-0 bottom-0 z-[50] flex items-end pl-3" style={{ paddingBottom: 'var(--safe-bottom)', transform: pop === 'color' ? 'translateY(130%)' : 'none', opacity: pop === 'color' ? 0 : 1, transition: 'transform .22s ease, opacity .18s', pointerEvents: pop === 'color' ? 'none' : 'auto' }}>
           <button
             type="button" aria-label="Colour" aria-pressed={pop === 'color'} disabled={eraser} onClick={() => setPop((p) => (p === 'color' ? null : 'color'))}
             className="mb-5 grid h-12 w-12 shrink-0 place-items-center rounded-full border-0 bg-transparent disabled:opacity-30"
@@ -189,13 +198,12 @@ export function DrawStudio({ palette, accent, look, onDone }: Props) {
               return (
                 <button
                   key={t.id} type="button" role="radio" aria-checked={on} aria-label={t.label} onClick={() => pickTool(t.id)}
-                  className="relative h-[124px] w-[66px] shrink-0 overflow-hidden border-0 bg-transparent p-0"
+                  className="relative h-[132px] w-[62px] shrink-0 overflow-hidden border-0 bg-transparent p-0"
                 >
                   <span
-                    className="absolute inset-x-0 top-0 flex justify-center [&_svg]:h-[112px] [&_svg]:w-[112px]"
-                    style={{ transform: `translateY(${on ? 0 : 12}px)`, transition: 'transform .18s ease' }}
+                    className="absolute inset-x-0 top-0 flex justify-center [&_svg]:h-[124px] [&_svg]:w-[124px]"
+                    style={{ transform: `translateY(${on ? 0 : 16}px)`, transition: 'transform .18s ease', filter: 'drop-shadow(0 4px 5px rgba(20,24,40,.3)) drop-shadow(0 0 1px rgba(20,24,40,.25))' }}
                   >{t.icon(color)}</span>
-                  <span className="absolute inset-x-0 bottom-1 text-center text-[10.5px] font-extrabold" style={{ color: look.dark ? '#d8d8de' : '#6b6b73', opacity: on ? 1 : 0.8 }}>{t.label}</span>
                 </button>
               )
             })}
