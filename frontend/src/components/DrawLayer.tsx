@@ -117,6 +117,8 @@ interface Props {
   bottomInset: number
   /** canvas zoom (1 = fit to width) */
   zoom?: number
+  /** let touches through (to scroll the page) instead of drawing */
+  off?: boolean
 }
 
 /** takes `radius` px of every stroke around (x, y) away, splitting a stroke in two when the rub goes through the middle */
@@ -137,7 +139,7 @@ function rub(strokes: Stroke[], x: number, y: number, radius: number): Stroke[] 
 }
 
 /** Transparent pointer-capture layer for freehand drawing (page scroll is locked while active). */
-export function DrawLayer({ surfaceRef, strokes, color, size, brush, opacity = 1, erase, onChange, onBegin, bottomInset, zoom = 1 }: Props) {
+export function DrawLayer({ surfaceRef, strokes, color, size, brush, opacity = 1, erase, onChange, onBegin, bottomInset, zoom = 1, off = false }: Props) {
   const drawing = useRef(false)
   const lastRub = useRef<[number, number] | null>(null)
   const live = useRef<Stroke[]>(strokes)
@@ -154,7 +156,7 @@ export function DrawLayer({ surfaceRef, strokes, color, size, brush, opacity = 1
       data-ui
       aria-label="Drawing area"
       className="fixed inset-x-0 top-0 touch-none"
-      style={{ bottom: bottomInset, zIndex: 46, cursor: 'crosshair' }}
+      style={{ bottom: bottomInset, zIndex: 46, cursor: 'crosshair', pointerEvents: off ? 'none' : 'auto' }}
       onPointerDown={(e) => {
         if (e.button > 0) return
         e.currentTarget.setPointerCapture(e.pointerId)

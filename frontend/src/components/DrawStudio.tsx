@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Check, ChevronDown, ChevronUp, Redo2, Trash2, Undo2 } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp, Hand, Redo2, Trash2, Undo2 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { shade } from '../lib/color'
 import type { ResolvedCanvas } from '../lib/canvasStyle'
@@ -58,6 +58,8 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
   const touch = useRef<{ y: number; y0: number; moved: boolean } | null>(null)
   const raf = useRef(0)
   const shelfRef = useRef(150)
+  /** hand on: a finger scrolls the page and nothing is drawn */
+  const [hand, setHand] = useState(false)
   const [pop, setPop] = useState<null | 'tune' | 'color'>(null)
 
   const color = shade(base, SHADES[shadeAt])
@@ -161,20 +163,25 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
         initial={{ y: 60 }} animate={{ y: 0 }} transition={{ type: 'spring', stiffness: 320, damping: 32 }}
       >
         {/* the page: your canvas look, strokes on top */}
-        <div ref={scroller} className="no-scrollbar absolute inset-0 overflow-y-auto" style={{ touchAction: 'none', overscrollBehavior: 'contain' }}>
+        <div ref={scroller} onScroll={(e) => grow(e.currentTarget)} className="no-scrollbar absolute inset-0 overflow-y-auto" style={{ touchAction: hand ? 'pan-y' : 'none', overscrollBehavior: 'contain' }}>
           <div ref={page} className="relative" style={{ ...look.css, minHeight: `calc(100% + ${extra}px)` }}>
             <DrawStrokes strokes={strokes} />
           </div>
         </div>
         <DrawLayer
           surfaceRef={page} strokes={strokes} color={color} size={size} brush={eraser ? 'pen' : tool} opacity={opacity} erase={eraser}
-          onChange={setStrokes} onBegin={begin} bottomInset={shelfH}
+          onChange={setStrokes} onBegin={begin} bottomInset={shelfH} off={hand}
         />
 
         {/* top bar */}
         <div className="absolute inset-x-0 top-0 z-[50] flex items-center gap-1 px-3 pt-3">
           <button type="button" aria-label="Undo" onClick={undo} disabled={!past.length} className="grid h-11 w-11 place-items-center rounded-full border-0 bg-white/80 text-[#17171a] backdrop-blur disabled:opacity-30"><Undo2 size={20} /></button>
           <button type="button" aria-label="Redo" onClick={redo} disabled={!future.length} className="grid h-11 w-11 place-items-center rounded-full border-0 bg-white/80 text-[#17171a] backdrop-blur disabled:opacity-30"><Redo2 size={20} /></button>
+          <button
+            type="button" aria-label={hand ? 'Back to drawing' : 'Scroll with your finger'} aria-pressed={hand} onClick={() => { setHand((v) => !v); setPop(null) }}
+            className="ml-1 grid h-11 w-11 place-items-center rounded-full border-0 backdrop-blur"
+            style={hand ? { background: '#17171a', color: '#fff' } : { background: 'rgba(255,255,255,.8)', color: '#17171a' }}
+          ><Hand size={20} /></button>
           <span className="flex-1" />
           <button type="button" aria-label="Clear the drawing" onClick={clear} disabled={!strokes.length} className="grid h-11 w-11 place-items-center rounded-full border-0 bg-white/80 text-[#17171a] backdrop-blur disabled:opacity-30"><Trash2 size={19} /></button>
           <motion.button type="button" whileTap={{ scale: 0.95 }} onClick={done} className="ml-1 flex h-11 items-center gap-1.5 rounded-full border-0 bg-[#17171a] px-5 text-[15px] font-semibold text-white">
