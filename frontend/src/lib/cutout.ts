@@ -6,6 +6,7 @@
  * to any server: the photo never leaves the phone. See /licenses.
  */
 import type { InferenceSession } from 'onnxruntime-web'
+import { alphaOf, cleanMask, guidedFilter, writeAlpha } from './cutoutExtras'
 
 const MODEL_URL = '/models/u2netp.onnx'
 const SIZE = 320
@@ -29,6 +30,8 @@ async function loadOrt(): Promise<Ort> {
   })
   return ortP
 }
+
+export { cleanMask, removePieceAt } from './cutoutExtras'
 
 /** Downloads the model (with progress) and prepares it. Cached for the rest of the session and by the service worker. */
 export function loadModel(onProgress?: (fraction: number) => void): Promise<InferenceSession> {
@@ -88,39 +91,53 @@ export async function cutout(file: Blob, onStage?: (s: 'model' | 'analyzing') =>
   photo.getContext('2d')!.drawImage(bmp, 0, 0, w, h)
   bmp.close?.()
 
-  // model input: 320x320, scaled by the image maximum, ImageNet normalised, channels first
-  const small = make(SIZE, SIZE)
-  const sctx = small.getContext('2d', { willReadFrequently: true })!
-  sctx.drawImage(photo, 0, 0, SIZE, SIZE)
-  const px = sctx.getImageData(0, 0, SIZE, SIZE).data
-  let max = 1
-  for (let i = 0; i < px.length; i += 4) max = Math.max(max, px[i], px[i + 1], px[i + 2])
   const plane = SIZE * SIZE
-  const input = new Float32Array(3 * plane)
-  for (let i = 0; i < plane; i++) {
-    for (let c = 0; c < 3; c++) input[c * plane + i] = (px[i * 4 + c] / max - MEAN[c]) / STD[c]
+  /** one pass of the network over the photo (optionally mirrored), as 0..1 per pixel at 320 x 320 */
+  const run = async (flip: boolean) => {
+    const small = make(SIZE, SIZE)
+    const sctx = small.getContext('2d', { willReadFrequently: true })!
+    if (flip) { sctx.translate(SIZE, 0); sctx.scale(-1, 1) }
+    sctx.drawImage(photo, 0, 0, SIZE, SIZE)
+    const px = sctx.getImageData(0, 0, SIZE, SIZE).data
+    let max = 1
+    for (let i = 0; i < px.length; i += 4) max = Math.max(max, px[i], px[i + 1], px[i + 2])
+    const input = new Float32Array(3 * plane)
+    for (let i = 0; i < plane; i++) for (let c = 0; c < 3; c++) input[c * plane + i] = (px[i * 4 + c] / max - MEAN[c]) / STD[c]
+    const out = await session.run({ [session.inputNames[0]]: new ort.Tensor('float32', input, [1, 3, SIZE, SIZE]) })
+    const pred = out[session.outputNames[0]].data as Float32Array
+    let lo = Infinity, hi = -Infinity
+    for (let i = 0; i < plane; i++) { lo = Math.min(lo, pred[i]); hi = Math.max(hi, pred[i]) }
+    const range = hi - lo || 1
+    const res = new Float32Array(plane)
+    for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) res[y * SIZE + x] = (pred[y * SIZE + (flip ? SIZE - 1 - x : x)] - lo) / range
+    return res
   }
-  const out = await session.run({ [session.inputNames[0]]: new ort.Tensor('float32', input, [1, 3, SIZE, SIZE]) })
-  const pred = out[session.outputNames[0]].data as Float32Array
-
-  // normalise 0..1, sharpen the edge a little, store as alpha
-  let lo = Infinity
-  let hi = -Infinity
-  for (let i = 0; i < plane; i++) { lo = Math.min(lo, pred[i]); hi = Math.max(hi, pred[i]) }
-  const range = hi - lo || 1
+  // looking at the photo twice (as is, and mirrored) and averaging steadies the shape of the subject
+  const p1 = await run(false)
+  const p2 = await run(true)
+  const avg = new Float32Array(plane)
+  for (let i = 0; i < plane; i++) avg[i] = (p1[i] + p2[i]) / 2
   const matte = make(SIZE, SIZE)
-  const mctx = matte.getContext('2d')!
-  const id = mctx.createImageData(SIZE, SIZE)
-  for (let i = 0; i < plane; i++) {
-    const a = smooth(0.2, 0.8, (pred[i] - lo) / range)
-    id.data[i * 4] = id.data[i * 4 + 1] = id.data[i * 4 + 2] = 255
-    id.data[i * 4 + 3] = Math.round(a * 255)
-  }
-  mctx.putImageData(id, 0, 0)
+  writeAlpha(matte, avg)
+  const soft = make(w, h)
+  const sctx2 = soft.getContext('2d', { willReadFrequently: true })!
+  sctx2.imageSmoothingQuality = 'high'
+  sctx2.drawImage(matte, 0, 0, w, h)
+  const rough = alphaOf(soft)
+
+  // snap the rough shape to the photo's real edges
+  const px = photo.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, w, h).data
+  const luma = new Float32Array(w * h)
+  for (let i = 0; i < luma.length; i++) luma[i] = (0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2]) / 255
+  const r = Math.max(5, Math.round(Math.min(w, h) * 0.014))
+  const refined = guidedFilter(luma, rough, w, h, r, 0.0004)
+  // crisp edge, still anti-aliased
+  const finalA = new Float32Array(w * h)
+  for (let i = 0; i < finalA.length; i++) finalA[i] = smooth(0.32, 0.68, 0.35 * rough[i] + 0.65 * refined[i])
+
   const mask = make(w, h)
-  const m2 = mask.getContext('2d')!
-  m2.imageSmoothingQuality = 'high'
-  m2.drawImage(matte, 0, 0, w, h)
+  writeAlpha(mask, finalA)
+  cleanMask(mask)
   return { photo, mask }
 }
 

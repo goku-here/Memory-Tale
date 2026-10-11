@@ -738,11 +738,11 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   }, [selected, vItems, canvasW])
 
   const lastReorder = useRef(0)
-  /** One tap: all the way above (or below) everything it overlaps. Quick repeat taps count once. */
+  /** One tap: one level up (above the next overlapping item) or one level down. Very quick repeat taps count once. */
   const reorder = (dir: 1 | -1) => {
     if (!selected) return
     const now = performance.now()
-    if (now - lastReorder.current < 350) return
+    if (now - lastReorder.current < 250) return
     lastReorder.current = now
     tour.emit('reorder')
     const ids = overlap.ids
@@ -752,11 +752,11 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       if (i < 0) return list
       const me = order[i]
       let at = -1
-      if (dir === 1) { for (let k = order.length - 1; k > i; k--) if (ids.has(order[k].id)) { at = k; break } }
-      else { for (let k = 0; k < i; k++) if (ids.has(order[k].id)) { at = k; break } }
+      if (dir === 1) { for (let k = i + 1; k < order.length; k++) if (ids.has(order[k].id)) { at = k; break } }
+      else { for (let k = i - 1; k >= 0; k--) if (ids.has(order[k].id)) { at = k; break } }
       if (at < 0) return list
       order.splice(i, 1)
-      order.splice(dir === 1 ? at : at, 0, me) // above the top overlapping item, or just below the lowest one
+      order.splice(at, 0, me) // just above the next overlapping item, or just below the one under it
       const z = new Map(order.map((x, k) => [x.id, k + 1]))
       return list.map((x) => (z.has(x.id) ? { ...x, zIndex: z.get(x.id)! } : x))
     })
