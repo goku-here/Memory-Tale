@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Check, Redo2, Trash2, Undo2 } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp, Redo2, Trash2, Undo2 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { shade } from '../lib/color'
 import type { ResolvedCanvas } from '../lib/canvasStyle'
@@ -55,7 +55,7 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
   /** the page grows as you draw towards its bottom, and follows your finger when you reach an edge */
   const scroller = useRef<HTMLDivElement>(null)
   const [extra, setExtra] = useState(0)
-  const touch = useRef<{ y: number } | null>(null)
+  const touch = useRef<{ y: number; y0: number; moved: boolean } | null>(null)
   const raf = useRef(0)
   const shelfRef = useRef(150)
   const [pop, setPop] = useState<null | 'tune' | 'color'>(null)
@@ -89,7 +89,8 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
     const r = el.getBoundingClientRect()
     const low = r.bottom - shelfRef.current - 70, high = r.top + 80
     let v = 0
-    if (t.y > low) v = Math.min(9, (t.y - low) * 0.12 + 1.5)
+    if (!t.moved) v = 0
+    else if (t.y > low) v = Math.min(9, (t.y - low) * 0.12 + 1.5)
     else if (t.y < high && el.scrollTop > 0) v = -Math.min(9, (high - t.y) * 0.12 + 1.5)
     if (v) {
       if (v > 0 && el.scrollTop + el.clientHeight > el.scrollHeight - 300) setExtra((x) => x + 600)
@@ -97,14 +98,34 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
     }
     raf.current = requestAnimationFrame(tick)
   }
-  const track_ = (e: React.PointerEvent) => { if (touch.current) touch.current.y = e.clientY }
+  const track_ = (e: React.PointerEvent) => { const t = touch.current; if (t) { t.y = e.clientY; if (Math.abs(e.clientY - t.y0) > 8) t.moved = true } }
   const startTrack = (e: React.PointerEvent) => {
-    if (e.button > 0) return
-    touch.current = { y: e.clientY }
+    // only a stroke in progress moves the page: a tap near the edge, or on a button, leaves it alone
+    if (e.button > 0 || !(e.target as HTMLElement).closest('[aria-label="Drawing area"]')) return
+    touch.current = { y: e.clientY, y0: e.clientY, moved: false }
     if (!raf.current) raf.current = requestAnimationFrame(tick)
   }
   const stopTrack = () => { touch.current = null }
   useEffect(() => () => cancelAnimationFrame(raf.current), [])
+
+  const grow = (el: HTMLDivElement) => { if (el.scrollTop + el.clientHeight > el.scrollHeight - 300) setExtra((x) => x + 600) }
+  /** the side arrows: a tap moves the page by half a screen, holding keeps it moving */
+  const hold = useRef<{ t: number; r: number; on: boolean } | null>(null)
+  const arrowDown = (dir: 1 | -1) => {
+    const el = scroller.current
+    if (!el) return
+    const h = { t: 0, r: 0, on: false }
+    hold.current = h
+    const loop = () => { if (hold.current !== h) return; if (dir > 0) grow(el); el.scrollTop += dir * 11; h.r = requestAnimationFrame(loop) }
+    h.t = window.setTimeout(() => { h.on = true; loop() }, 240)
+  }
+  const arrowUp = (dir: 1 | -1) => {
+    const h = hold.current, el = scroller.current
+    hold.current = null
+    if (!h || !el) return
+    clearTimeout(h.t); cancelAnimationFrame(h.r)
+    if (!h.on) { if (dir > 0) grow(el); setTimeout(() => el.scrollBy({ top: dir * el.clientHeight * 0.5, behavior: 'smooth' }), 40) }
+  }
 
   const begin = () => { setPop(null); setPast((p) => [...p.slice(-40), strokesRef.current]); setFuture([]) }
   const undo = () => { const prev = past[past.length - 1]; if (!prev) return; setFuture((f) => [...f, strokesRef.current]); setPast((p) => p.slice(0, -1)); setStrokes(prev) }
@@ -160,6 +181,15 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
             <Check size={18} strokeWidth={3} /> Done
           </motion.button>
         </div>
+
+          <button
+            type="button" aria-label="Scroll up" onPointerDown={(e) => { e.stopPropagation(); arrowDown(-1) }} onPointerUp={() => arrowUp(-1)} onPointerLeave={() => arrowUp(-1)} onPointerCancel={() => arrowUp(-1)}
+            className="absolute right-3 z-[52] grid h-11 w-11 touch-none place-items-center rounded-full border-0 bg-white/90 text-[#17171a] shadow-[0_4px_14px_rgba(20,24,40,.22)] backdrop-blur" style={{ top: 72 }}
+          ><ChevronUp size={22} strokeWidth={2.6} /></button>
+          <button
+            type="button" aria-label="Scroll down" onPointerDown={(e) => { e.stopPropagation(); arrowDown(1) }} onPointerUp={() => arrowUp(1)} onPointerLeave={() => arrowUp(1)} onPointerCancel={() => arrowUp(1)}
+            className="absolute right-3 z-[52] grid h-11 w-11 touch-none place-items-center rounded-full border-0 bg-white/90 text-[#17171a] shadow-[0_4px_14px_rgba(20,24,40,.22)] backdrop-blur" style={{ bottom: shelfH + 14 }}
+          ><ChevronDown size={22} strokeWidth={2.6} /></button>
 
         {/* thickness and opacity */}
         {pop === 'tune' && (
