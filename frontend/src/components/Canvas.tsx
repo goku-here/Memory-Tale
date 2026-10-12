@@ -46,7 +46,7 @@ import { LocationTool } from './LocationTool'
 import { PeopleSheet } from './PeopleSheet'
 import { mapAspect } from '../lib/geo'
 import { CanvasStyleSheet } from './CanvasStyleSheet'
-import { IcClapper, IcDownload, IcEdit, IcPalette, IcPeople, IcShare, IcTrash } from './ToolIcons'
+import { IcClapper, IcDownload, IcEdit, IcLock, IcPalette, IcPeople, IcShare, IcTrash } from './ToolIcons'
 import { resolveCanvas } from '../lib/canvasStyle'
 import { SizeSheet, StoryOverlay, StoryPreview } from './StoryMode'
 import { THREAD_COLORS, ThreadsSvg, threadMid } from './Threads'
@@ -927,7 +927,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     },
     onDelete: () => { commit((l) => l.filter((x) => x.id !== selected.id && !(x.type === 'thread' && (x.props.a === selected.id || x.props.b === selected.id)))); setSelectedId(null) },
     onConnect: () => { if (connectFrom) setConnectFrom(null); else setConnectFrom(selected.id) },
-    onGroup: selected.type === 'group' ? { locked: true, run: () => unlockGroup(selected.id) } : selected.groupId ? { locked: false, run: () => lockGroup(selected.groupId!) } : undefined,
+    onGroup: selected.type === 'group' ? { locked: true, run: () => unlockGroup(selected.id) } : undefined,
     onForward: overlap.up ? () => reorder(1) : undefined,
     onBackward: overlap.down ? () => reorder(-1) : undefined,
     onView: selected.type === 'photo' && hasMouse() ? () => viewItem(selected.id) : undefined,
@@ -1283,7 +1283,11 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
 
             {groupFrame && !drawing && (
               <div className="pointer-events-none absolute rounded-md" style={{ left: groupFrame.l - 6, top: groupFrame.t - 6, width: groupFrame.r - groupFrame.l + 12, height: groupFrame.b - groupFrame.t + 12, border: `1.5px dashed ${accent}`, zIndex: 8400 }}>
-                <span className="absolute -top-3 left-2 rounded-full bg-white px-2 py-0.5 text-[10px] font-extrabold" style={{ color: accent, boxShadow: '0 1px 4px rgba(0,0,0,.15)' }}>Unlocked: edit the pieces, then Lock</span>
+                <button
+                  type="button" data-ui aria-label="Lock the pieces together" onClick={() => lockGroup(selected!.groupId!)} onPointerDown={(e) => e.stopPropagation()}
+                  className="pointer-events-auto absolute -top-4 left-2 flex h-8 items-center gap-1.5 rounded-full border-0 bg-white pl-1.5 pr-3 text-[12px] font-extrabold text-[#17171a]"
+                  style={{ boxShadow: '0 2px 8px rgba(20,24,40,.22), 0 0 0 1px rgba(20,24,40,.05)', transform: `scale(${1 / zoom})`, transformOrigin: 'left center' }}
+                ><IcLock /> Lock</button>
               </div>
             )}
             {selected && actions && !drawing && editingId !== selected.id && draggingId !== selected.id && (
