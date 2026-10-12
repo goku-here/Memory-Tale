@@ -231,14 +231,14 @@ export function SelectionOverlay({
         ))}
         {/* resize + rotate */}
         {!locked && <button
-          type="button" data-ui aria-label="Drag to resize and turn"
+          type="button" data-ui aria-label="Drag to turn and resize"
           className="pointer-events-auto absolute grid h-11 w-11 touch-none place-items-center border-0 bg-transparent"
           style={{ right: -26, bottom: -26, transform: `scale(${k})` }}
           onPointerDown={(e) => actions.onHandle(e, 'resize')}
         >
           <span className="grid h-6 w-6 place-items-center rounded-full bg-white shadow" style={{ border: `2px solid ${accent}` }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M5 5l14 14M5 5v6M5 5h6M19 19v-6M19 19h-6" />
+              <path d="M20 12a8 8 0 1 1-2.6-5.9" /><path d="M20 4v5h-5" />
             </svg>
           </span>
         </button>}
