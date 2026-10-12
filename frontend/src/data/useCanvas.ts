@@ -3,6 +3,7 @@ import { repo } from './repo'
 import { pushCanvas, reportError, subscribeCanvas } from './sync'
 import type { CanvasItem } from '../types'
 import { MIN_HEIGHT } from '../lib/items'
+import { COLLAGES } from '../lib/collages'
 
 type Updater = (items: CanvasItem[]) => CanvasItem[]
 
@@ -58,7 +59,8 @@ export function useCanvas(memoryId: string, uid?: string, readOnly = false) {
     let alive = true
     void repo.loadCanvas(memoryId).then((doc) => {
       if (!alive) return
-      ref.current = (doc?.items as CanvasItem[]) ?? []
+      // frames from an older build that no longer exist are dropped instead of crashing the page
+      ref.current = ((doc?.items as CanvasItem[]) ?? []).filter((i) => i.type !== 'collage' || !!COLLAGES[i.props.kind])
       heightRef.current = Math.max(MIN_HEIGHT, doc?.height ?? MIN_HEIGHT)
       setItems(ref.current)
       setHeightState(heightRef.current)

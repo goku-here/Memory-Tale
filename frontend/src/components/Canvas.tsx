@@ -352,7 +352,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       else if (it.type === 'text') openText()
       else if (it.type === 'note' || it.type === 'divider') { begin(); setEditingId(id) }
       else if (it.type === 'bubble') openBubble()
-      else if (it.type === 'collage' && COLLAGES[it.props.kind].slots.length) { begin(); setSheet('collage') }
+      else if (it.type === 'collage' && COLLAGES[it.props.kind]?.slots.length) { begin(); setSheet('collage') }
       window.clearTimeout(viewTimer.current)
     },
   })
@@ -668,8 +668,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     if (!files?.length || !t) return
     try {
       const target = itemsRef.current.find((i) => i.id === t.id)
-      const room = target?.type === 'collage' ? COLLAGES[target.props.kind].slots.length - t.index
-        : target?.type === 'group' ? (() => { const c = target.props.children[Math.floor(t.index / 100)]; return c?.type === 'collage' ? COLLAGES[c.props.kind].slots.length - (t.index % 100) : 1 })()
+      const room = target?.type === 'collage' ? (COLLAGES[target.props.kind]?.slots.length ?? 1) - t.index
+        : target?.type === 'group' ? (() => { const c = target.props.children[Math.floor(t.index / 100)]; return c?.type === 'collage' ? (COLLAGES[c.props.kind]?.slots.length ?? 1) - (t.index % 100) : 1 })()
         : 3 - t.index
       const imgs = await Promise.all([...files].slice(0, Math.max(1, room)).map((f) => compressImage(f, { maxSize: 1000, quality: 0.82 })))
       commit((list) => list.map((i) => {
@@ -817,10 +817,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     const sc = scroller.current
     const sf = surface.current
     if (!sc || !sf) return
-    let y: number | null = null
-    try { const v = localStorage.getItem(storyKey); if (v !== null) y = Math.max(0, +v || 0) } catch { /* ignore */ }
-    // first time: start at what is on screen now
-    if (y === null) y = Math.max(0, (HEADER_H + 10 - sf.getBoundingClientRect().top) / zoomRef.current)
+    // the frame starts right where you are on the page (not where it was last time)
+    const y = Math.max(0, (HEADER_H + 10 - sf.getBoundingClientRect().top) / zoomRef.current)
     setStoryY(y)
     setSelectedId(null)
     setStory(true)
@@ -939,7 +937,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       selected.type === 'map' ? () => { setEditMapId(selected.id); setSheet('location') }
       : selected.type === 'text' ? openText
       : selected.type === 'bubble' ? openBubble
-      : selected.type === 'collage' && COLLAGES[selected.props.kind].slots.length ? () => { begin(); setSheet('collage') }
+      : selected.type === 'collage' && COLLAGES[selected.props.kind]?.slots.length ? () => { begin(); setSheet('collage') }
       : selected.type === 'draw' ? () => { setEditDrawId(selected.id); setSheet('draw') }
       : selected.type === 'note' || selected.type === 'divider' ? () => { begin(); setEditingId(selected.id) }
       : undefined,
