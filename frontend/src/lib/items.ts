@@ -15,7 +15,7 @@ export function normalizeZ(items: CanvasItem[]) {
 }
 
 export function cloneItem(item: CanvasItem, z: number): CanvasItem {
-  return { ...structuredClone(item), id: uid(), x: Math.min(95, item.x + 5), y: item.y + 36, zIndex: z }
+  return { ...structuredClone(item), id: uid(), groupId: undefined, x: Math.min(95, item.x + 5), y: item.y + 36, zIndex: z }
 }
 
 /** a photo that was turned into a background */

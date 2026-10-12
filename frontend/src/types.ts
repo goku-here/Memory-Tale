@@ -171,6 +171,12 @@ export interface CollageProps {
   /** the line of writing under each polaroid-style picture */
   texts?: string[]
 }
+/** a locked template (like a frame in a design tool): its pieces, positioned from its centre, in a box w x h that scales as one */
+export interface GroupProps {
+  w: number
+  h: number
+  children: CanvasItem[]
+}
 export interface ThreadProps {
   /** ids of the two connected items */
   a: string
@@ -188,6 +194,8 @@ export interface ItemBase {
   height: number
   rotation: number
   zIndex: number
+  /** pieces of an unlocked template share this id until they are locked together again */
+  groupId?: string
 }
 
 export type CanvasItem = ItemBase &
@@ -202,6 +210,7 @@ export type CanvasItem = ItemBase &
     | { type: 'bubble'; props: BubbleProps }
     | { type: 'clothesline'; props: ClotheslineProps }
     | { type: 'collage'; props: CollageProps }
+    | { type: 'group'; props: GroupProps }
     | { type: 'thread'; props: ThreadProps }
   )
 

@@ -371,3 +371,30 @@ export const IcCalligraphyTool = ({ c = '#3FA84E' }: TP) => (
     <rect x="11.1" y="15" width="1.8" height="8.4" rx=".9" fill="url(#t3-ng)" />
   </S>
 )
+
+/** a page layout: header band and two columns */
+export const IcTemplates = () => (
+  <S>
+    <defs><G id="ic-tpl" a="#B9A4FF" b="#6A5CF0" /><G id="ic-tpl2" a="#FFD08A" b="#F59A2B" /></defs>
+    <rect x="3" y="3" width="18" height="18" rx="3.4" fill="#fff" stroke="#D7DAF2" strokeWidth="1.2" />
+    <rect x="5.4" y="5.4" width="13.2" height="4.4" rx="1.4" fill="url(#ic-tpl)" />
+    <rect x="5.4" y="11.4" width="6" height="7.2" rx="1.4" fill="url(#ic-tpl2)" />
+    <rect x="13" y="11.4" width="5.6" height="2.8" rx="1.1" fill="#C8CCE8" /><rect x="13" y="15.6" width="5.6" height="3" rx="1.1" fill="#C8CCE8" />
+  </S>
+)
+export const IcLock = () => (
+  <S>
+    <defs><G id="ic-lock" a="#FFC66B" b="#F28A1E" /></defs>
+    <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="#5B6477" strokeWidth="2.2" strokeLinecap="round" />
+    <rect x="4.6" y="10" width="14.8" height="10.6" rx="3" fill="url(#ic-lock)" />
+    <circle cx="12" cy="15" r="1.6" fill="#7A3E05" /><rect x="11.3" y="15.2" width="1.4" height="3" rx=".7" fill="#7A3E05" />
+  </S>
+)
+export const IcUnlock = () => (
+  <S>
+    <defs><G id="ic-unlock" a="#9FE0BE" b="#2DB574" /></defs>
+    <path d="M8 10.5V8a4 4 0 0 1 7.6-1.7" fill="none" stroke="#5B6477" strokeWidth="2.2" strokeLinecap="round" />
+    <rect x="4.6" y="10" width="14.8" height="10.6" rx="3" fill="url(#ic-unlock)" />
+    <circle cx="12" cy="15" r="1.6" fill="#0C5A37" /><rect x="11.3" y="15.2" width="1.4" height="3" rx=".7" fill="#0C5A37" />
+  </S>
+)

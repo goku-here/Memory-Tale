@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useState, type ReactNode } from 'react'
-import { IcBubble, IcCamera, IcGallery, IcDraw, IcFlag, IcGrid, IcLine, IcMore, IcNote, IcPhoto, IcPhone, IcPin, IcSticker, IcText } from './ToolIcons'
+import { IcBubble, IcCamera, IcGallery, IcDraw, IcFlag, IcGrid, IcLine, IcMore, IcNote, IcPhoto, IcPhone, IcPin, IcSticker, IcTemplates, IcText } from './ToolIcons'
 
 export type ToolId = 'templates' | 'sticker' | 'draw' | 'text' | 'photo' | 'camera' | 'note' | 'location' | 'divider' | 'bubble' | 'line' | 'story' | 'canvas'
 
@@ -76,7 +76,7 @@ export function BottomToolbar({ visible, onTool, inStory }: Props) {
                   transition={{ type: 'spring', stiffness: 480, damping: 30 }}
                 >
                   {([
-                    ['templates', 'Templates', <IcGrid key="t" />],
+                    ['templates', 'Templates', <IcTemplates key="t" />],
                     ['note', 'Sticky note', <IcNote key="n" />],
                     ['bubble', 'Chat bubble', <IcBubble key="b" />],
                     ['line', 'Polaroid line', <IcLine key="p" />],

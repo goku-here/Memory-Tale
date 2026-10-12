@@ -6,7 +6,7 @@ import { BubbleBody } from './Bubble'
 import { ClotheslineBody } from './Clothesline'
 import { DrawItem } from './DrawLayer'
 import { MapCard } from './MapCard'
-import { IcCopy, IcDown, IcEdit, IcExpand, IcFrame, IcPalette, IcThread, IcThreadOn, IcTrash, IcUp } from './ToolIcons'
+import { IcCopy, IcDown, IcEdit, IcExpand, IcFrame, IcLock, IcPalette, IcThread, IcThreadOn, IcTrash, IcUnlock, IcUp } from './ToolIcons'
 import { PhotoFrame } from './PhotoFrame'
 import { StickerArt } from './stickers'
 import { NOTE_COLORS, StickyNote } from './StickyNote'
@@ -77,6 +77,25 @@ function DividerBody({ item, editing, onEditText, onEditDone }: { item: Extract<
 }
 
 /** The visual content of an item, shared by the live canvas and the PNG export. */
+/** a locked template: its pieces at their places, scaled with the box, moving and turning as one */
+function GroupBody({ item, onSlot }: { item: Extract<CanvasItem, { type: 'group' }>; onSlot?: (i: number) => void }) {
+  const g = item.props
+  const s = item.width / g.w
+  const kids = [...g.children].sort((a, b) => a.zIndex - b.zIndex)
+  return (
+    <div className="relative" style={{ width: g.w, height: g.h, transform: `scale(${s})`, transformOrigin: '0 0' }}>
+      {kids.map((c) => (
+        <div
+          key={c.id}
+          style={{ position: 'absolute', left: g.w / 2 + c.x, top: g.h / 2 + c.y, width: c.width, height: c.type === 'text' ? 'auto' : c.height, transform: `translate(-50%,-50%) rotate(${c.rotation}deg)` }}
+        >
+          <ItemBody item={c} selected={false} onSlot={onSlot ? (i) => onSlot(g.children.indexOf(c) * 100 + i) : undefined} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function ItemBody({
   item, editing = false, selected = false, onSlot, onView, onMeasure = () => {}, onEditText = () => {}, onEditDone = () => {},
 }: { item: CanvasItem; editing?: boolean; selected?: boolean; onSlot?: (i: number) => void; onView?: (i: number) => void; onMeasure?: ItemProps['onMeasure']; onEditText?: ItemProps['onEditText']; onEditDone?: ItemProps['onEditDone'] }) {
@@ -90,6 +109,7 @@ export function ItemBody({
     case 'divider': return <DividerBody item={item} editing={editing} onEditText={onEditText} onEditDone={onEditDone} />
     case 'bubble': return <BubbleBody bubble={item.props} width={item.width} height={item.height} />
     case 'clothesline': return <ClotheslineBody line={item.props} selected={selected} onSlot={onSlot} onView={onView} />
+    case 'group': return <GroupBody item={item} onSlot={onSlot} />
     case 'collage': return <CollageBody collage={item.props} selected={selected} onSlot={onSlot} onView={onView} />
     case 'thread': return null
   }
@@ -147,6 +167,8 @@ export interface SelectionActions {
   onConnect?: () => void
   onView?: () => void
   onColor?: (color: string) => void
+  /** lock the pieces of a template together, or unlock them to edit */
+  onGroup?: { locked: boolean; run: () => void }
 }
 
 function TB({ label, onClick, children, danger, caption, w = 42, active }: { label: string; onClick: () => void; children: React.ReactNode; danger?: boolean; caption: string; w?: number; active?: boolean }) {
@@ -171,7 +193,7 @@ export function SelectionOverlay({
   const rad = (item.rotation * Math.PI) / 180
   const hh = (Math.abs(item.width * Math.sin(rad)) + Math.abs(item.height * Math.cos(rad))) / 2
   const [colorsOpen, setColorsOpen] = useState(false)
-  const nButtons = locked ? 2 : 2 + (actions.onForward ? 1 : 0) + (actions.onBackward ? 1 : 0) + (actions.onEdit ? 1 : 0) + (actions.onFrame ? 1 : 0) + (actions.onConnect ? 1 : 0) + (actions.onView ? 1 : 0) + (actions.onColor ? 1 : 0)
+  const nButtons = locked ? 2 : 2 + (actions.onForward ? 1 : 0) + (actions.onBackward ? 1 : 0) + (actions.onEdit ? 1 : 0) + (actions.onFrame ? 1 : 0) + (actions.onConnect ? 1 : 0) + (actions.onView ? 1 : 0) + (actions.onColor ? 1 : 0) + (actions.onGroup ? 1 : 0)
   // the toolbar and handles keep their on-screen size however far the canvas is zoomed out
   const k = 1 / zoom
   // a little more room between the buttons on wider screens; phones need the tighter fit
@@ -244,6 +266,7 @@ export function SelectionOverlay({
           {!locked && actions.onView && <TB w={bw} label="View full size" caption="View" onClick={actions.onView}><IcExpand /></TB>}
           {actions.onFrame && <TB w={bw} label="Frame" caption="Frame" onClick={actions.onFrame}><IcFrame /></TB>}
           {!locked && actions.onColor && <TB w={bw} label="Note colour" caption="Colour" onClick={() => setColorsOpen((v) => !v)}><IcPalette /></TB>}
+          {actions.onGroup && <TB w={bw} label={actions.onGroup.locked ? 'Unlock to edit the pieces' : 'Lock the pieces together'} caption={actions.onGroup.locked ? 'Unlock' : 'Lock'} active={!actions.onGroup.locked} onClick={actions.onGroup.run}>{actions.onGroup.locked ? <IcLock /> : <IcUnlock />}</TB>}
           {!locked && actions.onEdit && <TB w={bw} label="Edit" caption="Edit" onClick={actions.onEdit}><IcEdit /></TB>}
           {!locked && actions.onConnect && <TB w={bw} label={connecting ? 'Cancel the thread' : 'Tie with thread'} caption={connecting ? 'Pick 2nd' : 'Thread'} active={connecting} onClick={actions.onConnect}>{connecting ? <IcThreadOn /> : <IcThread />}</TB>}
           {!locked && <TB w={bw} label="Duplicate" caption="Copy" onClick={actions.onDuplicate}><IcCopy /></TB>}

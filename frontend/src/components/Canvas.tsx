@@ -30,6 +30,7 @@ import { FramePicker } from './FramePicker'
 import { NOTE_COLORS } from './StickyNote'
 import { StickerTray } from './StickerTray'
 import { CollageEditor } from './CollageEditor'
+import { TemplateSheet } from './TemplateSheet'
 import { COLLAGES, type CollageKind } from '../lib/collages'
 import type { TemplateDef } from '../lib/templates'
 import { SVG_STICKERS } from './stickers'
@@ -64,7 +65,7 @@ interface CanvasProps {
   reveal?: { p: MotionValue<number>; rect: DOMRect }
 }
 
-type Sheet = 'collage' | 'frame' | 'sticker' | 'text' | 'draw' | 'location' | 'bubble' | null
+type Sheet = 'templates' | 'collage' | 'frame' | 'sticker' | 'text' | 'draw' | 'location' | 'bubble' | null
 
 function MenuItem({ icon, label, onClick, danger }: { icon: ReactNode; label: string; onClick: () => void; danger?: boolean }) {
   return (
@@ -137,7 +138,6 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [sheet, setSheet] = useState<Sheet>(null)
-  const [trayTab, setTrayTab] = useState<'frames' | 'templates' | undefined>()
   const [sheetHs, setSheetHs] = useState<Record<string, number>>({})
   const [canvasW, setCanvasW] = useState(() => Math.min(window.innerWidth, 520))
   const canvasWRef = useRef(canvasW)
@@ -461,8 +461,10 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     // a doodle sits under the photos, notes and stickers (but above a background photo), so it never covers them
     commit((list) => {
       const solid = list.filter((x) => !isBg(x))
-      const z = solid.length ? Math.min(...solid.map((x) => x.zIndex)) - 0.5 : nextZ(list)
-      return [...list, { id, type: 'draw', x: c.x, y: c.y, width: r.width * s, height: r.height * s, rotation: 0, zIndex: z, props: r.draw }]
+      const z = solid.length ? Math.min(...solid.map((x) => x.zIndex)) - 1 : nextZ(list)
+      // a background photo sits right under the doodle: make sure it is still lower
+      const moved = list.map((x) => (isBg(x) && x.zIndex >= z ? { ...x, zIndex: z - 1 } : x))
+      return [...moved, { id, type: 'draw', x: c.x, y: c.y, width: r.width * s, height: r.height * s, rotation: 0, zIndex: z, props: r.draw }]
     })
     setSelectedId(id)
   }
@@ -666,10 +668,22 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     if (!files?.length || !t) return
     try {
       const target = itemsRef.current.find((i) => i.id === t.id)
-      const room = target?.type === 'collage' ? COLLAGES[target.props.kind].slots.length - t.index : 3 - t.index
+      const room = target?.type === 'collage' ? COLLAGES[target.props.kind].slots.length - t.index
+        : target?.type === 'group' ? (() => { const c = target.props.children[Math.floor(t.index / 100)]; return c?.type === 'collage' ? COLLAGES[c.props.kind].slots.length - (t.index % 100) : 1 })()
+        : 3 - t.index
       const imgs = await Promise.all([...files].slice(0, Math.max(1, room)).map((f) => compressImage(f, { maxSize: 1000, quality: 0.82 })))
       commit((list) => list.map((i) => {
         if (i.id !== t.id) return i
+        if (i.type === 'group') {
+          const ci = Math.floor(t.index / 100), si = t.index % 100
+          const kids = i.props.children.map((c, k) => {
+            if (k !== ci || c.type !== 'collage') return c
+            const photos = [...c.props.photos]
+            imgs.forEach((m, n) => { photos[si + n] = m.dataUrl })
+            return { ...c, props: { ...c.props, photos } }
+          })
+          return { ...i, props: { ...i.props, children: kids } }
+        }
         if (i.type === 'collage') {
           const photos = [...i.props.photos]
           imgs.forEach((m, k) => { photos[t.index + k] = m.dataUrl })
@@ -696,35 +710,97 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     if (close) setSheet(null)
     return id
   }
-  /** a whole page design: its paper, frames, stickers and text land as separate items, so each one can be changed on its own */
-  const addTemplate = (def: TemplateDef) => {
-    const W = Math.round(clamp(canvasW * 0.92, 150, 420))
+  /** the box an item covers on the canvas, in px (turned items use the box that holds them) */
+  const boundsOf = (it: CanvasItem) => {
+    const r = (it.rotation * Math.PI) / 180
+    const bw = Math.abs(it.width * Math.cos(r)) + Math.abs(it.height * Math.sin(r))
+    const bh = Math.abs(it.width * Math.sin(r)) + Math.abs(it.height * Math.cos(r))
+    const cx = (it.x / 100) * canvasW
+    return { l: cx - bw / 2, r: cx + bw / 2, t: it.y - bh / 2, b: it.y + bh / 2, cx }
+  }
+
+  /** the first empty stretch of the page, from the top of what is on screen downwards, that a w x h design fits in */
+  const emptySpot = (w: number, h: number) => {
+    const rects = itemsRef.current.filter((i) => !isBg(i) && i.type !== 'thread').map(boundsOf)
     const c = viewCenter(true)
-    commit((list) => {
-      let z = nextZ(list)
-      const made: CanvasItem[] = def.pieces.map((p) => {
-        const x = c.x + (p.dx * W / canvasW) * 100
-        const y = c.y + p.dy * W
-        const base = { id: uid(), x, y, rotation: p.rot ?? 0, zIndex: z++ }
-        if (p.type === 'collage') {
-          const d = COLLAGES[p.kind]
-          const w = Math.round(p.w * W)
-          return { ...base, type: 'collage', width: w, height: Math.round((w * d.h) / d.w), props: { kind: p.kind, photos: d.slots.map(() => '') } } as CanvasItem
-        }
-        if (p.type === 'sticker') {
-          const ratio = SVG_STICKERS[p.id]?.ratio ?? 1
-          const w = Math.round(p.w * W)
-          return { ...base, type: 'sticker', width: w, height: Math.round(w / ratio), props: { kind: 'svg', value: p.id } } as CanvasItem
-        }
-        return {
-          ...base, type: 'text', width: Math.round(p.w * W), height: Math.round(p.size * 1.4 * p.text.split('\n').length),
-          props: { text: p.text, font: p.font === 'display' ? theme.font : "'Manrope', sans-serif", size: p.size, color: p.color, align: p.align },
-        } as CanvasItem
-      })
-      return [...list, ...made]
+    const x0 = (canvasW - w) / 2
+    let y = Math.max(150, c.y - (window.innerHeight / 2 - 150) / zoomRef.current)
+    const end = rects.reduce((m, r) => Math.max(m, r.b), 0) + 40
+    for (; y < end; y += 20) {
+      if (!rects.some((r) => r.b > y - 14 && r.t < y + h + 14 && r.r > x0 && r.l < x0 + w)) return y
+    }
+    return end
+  }
+
+  /** a template lands as one locked piece (like a frame in a design tool), in an empty spot, and the page scrolls to it */
+  const addTemplate = (def: TemplateDef) => {
+    const W = Math.round(clamp(canvasW * 0.9, 150, 420))
+    const H = Math.round(W * def.aspect)
+    const top = emptySpot(W, H)
+    const gid = uid()
+    const children: CanvasItem[] = def.pieces.map((p, i) => {
+      const base = { id: uid(), x: p.dx * W, y: p.dy * W, rotation: p.rot ?? 0, zIndex: i + 1 }
+      if (p.type === 'collage') {
+        const d = COLLAGES[p.kind]
+        const w = Math.round(p.w * W)
+        return { ...base, type: 'collage', width: w, height: Math.round((w * d.h) / d.w), props: { kind: p.kind, photos: d.slots.map(() => '') } } as CanvasItem
+      }
+      if (p.type === 'sticker') {
+        const ratio = SVG_STICKERS[p.id]?.ratio ?? 1
+        const w = Math.round(p.w * W)
+        return { ...base, type: 'sticker', width: w, height: Math.round(w / ratio), props: { kind: 'svg', value: p.id } } as CanvasItem
+      }
+      return {
+        ...base, type: 'text', width: Math.round(p.w * W), height: Math.round(p.size * 1.4 * p.text.split('\n').length),
+        props: { text: p.text, font: p.font === 'display' ? theme.font : "'Manrope', sans-serif", size: p.size, color: p.color, align: p.align },
+      } as CanvasItem
     })
+    commit((list) => [...list, { id: gid, type: 'group', x: 50, y: top + H / 2, width: W, height: H, rotation: 0, zIndex: nextZ(list), props: { w: W, h: H, children } }])
     setSheet(null)
+    setSelectedId(gid)
+    window.setTimeout(() => scroller.current?.scrollTo({ top: Math.max(0, (wrap.current?.offsetTop ?? 0) + top * zoomRef.current - HEADER_H - 90), behavior: 'smooth' }), 120)
+  }
+
+  /** unlock: the pieces become ordinary items (tagged with the group) at the places they had */
+  const unlockGroup = (id: string) => {
+    commit((list) => {
+      const g = list.find((i) => i.id === id)
+      if (!g || g.type !== 'group') return list
+      const s = g.width / g.props.w
+      const th = (g.rotation * Math.PI) / 180
+      const cs = Math.cos(th), sn = Math.sin(th)
+      const gx = (g.x / 100) * canvasW
+      const kids = [...g.props.children].sort((a, b) => a.zIndex - b.zIndex).map((c, i) => {
+        const ox = c.x * s, oy = c.y * s
+        const x = gx + ox * cs - oy * sn, y = g.y + ox * sn + oy * cs
+        const out: CanvasItem = { ...c, x: (x / canvasW) * 100, y, width: c.width * s, height: c.height * s, rotation: c.rotation + g.rotation, zIndex: g.zIndex + i, groupId: id }
+        if (out.type === 'text') out.props = { ...out.props, size: Math.round(out.props.size * s * 10) / 10 }
+        return out
+      })
+      // stacking numbers must be whole: everything above the template moves up to make room for its pieces
+      const room = kids.length - 1
+      return [...list.filter((i) => i.id !== id).map((i) => (i.zIndex > g.zIndex ? { ...i, zIndex: i.zIndex + room } : i)), ...kids]
+    })
     setSelectedId(null)
+  }
+
+  /** lock: the pieces of the group, and anything dropped inside its area, join into one piece again */
+  const lockGroup = (gid: string) => {
+    commit((list) => {
+      const members = list.filter((i) => i.groupId === gid)
+      if (!members.length) return list
+      const bb = members.map(boundsOf)
+      const L = Math.min(...bb.map((b) => b.l)), R = Math.max(...bb.map((b) => b.r)), T = Math.min(...bb.map((b) => b.t)), B = Math.max(...bb.map((b) => b.b))
+      const inside = list.filter((i) => !i.groupId && i.type !== 'thread' && i.type !== 'group' && !isBg(i) && (() => { const b = boundsOf(i); return b.cx > L && b.cx < R && i.y > T && i.y < B })())
+      const all = [...members, ...inside].sort((a, b) => a.zIndex - b.zIndex)
+      const cx = (L + R) / 2, cy = (T + B) / 2
+      const kids: CanvasItem[] = all.map((c, i) => ({ ...c, groupId: undefined, x: (c.x / 100) * canvasW - cx, y: c.y - cy, zIndex: i + 1 }))
+      const gone = new Set(all.map((c) => c.id))
+      const rest = list.filter((i) => !gone.has(i.id) && !(i.type === 'thread' && (gone.has(i.props.a) || gone.has(i.props.b))))
+      const W = Math.round(R - L), H = Math.round(B - T)
+      return [...rest, { id: gid, type: 'group', x: (cx / canvasW) * 100, y: cy, width: W, height: H, rotation: 0, zIndex: Math.max(...all.map((c) => c.zIndex)), props: { w: W, h: H, children: kids } } as CanvasItem]
+    })
+    setSelectedId(gid)
   }
 
   const addDivider = () => {
@@ -778,8 +854,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     switch (t) {
       case 'photo': fileInput.current?.click(); break
       case 'camera': setCameraOpen(true); break
-      case 'sticker': setTrayTab(undefined); setSheet('sticker'); break
-      case 'templates': setTrayTab('templates'); setSheet('sticker'); break
+      case 'sticker': setSheet('sticker'); break
+      case 'templates': setSheet('templates'); break
       case 'text': addText(); break
       case 'draw': setSheet('draw'); break
       case 'note': addNote(); break
@@ -853,6 +929,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     },
     onDelete: () => { commit((l) => l.filter((x) => x.id !== selected.id && !(x.type === 'thread' && (x.props.a === selected.id || x.props.b === selected.id)))); setSelectedId(null) },
     onConnect: () => { if (connectFrom) setConnectFrom(null); else setConnectFrom(selected.id) },
+    onGroup: selected.type === 'group' ? { locked: true, run: () => unlockGroup(selected.id) } : selected.groupId ? { locked: false, run: () => lockGroup(selected.groupId!) } : undefined,
     onForward: overlap.up ? () => reorder(1) : undefined,
     onBackward: overlap.down ? () => reorder(-1) : undefined,
     onView: selected.type === 'photo' && hasMouse() ? () => viewItem(selected.id) : undefined,
@@ -996,6 +1073,14 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
 
   const editMap = items.find((i) => i.id === editMapId)
   const bubbleItem = selected?.type === 'bubble' ? selected : undefined
+  /** the dashed outline around the pieces of an unlocked template while one of them is selected */
+  const groupFrame = (() => {
+    const gid = selected?.groupId
+    if (!gid) return null
+    const bb = vItems.filter((i) => i.groupId === gid).map(boundsOf)
+    if (!bb.length) return null
+    return { l: Math.min(...bb.map((b) => b.l)), r: Math.max(...bb.map((b) => b.r)), t: Math.min(...bb.map((b) => b.t)), b: Math.max(...bb.map((b) => b.b)) }
+  })()
   const collageItem = selected?.type === 'collage' ? selected : undefined
   const textItem = selected?.type === 'text' ? selected : undefined
   const photoItem = selected?.type === 'photo' ? selected : undefined
@@ -1198,6 +1283,11 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
               )
             })()}
 
+            {groupFrame && !drawing && (
+              <div className="pointer-events-none absolute rounded-md" style={{ left: groupFrame.l - 6, top: groupFrame.t - 6, width: groupFrame.r - groupFrame.l + 12, height: groupFrame.b - groupFrame.t + 12, border: `1.5px dashed ${accent}`, zIndex: 8400 }}>
+                <span className="absolute -top-3 left-2 rounded-full bg-white px-2 py-0.5 text-[10px] font-extrabold" style={{ color: accent, boxShadow: '0 1px 4px rgba(0,0,0,.15)' }}>Unlocked: edit the pieces, then Lock</span>
+              </div>
+            )}
             {selected && actions && !drawing && editingId !== selected.id && draggingId !== selected.id && (
               <SelectionOverlay item={selected} canvasW={canvasW} topLimit={((scroller.current?.scrollTop ?? 0) + 8) / zoom} accent={accent} actions={actions} hideToolbar={!!sheet} zoom={zoom} locked={isBg(selected)} connecting={!!connectFrom} />
             )}
@@ -1350,6 +1440,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
         )}
       </ToolSheet>
 
+      <TemplateSheet open={sheet === 'templates'} onClose={closeSheet} accent={accent} themeId={memory.themeId} onPick={addTemplate} />
+
       <ToolSheet
         open={sheet === 'collage' && !!collageItem} onClose={closeSheet} title="Photo frame" snaps={[0.56, 0.88]} dim={0.18} z={55}
         onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, collage: h }))}
@@ -1376,7 +1468,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
         open={sheet === 'sticker'} onClose={closeSheet} title="Stickers" snaps={[0.94]} dim={0.18} z={55}
         onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, sticker: h }))}
       >
-        <StickerTray key={trayTab ?? 'all'} initialGroup={trayTab} accent={accent} onPick={(s) => addSticker(s)} onPickMany={addStickers} onFrame={(k) => addCollage(k)} onTemplate={addTemplate} />
+        <StickerTray accent={accent} onPick={(s) => addSticker(s)} onPickMany={addStickers} onFrame={(k) => addCollage(k)} />
       </ToolSheet>
 
       <ToolSheet
