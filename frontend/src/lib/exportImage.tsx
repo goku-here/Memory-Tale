@@ -27,7 +27,7 @@ function ExportView({ memory, items: raw, width }: { memory: Memory; items: Canv
     <div
       id="keepsake-export"
       style={{
-        width, backgroundColor: rc.bg, position: 'relative', overflow: 'hidden', fontFamily: 'Manrope, sans-serif',
+        width, backgroundColor: rc.bg, position: 'relative', overflow: 'hidden', isolation: 'isolate', fontFamily: 'Manrope, sans-serif',
         ['--t-pin' as string]: theme.palette[0], ['--t-pin2' as string]: theme.palette[1],
       }}
     >
@@ -43,12 +43,12 @@ function ExportView({ memory, items: raw, width }: { memory: Memory; items: Canv
           ...shiftedCss(rc, offset),
         }}
       >
-        {[...items].filter((i) => i.type !== 'thread').sort((a, b) => a.zIndex - b.zIndex).map((it) => (
+        {[...items].filter((i) => i.type !== 'thread').sort((a, b) => a.zIndex - b.zIndex).map((it, rank) => (
           <div
             key={it.id}
             style={{
               position: 'absolute', left: `${it.x}%`, top: it.y - offset, width: it.width, height: it.type === 'text' ? 'auto' : it.height,
-              transform: `translate(-50%,-50%) rotate(${it.rotation}deg)`, zIndex: it.zIndex,
+              transform: `translate(-50%,-50%) rotate(${it.rotation}deg)`, zIndex: rank + 1,
             }}
           >
             <ItemBody item={it} />

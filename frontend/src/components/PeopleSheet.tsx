@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
-import { Crown, Loader2, UserMinus } from 'lucide-react'
+import { Crown, Eye, Loader2, Pencil, UserMinus } from 'lucide-react'
 import { useState } from 'react'
-import { peopleOf, removeMember } from '../data/people'
+import { peopleOf, removeMember, setRole } from '../data/people'
 import { reportError } from '../data/sync'
 import { useAuth } from '../data/useAuth'
 import type { Memory } from '../types'
@@ -22,8 +22,20 @@ export function PeopleSheet({ open, onClose, memory }: { open: boolean; onClose:
   const people = peopleOf(memory, user)
   const isOwner = !!user && (memory.ownerId ?? user.uid) === user.uid
   const owner = people.find((p) => p.owner)
+  const viewers = new Set(memory.viewerIds ?? [])
   const [target, setTarget] = useState<{ id: string; name: string } | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+
+  const changeRole = async (id: string, name: string, role: 'edit' | 'view') => {
+    setBusy(id)
+    try {
+      await setRole(memory, id, role)
+      toast(role === 'view' ? `${name} can now only view` : `${name} can now edit`)
+    } catch (e) {
+      reportError(e)
+      toast('Could not change it. Publish the latest backend/firestore.rules in Firebase, then try again.')
+    } finally { setBusy(null) }
+  }
 
   const confirm = async () => {
     if (!user || !target) return
@@ -52,8 +64,20 @@ export function PeopleSheet({ open, onClose, memory }: { open: boolean; onClose:
                 <Avatar name={p.name} photo={p.photo} color={p.color} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[15.5px] font-bold text-[#17171a]">{p.name}{p.id === user?.uid && <span className="font-semibold text-neutral-400"> (you)</span>}</div>
-                  {p.owner && <div className="flex items-center gap-1 text-[12.5px] font-bold text-amber-600"><Crown size={13} /> Owner</div>}
+                  {p.owner
+                    ? <div className="flex items-center gap-1 text-[12.5px] font-bold text-amber-600"><Crown size={13} /> Owner</div>
+                    : viewers.has(p.id)
+                      ? <div className="flex items-center gap-1 text-[12.5px] font-bold text-neutral-500"><Eye size={13} /> Can only view</div>
+                      : <div className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-600"><Pencil size={13} /> Can edit</div>}
                 </div>
+                {isOwner && !p.owner && (
+                  <motion.button
+                    type="button" whileTap={{ scale: 0.94 }} disabled={busy === p.id} onClick={() => void changeRole(p.id, p.name, viewers.has(p.id) ? 'edit' : 'view')}
+                    className="flex h-10 items-center gap-1.5 rounded-full border-0 bg-neutral-100 px-3.5 text-[13.5px] font-bold text-[#17171a] disabled:opacity-50"
+                  >
+                    {viewers.has(p.id) ? <><Pencil size={15} /> Allow edit</> : <><Eye size={15} /> View only</>}
+                  </motion.button>
+                )}
                 {isOwner && !p.owner && (
                   <motion.button
                     type="button" whileTap={{ scale: 0.94 }} disabled={busy === p.id} onClick={() => setTarget({ id: p.id, name: p.name })}
@@ -67,7 +91,7 @@ export function PeopleSheet({ open, onClose, memory }: { open: boolean; onClose:
           </ul>
           <p className="m-0 mt-4 px-2 text-center text-[13px] leading-snug text-neutral-400">
             {isOwner
-              ? 'You own this memory. Anyone you remove loses access right away and cannot rejoin with an old link.'
+              ? 'You own this memory. Choose for each person whether they can edit or only view. Anyone you remove loses access right away and cannot rejoin with an old link.'
               : `${owner?.name ?? 'The owner'} owns this memory and is the only one who can remove people.`}
           </p>
         </div>

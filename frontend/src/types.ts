@@ -52,6 +52,8 @@ export interface Memory {
   /** cloud: Firebase uid of the creator, and everyone who may open it */
   ownerId?: string
   memberIds?: string[]
+  /** members who can look but not change anything (everyone else in memberIds can edit) */
+  viewerIds?: string[]
   members?: Member[]
   canvasStyle?: CanvasStyle
 }

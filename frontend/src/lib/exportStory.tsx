@@ -38,16 +38,16 @@ function StoryView({ memory: m, items: raw, canvasW, frameY, dots, mark, size }:
   return (
     <div
       style={{
-        width: canvasW, height: h, ...pattern, position: 'relative', overflow: 'hidden', fontFamily: 'Manrope, sans-serif',
+        width: canvasW, height: h, ...pattern, position: 'relative', overflow: 'hidden', isolation: 'isolate', fontFamily: 'Manrope, sans-serif',
         ['--t-pin' as string]: theme.palette[0], ['--t-pin2' as string]: theme.palette[1],
       }}
     >
-      {[...items].filter((i) => i.type !== 'thread').sort((a, b) => a.zIndex - b.zIndex).map((it) => (
+      {[...items].filter((i) => i.type !== 'thread').sort((a, b) => a.zIndex - b.zIndex).map((it, rank) => (
         <div
           key={it.id}
           style={{
             position: 'absolute', left: `${it.x}%`, top: it.y - frameY, width: it.width, height: it.type === 'text' ? 'auto' : it.height,
-            transform: `translate(-50%,-50%) rotate(${it.rotation}deg)`, zIndex: it.zIndex,
+            transform: `translate(-50%,-50%) rotate(${it.rotation}deg)`, zIndex: rank + 1,
           }}
         >
           <ItemBody item={it} />

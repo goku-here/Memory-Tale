@@ -148,7 +148,8 @@ export async function pushMemory(uid: string, m: Memory) {
   const ref = doc(d, 'memories', m.id)
   // never overwrite who is in the book with a possibly stale local copy: details only
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { memberIds, members, ownerId, ...details } = m as Memory & { joinToken?: string }
+  const { memberIds, members, ownerId, viewerIds, ...details } = m as Memory & { joinToken?: string }
+  void viewerIds
   delete (details as { joinToken?: string }).joinToken
   let exists = false
   try { exists = (await getDoc(ref)).exists() } catch { /* offline and not cached: treat as new */ }
@@ -297,6 +298,8 @@ export interface Invite {
   ownerPhoto?: string
   /** the real accounts in the book when the link was made (shown on the cover) */
   members?: Memory['members']
+  /** what the person who opens the link may do (older links: edit) */
+  role?: 'edit' | 'view'
 }
 interface Who { uid: string; name: string; photo?: string | null }
 
@@ -315,7 +318,7 @@ function publicBase() {
 }
 
 /** A brand-new, unguessable link every time. The invite doc carries just enough to show a preview. */
-export async function createInvite(who: Who, m: Memory): Promise<string> {
+export async function createInvite(who: Who, m: Memory, role: 'edit' | 'view' = 'edit'): Promise<string> {
   const d = getDb()
   if (!d) throw new Error('Cloud is not configured')
   await pushWholeMemory(who.uid, m) // the book has to exist in the cloud before anyone can join it
@@ -332,7 +335,7 @@ export async function createInvite(who: Who, m: Memory): Promise<string> {
   try { await updateDoc(doc(d, 'memories', m.id), clean({ members, updatedAt: Date.now() })) } catch { /* guests can't rewrite the list; the invite still carries it */ }
   const invite = clean({
     memoryId: m.id, createdBy: who.uid, createdAt: Date.now(), title: m.title, themeId: m.themeId, date: m.date, cover,
-    ownerName: who.name, ownerPhoto: who.photo ?? undefined, members,
+    ownerName: who.name, ownerPhoto: who.photo ?? undefined, members, role,
   })
   await setDoc(doc(d, 'invites', token), invite)
   return `${publicBase()}/join/${token}`
@@ -346,12 +349,13 @@ export async function getInvite(token: string): Promise<Invite | null> {
 }
 
 /** Adds the signed-in user to the book (allowed by the rules because the invite exists). */
-export async function joinMemory(token: string, memoryId: string, who: Who, color: string) {
+export async function joinMemory(token: string, memoryId: string, who: Who, color: string, role: 'edit' | 'view' = 'edit') {
   const d = getDb()
   if (!d) return
   await updateDoc(doc(d, 'memories', memoryId), {
     memberIds: arrayUnion(who.uid),
     members: arrayUnion(clean({ id: who.uid, name: who.name, color, photo: who.photo ?? undefined })),
+    ...(role === 'view' ? { viewerIds: arrayUnion(who.uid) } : {}),
     joinToken: token,
     updatedAt: Date.now(),
   })

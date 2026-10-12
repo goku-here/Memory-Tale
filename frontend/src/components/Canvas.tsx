@@ -1,7 +1,9 @@
 import { AnimatePresence, motion, useMotionValue, useTransform, type MotionValue } from 'framer-motion'
-import { ArrowLeft, Check, ChevronDown, Image as ImageIcon, Loader2, MoreHorizontal, Redo2, Undo2, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, Eye, Image as ImageIcon, Loader2, MoreHorizontal, Redo2, Undo2, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../data/useAuth'
+import { canEdit } from '../data/people'
+import { usePresence } from '../data/presence'
 import { useCanvas } from '../data/useCanvas'
 import { uid } from '../lib/id'
 import { compressImage } from '../lib/image'
@@ -103,7 +105,10 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   const replaceInput = useRef<HTMLInputElement>(null)
   const scrollY = useMotionValue(0)
   const { user } = useAuth()
-  const cv = useCanvas(memory.id, user?.uid)
+  /** view-only members can look around but not change anything */
+  const readOnly = !!user && !canEdit(memory, user.uid)
+  const cv = useCanvas(memory.id, user?.uid, readOnly)
+  const here = usePresence(memory.id, theme.palette[0])
   const { items, itemsRef, height, commit, live, begin, end, setHeight } = cv
   const heightRef = useRef(height)
   heightRef.current = height
@@ -397,6 +402,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   const startItemRef = useRef(startItem)
   startItemRef.current = startItem
   // stable identities keep the memoised items from re-rendering on every drag frame
+  const noopPointer = useCallback(() => {}, [])
   const startItemStable = useCallback((e: React.PointerEvent, id: string) => startItemRef.current(e, id), [])
   const onViewSlot = useCallback((id: string, index: number) => {
     openViewer(`${id}#${index}`)
@@ -444,9 +450,12 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     const c = viewCenter(true)
     const s = Math.min(1, (canvasW * 0.92) / r.width)
     const id = uid()
-    commit((list) => [...list, {
-      id, type: 'draw', x: c.x, y: c.y, width: r.width * s, height: r.height * s, rotation: 0, zIndex: nextZ(list), props: r.draw,
-    }])
+    // a doodle sits under the photos, notes and stickers (but above a background photo), so it never covers them
+    commit((list) => {
+      const solid = list.filter((x) => !isBg(x))
+      const z = solid.length ? Math.min(...solid.map((x) => x.zIndex)) - 0.5 : nextZ(list)
+      return [...list, { id, type: 'draw', x: c.x, y: c.y, width: r.width * s, height: r.height * s, rotation: 0, zIndex: z, props: r.draw }]
+    })
     setSelectedId(id)
   }
 
@@ -968,8 +977,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
                         initial={{ opacity: 0, scale: 0.85, y: -6 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }}
                         transition={{ type: 'spring', stiffness: 460, damping: 30 }}
                       >
-                        <MenuItem icon={<IcEdit />} label="Edit book" onClick={run(onEdit)} />
-                        <MenuItem icon={<IcPalette />} label="Change theme" onClick={run(onTheme)} />
+                        {!readOnly && <MenuItem icon={<IcEdit />} label="Edit book" onClick={run(onEdit)} />}
+                        {!readOnly && <MenuItem icon={<IcPalette />} label="Change theme" onClick={run(onTheme)} />}
                         <MenuItem icon={<IcShare />} label="Share" onClick={run(onShare)} />
                         {user && <MenuItem icon={<IcPeople />} label="People" onClick={run(() => setPeopleOpen(true))} />}
                         <MenuItem icon={<IcDownload />} label="Download book" onClick={run(() => void downloadBook())} />
@@ -981,7 +990,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
               </div>
             </div>
             <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center">
-              <div className="flex gap-1">
+ <div className="flex gap-1" style={readOnly ? { visibility: 'hidden' } : undefined}>
                 <button type="button" aria-label="Undo" disabled={!cv.canUndo} onClick={cv.undo}
                   className="grid h-11 w-11 place-items-center rounded-full border-0 bg-transparent text-current active:scale-95 disabled:opacity-25">
                   <Undo2 size={20} />
@@ -1014,8 +1023,22 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center justify-end gap-1 pr-1 text-[12px] font-bold text-neutral-400" role="status" aria-live="polite">
-                  {cv.status === 'saving' ? <><Loader2 size={13} className="animate-spin" /> Saving</> : <><Check size={13} strokeWidth={3} /> Saved</>}
+                <div className="flex items-center justify-end gap-2 pr-1 text-[12px] font-bold text-neutral-400" role="status" aria-live="polite">
+                  {here.length > 0 && (
+                    <span className="flex items-center" aria-label={`${here.map((h) => h.name).join(', ')} here now`} title={`${here.map((h) => h.name).join(', ')} here now`}>
+                      {here.slice(0, 3).map((h, i) => (
+                        <span key={h.id} className="relative -ml-2 first:ml-0" style={{ zIndex: 5 - i }}>
+                          {h.photo
+                            ? <img src={h.photo} alt={h.name} referrerPolicy="no-referrer" className="h-7 w-7 rounded-full object-cover ring-2 ring-white" />
+                            : <span className="grid h-7 w-7 place-items-center rounded-full text-[12px] font-extrabold text-white ring-2 ring-white" style={{ background: h.color }}>{h.name.slice(0, 1).toUpperCase()}</span>}
+                          <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+                        </span>
+                      ))}
+                      {here.length > 3 && <span className="-ml-2 grid h-7 min-w-7 place-items-center rounded-full bg-neutral-200 px-1 text-[11px] font-extrabold text-neutral-600 ring-2 ring-white">+{here.length - 3}</span>}
+                    </span>
+                  )}
+                  {readOnly ? <span className="flex items-center gap-1"><Eye size={13} /> View only</span>
+                    : cv.status === 'saving' ? <span className="flex items-center gap-1"><Loader2 size={13} className="animate-spin" /> Saving</span> : <span className="flex items-center gap-1"><Check size={13} strokeWidth={3} /> Saved</span>}
                 </div>
               )}
             </div>
@@ -1050,7 +1073,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
                   onItemClick={onItemClick}
                   dragging={draggingId === it.id}
                   editing={editingId === it.id}
-                  onPointerDown={startItemStable}
+                  onPointerDown={readOnly ? noopPointer : startItemStable}
                   onMeasure={onMeasure}
                   onEditText={onEditText}
                   onEditDone={onEditDone}
@@ -1233,7 +1256,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
         )}
       </AnimatePresence>
 
-      <BottomToolbar visible={!sheet && !editingId} inStory={story} accent={accent} onTool={onTool} />
+      <BottomToolbar visible={!sheet && !editingId && !readOnly} inStory={story} accent={accent} onTool={onTool} />
       <CanvasStyleSheet open={styleOpen} onClose={() => setStyleOpen(false)} memory={memory} value={cstyle} onChange={changeStyle} onHeight={(h) => setSheetHs((s) => ({ ...s, style: h }))} />
       {user && <PeopleSheet open={peopleOpen} onClose={() => setPeopleOpen(false)} memory={memory} />}
       <StoryPreview open={storyPreview} onClose={() => setStoryPreview(false)} memory={memory} accent={accent} getItems={() => itemsRef.current} frameY={storyY} canvasW={canvasW} size={size} />

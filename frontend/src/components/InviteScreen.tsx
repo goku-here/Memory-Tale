@@ -49,7 +49,7 @@ export function InviteScreen({ token, knownIds, onJoined, onDismiss }: Props) {
     setError('')
     try {
       if (!knownIds.has(invite.memoryId)) {
-        await joinMemory(token, invite.memoryId, { uid: who.uid, name: who.name, photo: who.photo }, getTheme(invite.themeId).palette[0])
+        await joinMemory(token, invite.memoryId, { uid: who.uid, name: who.name, photo: who.photo }, getTheme(invite.themeId).palette[0], invite.role ?? 'edit')
       }
       sessionStorage.removeItem(FLAG)
       onJoined(invite.memoryId)

@@ -13,7 +13,9 @@ const same = (a: CanvasItem[], b: CanvasItem[]) => a === b || (a.length === b.le
  *  - commit(): a discrete change that is recorded in history
  *  - begin()/live()/end(): a continuous gesture (drag, pinch) → one history entry
  */
-export function useCanvas(memoryId: string, uid?: string) {
+export function useCanvas(memoryId: string, uid?: string, readOnly = false) {
+  const ro = useRef(readOnly)
+  ro.current = readOnly
   const [items, setItems] = useState<CanvasItem[]>([])
   const [height, setHeightState] = useState(MIN_HEIGHT)
   const [loaded, setLoaded] = useState(false)
@@ -30,6 +32,7 @@ export function useCanvas(memoryId: string, uid?: string) {
   const timer = useRef<number | undefined>(undefined)
 
   const apply = useCallback((next: CanvasItem[]) => {
+    if (ro.current) return // view-only members cannot change the book
     ref.current = next
     dirty.current = true
     setItems(next)
@@ -139,6 +142,7 @@ export function useCanvas(memoryId: string, uid?: string) {
   }, [apply])
 
   const setHeight = useCallback((h: number) => {
+    if (ro.current) return
     heightRef.current = h
     dirty.current = true
     setHeightState(h)

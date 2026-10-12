@@ -68,6 +68,19 @@ export async function removeMember(owner: { uid: string; name: string; photo: st
   await updateDoc(ref, { memberIds: arrayRemove(targetUid), banned: arrayUnion(targetUid), members: clean(members), updatedAt: Date.now() })
 }
 
+/** Owner only. Lets `targetUid` change the book ('edit') or only look at it ('view'). Takes effect for them straight away. */
+export async function setRole(memory: Memory, targetUid: string, role: 'edit' | 'view') {
+  const d = getDb()
+  if (!d) throw new Error('Cloud is not configured')
+  await updateDoc(doc(d, 'memories', memory.id), { viewerIds: role === 'view' ? arrayUnion(targetUid) : arrayRemove(targetUid), updatedAt: Date.now() })
+  const ids = new Set(memory.viewerIds ?? [])
+  if (role === 'view') ids.add(targetUid); else ids.delete(targetUid)
+  await db.memories.update(memory.id, { viewerIds: [...ids] })
+}
+
+/** can this person change the book? (the owner always can) */
+export const canEdit = (memory: Memory, uid?: string | null) => !uid || memory.ownerId === uid || !(memory.viewerIds ?? []).includes(uid)
+
 /** My new name on every book I am in (cloud and this device), so other members see it too. */
 export async function renameEverywhere(uid: string, name: string) {
   for (const m of await db.memories.toArray()) {
