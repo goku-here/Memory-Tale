@@ -5,7 +5,7 @@ import type { MapProps } from '../types'
 import { arcRoute, fitProjector, formatDuration } from '../lib/geo'
 
 const MODE_ICON = { car: '🚗', bike: '🏍️', cycle: '🚲', walk: '🚶' } as const
-const timeText = (m: MapProps) => (m.seconds ? `${MODE_ICON[m.mode ?? 'car']} ${formatDuration(m.seconds)}` : '')
+const timeText = (m: MapProps) => (m.seconds && m.showTime !== false ? `${MODE_ICON[m.mode ?? 'car']} ${formatDuration(m.seconds)}` : '')
 
 const startIcon = L.divIcon({
   className: 'keepsake-pin',
@@ -77,7 +77,7 @@ function CardMap({ map }: { map: MapProps }) {
     >
       <div className="relative h-full w-full overflow-hidden" style={{ borderRadius: 16 }}>
         <div ref={host} className="pointer-events-none h-full w-full" />
-        {map.seconds ? <Chip text={timeText(map)} /> : null}
+        {timeText(map) ? <Chip text={timeText(map)} /> : null}
         <div
           className="pointer-events-none absolute bottom-2 left-1/2 z-[500] flex w-max max-w-[calc(100%-16px)] -translate-x-1/2 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-extrabold text-[#17171a]"
           style={{ background: 'rgba(255,255,255,.92)', boxShadow: '0 1px 4px rgba(0,0,0,.15)' }}
@@ -148,8 +148,11 @@ function Art({ w, h, line, from, to, via = [], map, color, ink, showLine = true 
   const fromW = Math.min(w - 8, map.from.name.length * 7.4)
   const chipText = timeText(map)
   const chipW = chipText.length * 7 + 24
-  const chipX = Math.max(4, Math.min(w - chipW - 4, mid.x + 12))
-  const chipY = Math.max(4, Math.min(h - 28, mid.y - 11))
+  // in the middle of the whole trip, just under the route so the route itself stays clear
+  const xs = line.map((p) => p.x), cx = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : mid.x
+  const under = line.filter((p) => Math.abs(p.x - cx) < chipW / 2 + 10).reduce((m, p) => Math.max(m, p.y), mid.y)
+  const chipX = Math.max(4, Math.min(w - chipW - 4, cx - chipW / 2))
+  const chipY = Math.max(4, Math.min(h - 28, under + 20))
   return (
     <svg className="pointer-events-none absolute inset-0" width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ overflow: 'visible' }}>
       {showLine && line.length > 1 && (

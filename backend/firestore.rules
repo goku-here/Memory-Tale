@@ -76,6 +76,8 @@ service cloud.firestore {
       allow list: if false;     // but nobody can browse invites
       allow create: if signedIn()
         && request.resource.data.createdBy == request.auth.uid
+        // only the owner can hand out edit access; links from anyone else are view-only
+        && (request.resource.data.get('role', 'edit') == 'view' || isOwner(get(/databases/$(database)/documents/memories/$(request.resource.data.memoryId)).data))
         && isMember(get(/databases/$(database)/documents/memories/$(request.resource.data.memoryId)).data);
       allow delete: if signedIn() && resource.data.createdBy == request.auth.uid;
     }

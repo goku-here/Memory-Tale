@@ -66,9 +66,9 @@ export function PeopleSheet({ open, onClose, memory }: { open: boolean; onClose:
                   <div className="truncate text-[15.5px] font-bold text-[#17171a]">{p.name}{p.id === user?.uid && <span className="font-semibold text-neutral-400"> (you)</span>}</div>
                   {p.owner
                     ? <div className="flex items-center gap-1 text-[12.5px] font-bold text-amber-600"><Crown size={13} /> Owner</div>
-                    : viewers.has(p.id)
+                    : (isOwner || p.id === user?.uid) && (viewers.has(p.id)
                       ? <div className="flex items-center gap-1 text-[12.5px] font-bold text-neutral-500"><Eye size={13} /> Can only view</div>
-                      : <div className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-600"><Pencil size={13} /> Can edit</div>}
+                      : <div className="flex items-center gap-1 text-[12.5px] font-bold text-neutral-500"><Pencil size={13} /> Can edit</div>)}
                 </div>
                 {isOwner && !p.owner && (
                   <motion.button

@@ -137,6 +137,8 @@ export interface MapProps {
   mode?: TravelMode
   /** travel time in seconds, shown as a small chip */
   seconds?: number
+  /** whether the travel time is shown (the person chooses; older maps show it) */
+  showTime?: boolean
   /** outline(s) of the surrounding area as [lat, lng] rings (region style) */
   region?: [number, number][][]
 }

@@ -24,6 +24,15 @@ export function ShareScreen({ memory, onClose }: { memory: Memory; onClose: () =
   const [sharing, setSharing] = useState(false)
   /** what people who open the link may do */
   const [role, setRole] = useState<'edit' | 'view'>('edit')
+  const [asking, setAsking] = useState(false)
+  /** only the owner can hand out edit access; everyone else's links are view-only */
+  const isOwner = !user || !memory.ownerId || memory.ownerId === user.uid
+
+  /** the owner first picks what the link allows, then sends it; anyone else sends straight away (view-only) */
+  const onShare = () => {
+    if (isOwner && !asking) { setAsking(true); return }
+    void share()
+  }
 
   const share = async () => {
     if (sharing) return
@@ -35,7 +44,7 @@ export function ShareScreen({ memory, onClose }: { memory: Memory; onClose: () =
         who = await signIn() // the sender needs an account so the book can live in the cloud
         if (!who) return
       }
-      const url = await createInvite({ uid: who.uid, name: who.name, photo: who.photo }, memory, role)
+      const url = await createInvite({ uid: who.uid, name: who.name, photo: who.photo }, memory, isOwner ? role : 'view')
       const data = {
         title: memory.title,
         text: `${who.name.split(' ')[0]} saved a memory for you on Memory Tale: “${memory.title}”`,
@@ -88,25 +97,27 @@ export function ShareScreen({ memory, onClose }: { memory: Memory; onClose: () =
       heading="Your memory is ready!"
       sub={SHARE_COPY[memory.themeId] ?? 'Share this memory with the people who were there.'}
     >
-      <div className="rounded-2xl bg-white/15 p-1 backdrop-blur" role="radiogroup" aria-label="What people with the link can do">
-        <div className="grid grid-cols-2 gap-1">
-          {([['edit', 'Can edit', Pencil], ['view', 'View only', Eye]] as const).map(([id, label, Icon]) => (
-            <button
-              key={id} type="button" role="radio" aria-checked={role === id} onClick={() => setRole(id)}
-              className="flex h-11 items-center justify-center gap-2 rounded-xl border-0 text-[14.5px] font-bold"
-              style={role === id ? { background: '#fff', color: '#17171a' } : { background: 'transparent', color: 'rgba(255,255,255,.85)' }}
-            ><Icon size={16} /> {label}</button>
-          ))}
+      {asking && (
+        <div className="rounded-2xl bg-white/15 p-1 backdrop-blur" role="radiogroup" aria-label="What people with the link can do">
+          <div className="grid grid-cols-2 gap-1">
+            {([['edit', 'Can edit', Pencil], ['view', 'View only', Eye]] as const).map(([id, label, Icon]) => (
+              <button
+                key={id} type="button" role="radio" aria-checked={role === id} onClick={() => setRole(id)}
+                className="flex h-11 items-center justify-center gap-2 rounded-xl border-0 text-[14.5px] font-bold"
+                style={role === id ? { background: '#fff', color: '#17171a' } : { background: 'transparent', color: 'rgba(255,255,255,.85)' }}
+              ><Icon size={16} /> {label}</button>
+            ))}
+          </div>
+          <p className="m-0 px-2 pb-1.5 pt-2 text-center text-[12.5px] leading-snug text-white/75">
+            {role === 'edit' ? 'People with this link can add and change things in the book.' : 'People with this link can look at the book but not change it.'} You can change this for each person later in People.
+          </p>
         </div>
-        <p className="m-0 px-2 pb-1.5 pt-2 text-center text-[12.5px] leading-snug text-white/75">
-          {role === 'edit' ? 'People with this link can add and change things in the book.' : 'People with this link can look at the book but not change it.'} You can change this for each person later in People.
-        </p>
-      </div>
+      )}
       <motion.button
-        type="button" whileTap={{ scale: 0.96 }} onClick={() => void share()} disabled={sharing}
+        type="button" whileTap={{ scale: 0.96 }} onClick={onShare} disabled={sharing}
         className="flex h-14 items-center justify-center gap-2.5 rounded-2xl border-0 bg-[#17171a] text-[16px] font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,.35)] disabled:opacity-70"
       >
-        {sharing ? <Loader2 size={19} className="animate-spin" /> : <Send size={19} />} {sharing ? 'Creating your link…' : 'Share memory'}
+        {sharing ? <Loader2 size={19} className="animate-spin" /> : <Send size={19} />} {sharing ? 'Creating your link…' : asking ? 'Send link' : 'Share memory'}
       </motion.button>
       <motion.button
         type="button" whileTap={{ scale: 0.96 }} onClick={onClose}

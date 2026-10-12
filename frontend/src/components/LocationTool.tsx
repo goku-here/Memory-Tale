@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { Bike, Car, Check, Footprints, Motorbike, Plus, Loader2, LocateFixed, MapPin, Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { MapProps, MapStyle, Place, TravelMode } from '../types'
-import { fetchRegion, fetchRouteInfo, searchPlaces, type PlaceHit } from '../lib/geo'
+import { fetchRegion, fetchRouteInfo, formatDuration, searchPlaces, type PlaceHit } from '../lib/geo'
 import { MapCard } from './MapCard'
 
 interface FieldProps {
@@ -130,6 +130,7 @@ export function LocationTool({ pins, accent, onAdd, initial }: Props) {
   const viaKey = JSON.stringify(via.map((s) => [s.lat, s.lng]))
   const [route, setRoute] = useState<[number, number][] | undefined>(initial?.route)
   const [seconds, setSeconds] = useState<number | undefined>(initial?.seconds)
+  const [showTime, setShowTime] = useState(initial ? initial.showTime !== false : false)
   const [style, setStyle] = useState<MapStyle>(initial?.style ?? 'card')
   const [mode, setMode] = useState<TravelMode>(initial?.mode ?? 'car')
   const [color, setColor] = useState(initial?.color ?? '#3B82F6')
@@ -214,7 +215,7 @@ export function LocationTool({ pins, accent, onAdd, initial }: Props) {
         </div>
         <div className="relative overflow-hidden rounded-3xl" style={{ height: cut ? 230 : 190, background: style === 'route' ? 'linear-gradient(160deg,#6c8a6a,#2f4a3a)' : '#f3f3f6' }}>
           {from && to ? (
-            <div className={`absolute inset-0 ${cut ? 'p-0.5' : 'p-1.5'}`}><MapCard key={style + (region ? 'r' : '')} map={{ from, to, stops: via, route, style, color, seconds, region, mode }} /></div>
+            <div className={`absolute inset-0 ${cut ? 'p-0.5' : 'p-1.5'}`}><MapCard key={style + (region ? 'r' : '')} map={{ from, to, stops: via, route, style, color, seconds, showTime, region, mode }} /></div>
           ) : (
             <div className="grid h-full place-items-center px-8 text-center text-[14px] font-semibold text-neutral-400">
               <span><MapPin className="mx-auto mb-2" size={26} />Pick two places to see your route</span>
@@ -245,6 +246,17 @@ export function LocationTool({ pins, accent, onAdd, initial }: Props) {
           ))}
         </div>
         {regionFailed && <p className="m-0 mt-1.5 text-[12px] text-amber-700">Couldn't find an outline for this area, so it is cut out along the route instead.</p>}
+        {seconds ? (
+          <button type="button" role="switch" aria-checked={showTime} onClick={() => setShowTime((v) => !v)} className="mt-3 flex min-h-11 w-full items-center justify-between rounded-2xl border-0 bg-transparent px-1 text-left">
+            <span>
+              <span className="block text-[14.5px] font-bold text-[#17171a]">Show the travel time</span>
+              <span className="block text-[12.5px] text-neutral-500">About {formatDuration(seconds)} by {mode === 'car' ? 'car' : mode === 'bike' ? 'bike' : mode === 'cycle' ? 'cycle' : 'foot'}. Turn it off to leave it out.</span>
+            </span>
+            <span className="relative ml-3 h-7 w-12 shrink-0 rounded-full transition-colors" style={{ background: showTime ? accent : '#d9d9df' }}>
+              <span className="absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all" style={{ left: showTime ? 22 : 2 }} />
+            </span>
+          </button>
+        ) : null}
         {style === 'route' && (
           <div className="mt-3 flex items-center gap-2.5">
             <span className="text-[12px] font-bold uppercase tracking-wider text-neutral-400">Line</span>
@@ -260,7 +272,7 @@ export function LocationTool({ pins, accent, onAdd, initial }: Props) {
       <div className="px-5">
         <motion.button
           type="button" whileTap={{ scale: 0.96 }} disabled={!ready || regionBusy}
-          onClick={() => ready && onAdd({ from, to, stops: via.length ? via : undefined, route, style, color, seconds, mode, region: style === 'region' ? region : undefined })}
+          onClick={() => ready && onAdd({ from, to, stops: via.length ? via : undefined, route, style, color, seconds, showTime, mode, region: style === 'region' ? region : undefined })}
           className="flex h-13 min-h-12 w-full items-center justify-center gap-2 rounded-full border-0 bg-[#17171a] text-[15px] font-semibold text-white disabled:opacity-35"
           style={ready ? { boxShadow: `0 8px 22px ${accent}55` } : undefined}
         >

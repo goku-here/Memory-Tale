@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ImagePlus, Scissors, X } from 'lucide-react'
+import { Check, ImagePlus, Scissors, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { StickerProps } from '../types'
@@ -12,6 +12,8 @@ import { STICKER_GROUPS, STICKERS, StickerArt, stickerRatio, type StickerCategor
 interface Props {
   accent: string
   onPick: (s: StickerProps) => void
+  /** several stickers chosen with a long press */
+  onPickMany?: (list: StickerProps[]) => void
 }
 
 type GroupId = (typeof STICKER_GROUPS)[number]['id'] | 'mine'
@@ -23,7 +25,7 @@ const isWide = (s: StickerProps) => s.kind === 'svg' && (s.value.startsWith('w-'
  * Stickers in three groups (Characters, Emoji, Packs) plus your own. Tapping a category chip jumps to
  * that section; picking a sticker adds it and closes the sheet.
  */
-export function StickerTray({ accent, onPick }: Props) {
+export function StickerTray({ accent, onPick, onPickMany }: Props) {
   const [group, setGroup] = useState<GroupId>('characters')
   const cats: readonly StickerCategory[] = STICKER_GROUPS.find((g) => g.id === group)?.categories ?? []
   const [active, setActive] = useState<StickerCategory>(cats[0])
@@ -34,6 +36,35 @@ export function StickerTray({ accent, onPick }: Props) {
   const [mine, setMine] = useState<{ id: string; dataUrl: string; ratio: number }[]>([])
   const loadMine = useCallback(async () => setMine((await db.myStickers.orderBy('createdAt').reverse().toArray()).map(({ id, dataUrl, ratio }) => ({ id, dataUrl, ratio }))), [])
   useEffect(() => { void loadMine() }, [loadMine])
+
+  /* ---- long press a sticker to pick several, then send them all to the page at once ---- */
+  const [chosen, setChosen] = useState<{ key: string; s: StickerProps }[]>([])
+  const selecting = chosen.length > 0
+  const hold = useRef<{ t: number; x: number; y: number } | null>(null)
+  const fired = useRef(false)
+  const keyOf = (s: StickerProps) => `${s.kind}:${s.value.length > 80 ? s.value.slice(-60) + s.value.length : s.value}`
+  const toggle = (s: StickerProps) => setChosen((l) => (l.some((c) => c.key === keyOf(s)) ? l.filter((c) => c.key !== keyOf(s)) : [...l, { key: keyOf(s), s }]))
+  /** handlers that make a sticker button tap-to-add, long-press-to-select */
+  const press = (s: StickerProps) => ({
+    onPointerDown: (e: React.PointerEvent) => {
+      fired.current = false
+      if (hold.current) window.clearTimeout(hold.current.t)
+      hold.current = { x: e.clientX, y: e.clientY, t: window.setTimeout(() => { fired.current = true; toggle(s); navigator.vibrate?.(12) }, 450) }
+    },
+    onPointerMove: (e: React.PointerEvent) => { const h = hold.current; if (h && Math.hypot(e.clientX - h.x, e.clientY - h.y) > 8) { window.clearTimeout(h.t); hold.current = null } },
+    onPointerUp: () => { if (hold.current) window.clearTimeout(hold.current.t); hold.current = null },
+    onPointerCancel: () => { if (hold.current) window.clearTimeout(hold.current.t); hold.current = null },
+    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+    onClick: () => {
+      if (fired.current) { fired.current = false; return }
+      if (selecting) toggle(s); else onPick(s)
+    },
+  })
+  const mark = (s: StickerProps) => chosen.some((c) => c.key === keyOf(s))
+  const badge = (s: StickerProps) => mark(s) && (
+    <span className="pointer-events-none absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full text-white" style={{ background: accent, boxShadow: '0 0 0 2px #fff' }}><Check size={14} strokeWidth={3.4} /></span>
+  )
+  const ring = (s: StickerProps): React.CSSProperties | undefined => (mark(s) ? { background: `${accent}1f`, boxShadow: `inset 0 0 0 2px ${accent}` } : undefined)
 
   const sections = useRef<Partial<Record<StickerCategory, HTMLElement | null>>>({})
   const chipBar = useRef<HTMLDivElement>(null)
@@ -153,15 +184,16 @@ export function StickerTray({ accent, onPick }: Props) {
               {mine.map((s) => (
                 <div key={s.id} className="relative">
                   <motion.button
-                    type="button" aria-label="Add my sticker" whileTap={{ scale: 0.88 }} onClick={() => onPick({ kind: 'image', value: s.dataUrl, ratio: s.ratio })}
-                    className="grid aspect-square w-full place-items-center rounded-2xl border-0 bg-transparent p-2"
+                    type="button" aria-label="Add my sticker" whileTap={{ scale: 0.88 }} {...press({ kind: 'image', value: s.dataUrl, ratio: s.ratio })}
+                    className="grid aspect-square w-full select-none place-items-center rounded-2xl border-0 bg-transparent p-2" style={ring({ kind: 'image', value: s.dataUrl, ratio: s.ratio })}
                   >
                     <div style={{ width: s.ratio >= 1 ? '100%' : `${s.ratio * 100}%`, aspectRatio: `${s.ratio}` }}>
                       <StickerArt sticker={{ kind: 'image', value: s.dataUrl, ratio: s.ratio }} width={60} preview />
                     </div>
                   </motion.button>
-                  <button type="button" aria-label="Delete my sticker" onClick={() => { void db.myStickers.delete(s.id).then(loadMine) }}
-                    className="absolute right-0 top-0 grid h-7 w-7 place-items-center rounded-full border-0 bg-black/55 text-white"><X size={14} /></button>
+                  {badge({ kind: 'image', value: s.dataUrl, ratio: s.ratio })}
+                  {!selecting && <button type="button" aria-label="Delete my sticker" onClick={() => { void db.myStickers.delete(s.id).then(loadMine) }}
+                    className="absolute right-0 top-0 grid h-7 w-7 place-items-center rounded-full border-0 bg-black/55 text-white"><X size={14} /></button>}
                 </div>
               ))}
             </div>
@@ -178,10 +210,11 @@ export function StickerTray({ accent, onPick }: Props) {
                 const wide = isWide(s)
                 return (
                   <motion.button
-                    key={s.value + i} type="button" aria-label={s.label ?? s.value} whileTap={{ scale: 0.88 }} onClick={() => onPick(s)}
-                    className={`grid place-items-center rounded-2xl border-0 bg-transparent p-2 ${wide ? 'col-span-2' : ''}`}
-                    style={{ aspectRatio: wide ? '2 / 1' : '1' }}
+                    key={s.value + i} type="button" aria-label={s.label ?? s.value} whileTap={{ scale: 0.88 }} {...press(s)}
+                    className={`relative grid select-none place-items-center rounded-2xl border-0 bg-transparent p-2 ${wide ? 'col-span-2' : ''}`}
+                    style={{ aspectRatio: wide ? '2 / 1' : '1', ...ring(s) }}
                   >
+                    {badge(s)}
                     <div style={{ width: s.kind === 'svg' ? (stickerRatio(s) < 1 ? `${stickerRatio(s) * 100}%` : '100%') : '78%', maxHeight: '100%', aspectRatio: s.kind === 'svg' ? `${stickerRatio(s)}` : '1' }}>
                       <StickerArt sticker={s} width={60} preview />
                     </div>
@@ -193,7 +226,19 @@ export function StickerTray({ accent, onPick }: Props) {
         ))
       )}
 
-      <p className="m-0 px-5 pb-2 pt-5 text-center text-[12px] text-neutral-400">All stickers are free to use. The Beans are drawn for Memory Tale.</p>
+      <p className="m-0 px-5 pb-2 pt-5 text-center text-[12px] text-neutral-400">All stickers are free to use. The Beans are drawn for Memory Tale. Press and hold a sticker to pick several.</p>
+      {selecting && <div className="h-20" aria-hidden />}
+
+      {selecting && createPortal(
+        <div className="fixed inset-x-0 bottom-0 z-[96] flex items-center gap-2 px-4 pt-3" style={{ paddingBottom: 'calc(var(--safe-bottom) + 12px)', background: 'linear-gradient(0deg, #fff 70%, rgba(255,255,255,0))' }}>
+          <button type="button" onClick={() => setChosen([])} className="h-12 rounded-full border-0 bg-neutral-100 px-5 text-[14.5px] font-bold text-[#17171a]">Cancel</button>
+          <motion.button
+            type="button" whileTap={{ scale: 0.97 }} onClick={() => { const list = chosen.map((c) => c.s); setChosen([]); if (onPickMany) onPickMany(list); else list.forEach(onPick) }}
+            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full border-0 text-[15px] font-semibold text-white" style={{ background: accent, boxShadow: `0 8px 22px ${accent}55` }}
+          ><Check size={18} strokeWidth={3} /> Add {chosen.length} sticker{chosen.length > 1 ? 's' : ''}</motion.button>
+        </div>,
+        document.body,
+      )}
 
       {/* rendered on <body>: the sheet is transformed, which would shrink "full screen" to the sheet's area */}
       {createPortal(

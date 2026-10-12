@@ -158,9 +158,9 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   const assetCtx = useMemo(() => ({ memoryId: memory.id, root: scrollRoot }), [memory.id, scrollRoot])
   // backgrounds are sized to this device's canvas width when drawn (see withBackground)
   const vItems = useMemo(() => withBackground(items, canvasW), [items, canvasW])
-  const selected = useMemo(() => vItems.find((i) => i.id === selectedId && i.type !== 'thread'), [vItems, selectedId])
+  const selected = useMemo(() => (readOnly ? undefined : vItems.find((i) => i.id === selectedId && i.type !== 'thread')), [vItems, selectedId, readOnly])
   const [threadTap, setThreadTap] = useState<{ id: string; x: number; y: number } | null>(null)
-  const selectedThread = useMemo(() => items.find((i): i is Extract<CanvasItem, { type: 'thread' }> => i.id === selectedId && i.type === 'thread'), [items, selectedId])
+  const selectedThread = useMemo(() => (readOnly ? undefined : items.find((i): i is Extract<CanvasItem, { type: 'thread' }> => i.id === selectedId && i.type === 'thread')), [items, selectedId, readOnly])
   const visibleItems = useMemo(() => vItems.filter((i) => i.type !== 'thread'), [vItems])
   const photoCount = useMemo(() => items.filter((i) => i.type === 'photo').length, [items])
   const drawing = sheet === 'draw'
@@ -575,13 +575,21 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     }
   }
 
-  const addSticker = (s: StickerProps) => {
+  /** several stickers from the tray's long-press selection: laid out in a loose row around the middle */
+  const addStickers = (list: StickerProps[]) => {
+    list.forEach((s, i) => addSticker(s, false, (i - (list.length - 1) / 2) * 34, (i % 2 ? 26 : -26)))
+    setSheet(null)
+    tour.emit('sticker-added')
+  }
+
+  const addSticker = (s: StickerProps, close = true, dx = 0, dy = 0) => {
     const ratio = stickerRatio(s)
     const w = s.kind === 'emoji' ? 96 : s.kind === 'image' ? 140 : ratio > 2.2 ? 190 : ratio > 1.5 ? 150 : 120
     addItem((z, c) => ({
-      id: '', type: 'sticker', zIndex: z, x: c.x + rnd(-14, 14), y: c.y + rnd(-30, 30),
+      id: '', type: 'sticker', zIndex: z, x: c.x + (close ? rnd(-14, 14) : dx / 4), y: c.y + (close ? rnd(-30, 30) : dy * 2),
       width: w, height: w / ratio, rotation: Math.round(rnd(-12, 12)), props: s,
     }), { ignoreSheet: true })
+    if (!close) return
     setSheet(null) // close the tray so the new sticker is visible
     tour.emit('sticker-added')
   }
@@ -990,15 +998,16 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
               </div>
             </div>
             <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center">
- <div className="flex gap-1" style={readOnly ? { visibility: 'hidden' } : undefined}>
-                <button type="button" aria-label="Undo" disabled={!cv.canUndo} onClick={cv.undo}
+ <div className="flex gap-1">
+                {readOnly && <span className="ml-2 flex h-11 items-center gap-1.5 text-[12px] font-bold text-neutral-400"><Eye size={14} /> View only</span>}
+                {!readOnly && <button type="button" aria-label="Undo" disabled={!cv.canUndo} onClick={cv.undo}
                   className="grid h-11 w-11 place-items-center rounded-full border-0 bg-transparent text-current active:scale-95 disabled:opacity-25">
                   <Undo2 size={20} />
-                </button>
-                <button type="button" aria-label="Redo" disabled={!cv.canRedo} onClick={cv.redo}
+                </button>}
+                {!readOnly && <button type="button" aria-label="Redo" disabled={!cv.canRedo} onClick={cv.redo}
                   className="grid h-11 w-11 place-items-center rounded-full border-0 bg-transparent text-current active:scale-95 disabled:opacity-25">
                   <Redo2 size={20} />
-                </button>
+                </button>}
               </div>
               {story ? (
                 <div className="flex items-center gap-1.5">
@@ -1037,7 +1046,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
                       {here.length > 3 && <span className="-ml-2 grid h-7 min-w-7 place-items-center rounded-full bg-neutral-200 px-1 text-[11px] font-extrabold text-neutral-600 ring-2 ring-white">+{here.length - 3}</span>}
                     </span>
                   )}
-                  {readOnly ? <span className="flex items-center gap-1"><Eye size={13} /> View only</span>
+                  {readOnly ? null
                     : cv.status === 'saving' ? <span className="flex items-center gap-1"><Loader2 size={13} className="animate-spin" /> Saving</span> : <span className="flex items-center gap-1"><Check size={13} strokeWidth={3} /> Saved</span>}
                 </div>
               )}
@@ -1136,7 +1145,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
             )}
 
             {/* a background does not catch taps; its tab is how to pick it up */}
-            {!drawing && vItems.filter((i) => isBg(i) && i.id !== selectedId).map((i) => (
+            {!drawing && !readOnly && vItems.filter((i) => isBg(i) && i.id !== selectedId).map((i) => (
               <button
                 key={`bgtab${i.id}`} type="button" data-ui aria-label="Select the background photo" onClick={() => setSelectedId(i.id)}
                 className="absolute flex h-8 items-center gap-1.5 rounded-full border-0 bg-white/90 px-3 text-[12px] font-bold text-[#17171a] shadow-[0_2px_8px_rgba(20,24,40,.25)]"
@@ -1293,7 +1302,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
         open={sheet === 'sticker'} onClose={closeSheet} title="Stickers" snaps={[0.5, 0.88]} initialSnap={1} dim={0.18} z={55}
         onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, sticker: h }))}
       >
-        <StickerTray accent={accent} onPick={addSticker} />
+        <StickerTray accent={accent} onPick={(s) => addSticker(s)} onPickMany={addStickers} />
       </ToolSheet>
 
       <ToolSheet

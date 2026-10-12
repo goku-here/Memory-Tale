@@ -103,6 +103,12 @@ export function BookCover({
                 {m.photo ? <img src={m.photo} alt={m.name} referrerPolicy="no-referrer" className="h-full w-full rounded-full object-cover" /> : m.name.slice(0, 1).toUpperCase()}
               </span>
             ))}
+            {members.length > 3 && (
+              <span
+                className="grid place-items-center rounded-full font-extrabold"
+                style={{ width: '7.6cqw', height: '7.6cqw', fontSize: '3.2cqw', background: 'rgba(255,255,255,.92)', color: '#17171a', marginLeft: '-2.4cqw', boxShadow: '0 0 0 .6cqw rgba(255,255,255,.85)' }}
+              >+{members.length - 3}</span>
+            )}
           </div>
         </div>
 
