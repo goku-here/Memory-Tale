@@ -29,6 +29,7 @@ import { DrawStudio } from './DrawStudio'
 import { FramePicker } from './FramePicker'
 import { NOTE_COLORS } from './StickyNote'
 import { StickerTray } from './StickerTray'
+import { COLLAGES, TEMPLATE_TEXTS, type CollageKind } from '../lib/collages'
 import { stickerRatio } from './stickers'
 import { TextEditor } from './TextEditor'
 import { FloatingShapes, getTheme, themeVars } from './ThemeEngine'
@@ -379,6 +380,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
         images.push({ key: it.id, src: it.props.src, thumb: it.props.thumb, photo: it.props, caption: it.props.frame === 'polaroid' ? it.props.caption : undefined, y: it.y, x: it.x })
       } else if (it.type === 'clothesline') {
         it.props.photos.forEach((src, n) => { if (src) images.push({ key: `${it.id}#${n}`, src, y: it.y, x: it.x - 30 + n * 30 }) })
+      } else if (it.type === 'collage') {
+        it.props.photos.forEach((src, n) => { if (src) images.push({ key: `${it.id}#${n}`, src, y: it.y + n, x: it.x }) })
       }
     }
     images.sort((a, b) => Math.round(a.y / 120) - Math.round(b.y / 120) || a.x - b.x)
@@ -657,9 +660,17 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     const t = slotTarget.current
     if (!files?.length || !t) return
     try {
-      const imgs = await Promise.all([...files].slice(0, 3 - t.index).map((f) => compressImage(f, { maxSize: 900, quality: 0.8 })))
+      const target = itemsRef.current.find((i) => i.id === t.id)
+      const room = target?.type === 'collage' ? COLLAGES[target.props.kind].slots.length - t.index : 3 - t.index
+      const imgs = await Promise.all([...files].slice(0, Math.max(1, room)).map((f) => compressImage(f, { maxSize: 1000, quality: 0.82 })))
       commit((list) => list.map((i) => {
-        if (i.id !== t.id || i.type !== 'clothesline') return i
+        if (i.id !== t.id) return i
+        if (i.type === 'collage') {
+          const photos = [...i.props.photos]
+          imgs.forEach((m, k) => { photos[t.index + k] = m.dataUrl })
+          return { ...i, props: { ...i.props, photos } }
+        }
+        if (i.type !== 'clothesline') return i
         const photos = [...i.props.photos] as [string, string, string]
         imgs.forEach((m, k) => { photos[t.index + k] = m.dataUrl })
         return { ...i, props: { photos } }
@@ -667,6 +678,34 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     } catch {
       toast("Couldn't read that photo")
     }
+  }
+
+  /** a photo frame from the Frames tab: lands in the middle of the screen with empty slots to fill */
+  const addCollage = (kind: CollageKind, close = true) => {
+    const def = COLLAGES[kind]
+    const w = Math.round(clamp(canvasW * (def.group === 'templates' ? 0.92 : def.w >= 100 && def.h > 200 ? 0.5 : kind.startsWith('ticket') ? 0.7 : 0.62), 150, 420))
+    const id = addItem((z, c) => ({
+      id: '', type: 'collage', zIndex: z, x: c.x, y: c.y, width: w, height: Math.round((w * def.h) / def.w), rotation: 0,
+      props: { kind, photos: def.slots.map(() => '') },
+    }), { ignoreSheet: true })
+    if (close) setSheet(null)
+    return id
+  }
+  /** a whole page design: the frames plus its text, placed together */
+  const addTemplate = (kind: CollageKind) => {
+    addCollage(kind, true)
+    const texts = TEMPLATE_TEXTS[kind] ?? []
+    const def = COLLAGES[kind]
+    const w = Math.round(clamp(canvasW * 0.92, 150, 420))
+    const h = Math.round((w * def.h) / def.w)
+    texts.forEach((t) => {
+      const c = viewCenter(true)
+      commit((list) => [...list, {
+        id: uid(), type: 'text', zIndex: nextZ(list), x: c.x + t.dx * (w / canvasW) * 100, y: c.y + t.dy * h, width: Math.round(w * t.width), height: Math.round(t.size * 1.4 * (t.text.split('\n').length || 1)),
+        rotation: t.rotation ?? 0,
+        props: { text: t.text, font: t.font === 'display' ? theme.font : "'Manrope', sans-serif", size: t.size, color: t.color, align: t.align },
+      }])
+    })
   }
 
   const addDivider = () => {
@@ -1299,10 +1338,10 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       </ToolSheet>
 
       <ToolSheet
-        open={sheet === 'sticker'} onClose={closeSheet} title="Stickers" snaps={[0.5, 0.88]} initialSnap={1} dim={0.18} z={55}
+        open={sheet === 'sticker'} onClose={closeSheet} title="Stickers" snaps={[0.94]} dim={0.18} z={55}
         onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, sticker: h }))}
       >
-        <StickerTray accent={accent} onPick={(s) => addSticker(s)} onPickMany={addStickers} />
+        <StickerTray accent={accent} onPick={(s) => addSticker(s)} onPickMany={addStickers} onFrame={(k) => addCollage(k)} onTemplate={addTemplate} />
       </ToolSheet>
 
       <ToolSheet

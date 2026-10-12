@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check, ImagePlus, Scissors, X } from 'lucide-react'
+import { Check, ImagePlus, Scissors, Search, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { StickerProps } from '../types'
@@ -7,17 +7,26 @@ import { compressImage } from '../lib/image'
 import { db } from '../data/db'
 import { uid } from '../lib/id'
 import { StickerMaker } from './StickerMaker'
-import { STICKER_GROUPS, STICKERS, StickerArt, stickerRatio, type StickerCategory } from './stickers'
+import { STICKER_GROUPS, STICKERS, StickerArt, stickerRatio, type StickerCategory, type StickerDef } from './stickers'
+import { CollageBody } from './CollageBody'
+import { COLLAGES, FRAME_KINDS, TEMPLATE_KINDS, type CollageKind } from '../lib/collages'
 
 interface Props {
   accent: string
   onPick: (s: StickerProps) => void
   /** several stickers chosen with a long press */
   onPickMany?: (list: StickerProps[]) => void
+  /** a photo frame to put on the page */
+  onFrame?: (kind: CollageKind) => void
+  /** a whole page design */
+  onTemplate?: (kind: CollageKind) => void
 }
 
-type GroupId = (typeof STICKER_GROUPS)[number]['id'] | 'mine'
-const TABS: { id: GroupId; label: string }[] = [...STICKER_GROUPS.map((g) => ({ id: g.id as GroupId, label: g.label })), { id: 'mine', label: 'Mine' }]
+type GroupId = (typeof STICKER_GROUPS)[number]['id'] | 'frames' | 'templates' | 'mine'
+const TABS: { id: GroupId; label: string }[] = [
+  ...STICKER_GROUPS.map((g) => ({ id: g.id as GroupId, label: g.label })),
+  { id: 'frames', label: 'Frames' }, { id: 'templates', label: 'Templates' }, { id: 'mine', label: 'Mine' },
+]
 
 const isWide = (s: StickerProps) => s.kind === 'svg' && (s.value.startsWith('w-') || s.value.startsWith('c-') || s.value.startsWith('tape') || s.value === 'ticket' || s.value === 'p-postmark' || s.value === 'd-wave')
 
@@ -25,11 +34,13 @@ const isWide = (s: StickerProps) => s.kind === 'svg' && (s.value.startsWith('w-'
  * Stickers in three groups (Characters, Emoji, Packs) plus your own. Tapping a category chip jumps to
  * that section; picking a sticker adds it and closes the sheet.
  */
-export function StickerTray({ accent, onPick, onPickMany }: Props) {
+export function StickerTray({ accent, onPick, onPickMany, onFrame, onTemplate }: Props) {
   const [group, setGroup] = useState<GroupId>('characters')
   const cats: readonly StickerCategory[] = STICKER_GROUPS.find((g) => g.id === group)?.categories ?? []
   const [active, setActive] = useState<StickerCategory>(cats[0])
   const [busy, setBusy] = useState(false)
+  const [query, setQuery] = useState('')
+  const q = query.trim().toLowerCase()
   const file = useRef<HTMLInputElement>(null)
   const makeInput = useRef<HTMLInputElement>(null)
   const [making, setMaking] = useState<File | null>(null)
@@ -65,6 +76,20 @@ export function StickerTray({ accent, onPick, onPickMany }: Props) {
     <span className="pointer-events-none absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full text-white" style={{ background: accent, boxShadow: '0 0 0 2px #fff' }}><Check size={14} strokeWidth={3.4} /></span>
   )
   const ring = (s: StickerProps): React.CSSProperties | undefined => (mark(s) ? { background: `${accent}1f`, boxShadow: `inset 0 0 0 2px ${accent}` } : undefined)
+
+  /** search: matches a sticker's name, its category or its group */
+  const found = (() => {
+    if (!q) return null
+    const out: StickerDef[] = []
+    for (const g of STICKER_GROUPS) {
+      for (const c of g.categories) {
+        const hitCat = c.toLowerCase().includes(q) || g.label.toLowerCase().includes(q)
+        for (const s of STICKERS[c]) if (hitCat || (s.label ?? '').toLowerCase().includes(q)) out.push(s)
+      }
+    }
+    return out
+  })()
+  const foundFrames = q ? [...FRAME_KINDS, ...TEMPLATE_KINDS].filter((k) => COLLAGES[k].label.toLowerCase().includes(q) || 'frame template photo'.includes(q)) : []
 
   const sections = useRef<Partial<Record<StickerCategory, HTMLElement | null>>>({})
   const chipBar = useRef<HTMLDivElement>(null)
@@ -131,20 +156,33 @@ export function StickerTray({ accent, onPick, onPickMany }: Props) {
   return (
     <div ref={root}>
       <div data-sticky-bar className="sticky top-0 z-10 bg-white pb-2">
-        {/* group tabs */}
-        <div className="flex gap-1.5 px-5 pb-2 pt-1" role="tablist" aria-label="Sticker groups">
-          {TABS.map((t) => (
-            <motion.button
-              key={t.id} role="tab" type="button" aria-selected={group === t.id} whileTap={{ scale: 0.95 }} onClick={() => chooseGroup(t.id)}
-              className="h-11 flex-1 rounded-full border-0 px-2 text-[14px] font-extrabold"
-              style={group === t.id ? { background: '#17171a', color: '#fff' } : { background: '#f1f1f3', color: '#55555f' }}
-            >
-              {t.label}
-            </motion.button>
-          ))}
+        {/* search */}
+        <div className="px-5 pb-2 pt-1">
+          <label className="flex h-11 items-center gap-2 rounded-full bg-[#f1f1f3] px-4 text-neutral-500">
+            <Search size={17} />
+            <input
+              value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search stickers, frames, templates" aria-label="Search stickers"
+              className="min-w-0 flex-1 border-0 bg-transparent text-[15px] font-semibold text-[#17171a] outline-none placeholder:font-medium placeholder:text-neutral-400"
+            />
+            {query && <button type="button" aria-label="Clear search" onClick={() => setQuery('')} className="grid h-7 w-7 place-items-center rounded-full border-0 bg-black/10 text-neutral-600"><X size={14} /></button>}
+          </label>
         </div>
+        {/* group tabs: scroll sideways */}
+        {!q && (
+          <div className="no-scrollbar flex gap-1.5 overflow-x-auto px-5 pb-2" role="tablist" aria-label="Sticker groups" style={{ touchAction: 'pan-x' }}>
+            {TABS.map((t) => (
+              <motion.button
+                key={t.id} role="tab" type="button" aria-selected={group === t.id} whileTap={{ scale: 0.95 }} onClick={() => chooseGroup(t.id)}
+                className="h-11 shrink-0 rounded-full border-0 px-5 text-[14px] font-extrabold"
+                style={group === t.id ? { background: '#17171a', color: '#fff' } : { background: '#f1f1f3', color: '#55555f' }}
+              >
+                {t.label}
+              </motion.button>
+            ))}
+          </div>
+        )}
         {/* category chips for the group */}
-        {cats.length > 0 && (
+        {!q && cats.length > 0 && (
           <div ref={chipBar} className="no-scrollbar flex gap-2 overflow-x-auto px-5" role="tablist" aria-label="Sticker categories" style={{ touchAction: 'pan-x' }}>
             {cats.map((c) => (
               <motion.button
@@ -159,7 +197,44 @@ export function StickerTray({ accent, onPick, onPickMany }: Props) {
         )}
       </div>
 
-      {group === 'mine' ? (
+      {q ? (
+        <div className="px-4 pt-3">
+          {foundFrames.length > 0 && (
+            <div className="mb-3 grid grid-cols-2 gap-2.5">
+              {foundFrames.map((k) => <CollageCard key={k} kind={k} accent={accent} onPick={() => (COLLAGES[k].group === 'templates' ? onTemplate?.(k) : onFrame?.(k))} />)}
+            </div>
+          )}
+          {found && found.length > 0 && (
+            <div className="grid grid-cols-4 gap-1">
+              {found.map((s, i) => {
+                const wide = isWide(s)
+                return (
+                  <motion.button
+                    key={s.value + i} type="button" aria-label={s.label ?? s.value} whileTap={{ scale: 0.88 }} {...press(s)}
+                    className={`relative grid select-none place-items-center rounded-2xl border-0 bg-transparent p-2 ${wide ? 'col-span-2' : ''}`}
+                    style={{ aspectRatio: wide ? '2 / 1' : '1', ...ring(s) }}
+                  >
+                    {badge(s)}
+                    <div style={{ width: s.kind === 'svg' ? (stickerRatio(s) < 1 ? `${stickerRatio(s) * 100}%` : '100%') : '78%', maxHeight: '100%', aspectRatio: s.kind === 'svg' ? `${stickerRatio(s)}` : '1' }}>
+                      <StickerArt sticker={s} width={60} preview />
+                    </div>
+                  </motion.button>
+                )
+              })}
+            </div>
+          )}
+          {!foundFrames.length && !found?.length && <p className="m-0 px-2 pb-4 pt-8 text-center text-[14px] text-neutral-500">Nothing called “{query}”. Try a word like heart, tape, food or camera.</p>}
+        </div>
+      ) : group === 'frames' || group === 'templates' ? (
+        <div className="px-4 pt-3">
+          <p className="m-0 px-1 pb-3 text-[13px] leading-snug text-neutral-500">
+            {group === 'frames' ? 'Tap one to put it on your page, then tap the plus to add your photo.' : 'Pick a whole page design, then tap each plus to put your own photos in.'}
+          </p>
+          <div className="grid grid-cols-2 gap-2.5">
+            {(group === 'frames' ? FRAME_KINDS : TEMPLATE_KINDS).map((k) => <CollageCard key={k} kind={k} accent={accent} onPick={() => (group === 'frames' ? onFrame?.(k) : onTemplate?.(k))} />)}
+          </div>
+        </div>
+      ) : group === 'mine' ? (
         <div className="px-5 pt-3">
           <div className="flex gap-2">
             <motion.button
@@ -257,5 +332,26 @@ export function StickerTray({ accent, onPick, onPickMany }: Props) {
         document.body,
       )}
     </div>
+  )
+}
+
+/** a frame or template as a card in the tray (drawn live, empty) */
+function CollageCard({ kind, accent, onPick }: { kind: CollageKind; accent: string; onPick: () => void }) {
+  const d = COLLAGES[kind]
+  const tall = d.h / d.w
+  return (
+    <motion.button
+      type="button" aria-label={d.label} whileTap={{ scale: 0.96 }} onClick={onPick}
+      className="flex flex-col items-center gap-2 rounded-2xl border-0 bg-[#f6f6f8] p-3 text-center"
+      style={{ boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.05)' }}
+    >
+      <span className="grid h-[148px] w-full place-items-center overflow-hidden">
+        <span className="block" style={{ width: `min(100%, ${148 / tall}px)`, aspectRatio: `${d.w} / ${d.h}` }}>
+          <span className="pointer-events-none block h-full w-full"><CollageBody collage={{ kind, photos: d.slots.map(() => '') }} selected={false} /></span>
+        </span>
+      </span>
+      <span className="text-[13px] font-bold text-[#17171a]">{d.label}</span>
+      <span className="text-[11.5px] font-semibold" style={{ color: accent }}>{d.slots.length} photo{d.slots.length > 1 ? 's' : ''}</span>
+    </motion.button>
   )
 }

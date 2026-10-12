@@ -164,6 +164,11 @@ export interface ClotheslineProps {
   /** three photo slots (data URLs, '' = empty) */
   photos: [string, string, string]
 }
+/** a photo frame or page template (see lib/collages): its pictures, one per slot ('' = empty) */
+export interface CollageProps {
+  kind: import('./lib/collages').CollageKind
+  photos: string[]
+}
 export interface ThreadProps {
   /** ids of the two connected items */
   a: string
@@ -194,6 +199,7 @@ export type CanvasItem = ItemBase &
     | { type: 'divider'; props: DividerProps }
     | { type: 'bubble'; props: BubbleProps }
     | { type: 'clothesline'; props: ClotheslineProps }
+    | { type: 'collage'; props: CollageProps }
     | { type: 'thread'; props: ThreadProps }
   )
 

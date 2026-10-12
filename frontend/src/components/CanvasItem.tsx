@@ -10,6 +10,7 @@ import { IcCopy, IcDown, IcEdit, IcExpand, IcFrame, IcPalette, IcThread, IcThrea
 import { PhotoFrame } from './PhotoFrame'
 import { StickerArt } from './stickers'
 import { NOTE_COLORS, StickyNote } from './StickyNote'
+import { CollageBody } from './CollageBody'
 
 interface ItemProps {
   item: CanvasItem
@@ -89,6 +90,7 @@ export function ItemBody({
     case 'divider': return <DividerBody item={item} editing={editing} onEditText={onEditText} onEditDone={onEditDone} />
     case 'bubble': return <BubbleBody bubble={item.props} width={item.width} height={item.height} />
     case 'clothesline': return <ClotheslineBody line={item.props} selected={selected} onSlot={onSlot} onView={onView} />
+    case 'collage': return <CollageBody collage={item.props} selected={selected} onSlot={onSlot} onView={onView} />
     case 'thread': return null
   }
 }

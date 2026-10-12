@@ -55,6 +55,7 @@ function swapAssets(item: CanvasItem, f: (v: string) => string): CanvasItem {
   if (item.type === 'photo') return { ...item, props: { ...item.props, src: f(item.props.src) } }
   if (item.type === 'sticker' && item.props.kind === 'image') return { ...item, props: { ...item.props, value: f(item.props.value) } }
   if (item.type === 'clothesline') return { ...item, props: { photos: item.props.photos.map((p) => (p ? f(p) : p)) as [string, string, string] } }
+  if (item.type === 'collage') return { ...item, props: { ...item.props, photos: item.props.photos.map((p) => (p ? f(p) : p)) } }
   return item
 }
 
