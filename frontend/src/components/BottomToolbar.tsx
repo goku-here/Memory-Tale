@@ -76,13 +76,13 @@ export function BottomToolbar({ visible, onTool, inStory }: Props) {
                   transition={{ type: 'spring', stiffness: 480, damping: 30 }}
                 >
                   {([
-                    ['templates', 'Templates', <IcTemplates key="t" />],
                     ['note', 'Sticky note', <IcNote key="n" />],
                     ['bubble', 'Chat bubble', <IcBubble key="b" />],
                     ['line', 'Polaroid line', <IcLine key="p" />],
                     ['location', 'Location', <IcPin key="l" />],
                     ['divider', 'Stop divider', <IcFlag key="d" />],
                     ['canvas', 'Canvas style', <IcGrid key="g" />],
+                    ['templates', 'Templates', <IcTemplates key="t" />],
                     ['story', 'Story mode', <IcPhone key="s" />],
                   ] as [ToolId, string, ReactNode][]).filter(([id]) => !(inStory && id === 'story')).map(([id, label, icon]) => (
                     <motion.button
