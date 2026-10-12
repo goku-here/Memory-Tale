@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Download, Eye, Loader2, Pencil, Send } from 'lucide-react'
+import { Download, Eye, Loader2, Send } from 'lucide-react'
 import { useState } from 'react'
 import type { Memory } from '../types'
 import { exportMemoryPng } from '../lib/exportImage'
@@ -23,7 +23,7 @@ export function ShareScreen({ memory, onClose }: { memory: Memory; onClose: () =
   const [busy, setBusy] = useState(false)
   const [sharing, setSharing] = useState(false)
   /** what people who open the link may do */
-  const [role, setRole] = useState<'edit' | 'view'>('edit')
+  const [role, setRole] = useState<'edit' | 'view'>('view')
   const [asking, setAsking] = useState(false)
   /** only the owner can hand out edit access; everyone else's links are view-only */
   const isOwner = !user || !memory.ownerId || memory.ownerId === user.uid
@@ -98,20 +98,18 @@ export function ShareScreen({ memory, onClose }: { memory: Memory; onClose: () =
       sub={SHARE_COPY[memory.themeId] ?? 'Share this memory with the people who were there.'}
     >
       {asking && (
-        <div className="rounded-2xl bg-white/15 p-1 backdrop-blur" role="radiogroup" aria-label="What people with the link can do">
-          <div className="grid grid-cols-2 gap-1">
-            {([['edit', 'Can edit', Pencil], ['view', 'View only', Eye]] as const).map(([id, label, Icon]) => (
-              <button
-                key={id} type="button" role="radio" aria-checked={role === id} onClick={() => setRole(id)}
-                className="flex h-11 items-center justify-center gap-2 rounded-xl border-0 text-[14.5px] font-bold"
-                style={role === id ? { background: '#fff', color: '#17171a' } : { background: 'transparent', color: 'rgba(255,255,255,.85)' }}
-              ><Icon size={16} /> {label}</button>
-            ))}
-          </div>
-          <p className="m-0 px-2 pb-1.5 pt-2 text-center text-[12.5px] leading-snug text-white/75">
-            {role === 'edit' ? 'People with this link can add and change things in the book.' : 'People with this link can look at the book but not change it.'} You can change this for each person later in People.
-          </p>
-        </div>
+        <button
+          type="button" role="switch" aria-checked={role === 'edit'} onClick={() => setRole(role === 'edit' ? 'view' : 'edit')}
+          className="flex min-h-14 w-full items-center justify-between gap-3 rounded-2xl border-0 bg-white/15 px-4 py-2.5 text-left backdrop-blur"
+        >
+          <span className="min-w-0">
+            <span className="block text-[15px] font-bold text-white">Give edit access</span>
+            <span className="block text-[12.5px] leading-snug text-white/75">{role === 'edit' ? 'They can add and change things in the book.' : 'They can only look at the book.'}</span>
+          </span>
+          <span className="relative h-7 w-12 shrink-0 rounded-full transition-colors" style={{ background: role === 'edit' ? '#fff' : 'rgba(255,255,255,.3)' }}>
+            <span className="absolute top-0.5 h-6 w-6 rounded-full transition-all" style={{ left: role === 'edit' ? 22 : 2, background: role === 'edit' ? '#17171a' : '#fff' }} />
+          </span>
+        </button>
       )}
       <motion.button
         type="button" whileTap={{ scale: 0.96 }} onClick={onShare} disabled={sharing}
