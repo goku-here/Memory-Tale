@@ -7,7 +7,7 @@ import { SVG_STICKERS } from '../components/stickers'
  * photo goes. Tapping an empty slot on the canvas adds a picture.
  */
 
-export type SlotShape = 'polaroid' | 'stamp' | 'plain'
+export type SlotShape = 'polaroid' | 'stamp' | 'plain' | 'film' | 'bare'
 export interface Slot {
   /** the picture area, in the drawing's own units */
   x: number
@@ -17,11 +17,17 @@ export interface Slot {
   /** degrees, turned around the picture area's centre */
   rot?: number
   shape: SlotShape
+  /** a polaroid-style slot also has a line of writing under the picture */
+  caption?: boolean
 }
 
 export interface CollageDef {
   label: string
-  group: 'frames' | 'templates'
+  /** frames are offered in the tray; pieces are what page templates are built from */
+  group: 'frames' | 'pieces'
+  /** artwork images (png/svg in /public) drawn under / over the pictures: the way to use designer-made frames */
+  underImg?: string
+  overImg?: string
   /** drawing size (the item's box has the same proportions) */
   w: number
   h: number
@@ -76,6 +82,8 @@ function FrameArt({ s }: { s: Slot }) {
       </>,
     )
   }
+  if (s.shape === 'bare') return null
+  if (s.shape === 'film') return <rect x={s.x} y={s.y} width={s.w} height={s.h} fill="#dcdce1" />
   return <rect x={s.x} y={s.y} width={s.w} height={s.h} rx="1.2" fill="#ececef" transform={`rotate(${s.rot ?? 0} ${cx} ${cy})`} />
 }
 
@@ -148,9 +156,9 @@ const CAMERA_W = 100
 function cameraDef(n: 1 | 3): CollageDef {
   const inner = 58
   const slots: Slot[] = [
-    { x: 21, y: 46, w: inner, h: inner, rot: -2.5, shape: 'polaroid' },
-    { x: 21, y: 122, w: inner, h: inner, rot: 2.2, shape: 'polaroid' },
-    { x: 21, y: 198, w: inner, h: inner, rot: -1.6, shape: 'polaroid' },
+    { x: 21, y: 46, w: inner, h: inner, rot: -2.5, shape: 'polaroid', caption: true },
+    { x: 21, y: 122, w: inner, h: inner, rot: 2.2, shape: 'polaroid', caption: true },
+    { x: 21, y: 198, w: inner, h: inner, rot: -1.6, shape: 'polaroid', caption: true },
   ].slice(0, n) as Slot[]
   return {
     label: n === 3 ? 'Camera with 3 photos' : 'Camera with a photo', group: 'frames', w: CAMERA_W, h: n === 3 ? 276 : 124,
@@ -223,7 +231,7 @@ function Ticket({ kind, x, y, w, h, rot = 0, id }: { kind: TicketKind; x: number
 function ticketDef(kind: TicketKind, label: string): CollageDef {
   return {
     label, group: 'frames', w: 100, h: 44,
-    slots: [{ x: 28, y: 6.6, w: 60, h: 30.8, shape: 'plain' }],
+    slots: [{ x: 28, y: 6.6, w: 60, h: 30.8, shape: 'bare' }],
     under: <Ticket kind={kind} x={0} y={0} w={100} h={44} id={kind} />,
   }
 }
@@ -242,7 +250,7 @@ const stampWideDef: CollageDef = {
 }
 const polaroidDef: CollageDef = {
   label: 'Polaroid', group: 'frames', w: 100, h: 116,
-  slots: [{ x: 11, y: 10, w: 78, h: 78, rot: -3, shape: 'polaroid' }],
+  slots: [{ x: 11, y: 10, w: 78, h: 78, rot: -3, shape: 'polaroid', caption: true }],
   over: <Deco id="tape-yellow" x={28} y={-2} w={44} rot={-4} />,
 }
 
@@ -258,23 +266,56 @@ function tornPoints(x: number, h: number, dir: 1 | -1, seed: number): [number, n
 }
 const poly = (pts: [number, number][]) => `M${pts.map(([x, y]) => `${x} ${y}`).join('L')}Z`
 
-const loveLetterDef: CollageDef = {
-  label: 'Love letter', group: 'templates', w: 100, h: 132,
-  slots: [
-    { x: 40, y: 12, w: 42, h: 52, rot: 5, shape: 'stamp' },
-    { x: 14, y: 70, w: 40, h: 40, rot: -6, shape: 'stamp' },
-  ],
+/* ---------- film strips ---------- */
+
+/** a strip of 35mm film: black, with sprocket holes you can see the page through, and a window for each picture */
+function filmDef(n: number, vertical: boolean, label: string): CollageDef {
+  const thick = 26, pitch = 24.6, win = 21.6, short = 15.8
+  const len = +(n * pitch + 2.2).toFixed(1)
+  const W = vertical ? thick : len, H = vertical ? len : thick
+  const slots: Slot[] = Array.from({ length: n }, (_, i) => {
+    const a = 2.2 + i * pitch + (pitch - 2.2 - win) / 2 + 0.4, b = (thick - short) / 2
+    return vertical ? { x: b, y: a, w: short, h: win, shape: 'film' as const } : { x: a, y: b, w: win, h: short, shape: 'film' as const }
+  })
+  // outer strip with the sprocket holes cut out (even-odd), and the pictures' windows cut out too
+  const holes: string[] = []
+  const hole = (x: number, y: number, w: number, h: number) => `M${x + 0.7} ${y}h${w - 1.4}a.7 .7 0 0 1 .7 .7v${h - 1.4}a.7 .7 0 0 1 -.7 .7h${-(w - 1.4)}a.7 .7 0 0 1 -.7 -.7v${-(h - 1.4)}a.7 .7 0 0 1 .7 -.7Z`
+  const count = Math.round(len / 4.9)
+  const step = len / count
+  for (let i = 0; i < count; i++) {
+    const p = i * step + (step - 2.8) / 2
+    if (vertical) { holes.push(hole(1.5, p, 2.2, 2.8)); holes.push(hole(thick - 3.7, p, 2.2, 2.8)) } else { holes.push(hole(p, 1.5, 2.8, 2.2)); holes.push(hole(p, thick - 3.7, 2.8, 2.2)) }
+  }
+  const wins = slots.map((s) => `M${s.x} ${s.y}h${s.w}v${s.h}h${-s.w}Z`)
+  const d = `M0 0H${W}V${H}H0Z ${holes.join(' ')} ${wins.join(' ')}`
+  return {
+    label, group: 'frames', w: W, h: H, slots,
+    over: (
+      <g style={{ filter: 'drop-shadow(0 1px 1.4px rgba(0,0,0,.35)) drop-shadow(0 3px 4px rgba(0,0,0,.2))' }}>
+        <defs>
+          <linearGradient id={`fl-${n}${vertical ? 'v' : 'h'}`} x1="0" y1="0" x2={vertical ? 1 : 0} y2={vertical ? 0 : 1}>
+            <stop offset="0" stopColor="#2b2b31" /><stop offset=".5" stopColor="#141417" /><stop offset="1" stopColor="#222228" />
+          </linearGradient>
+        </defs>
+        <path d={d} fillRule="evenodd" fill={`url(#fl-${n}${vertical ? 'v' : 'h'})`} />
+      </g>
+    ),
+  }
+}
+
+/* ---------- pieces: backgrounds and decorations that page templates are built from ---------- */
+
+const paperLetterDef: CollageDef = {
+  label: 'Letter paper', group: 'pieces', w: 100, h: 132, slots: [],
   under: (
     <g>
       <defs>
         <linearGradient id="ll-red" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#7a2a2d" /><stop offset="1" stopColor="#5b1c20" /></linearGradient>
         {PAPER_NOISE('ll-n')}
       </defs>
-      {/* white paper underneath, then the dark red paper with torn sides */}
       <rect x="0" y="0" width="100" height="132" fill="#f3efe7" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,.3))' }} />
       <path d={poly([...tornPoints(7, 132, 1, 8), ...tornPoints(93, 132, -1, 11).reverse()])} fill="url(#ll-red)" />
       <path d={poly([...tornPoints(7, 132, 1, 8), ...tornPoints(93, 132, -1, 11).reverse()])} fill="#000" filter="url(#ll-n)" opacity=".7" />
-      {/* spiral rings down the left side */}
       {Array.from({ length: 13 }, (_, i) => (
         <g key={i} transform={`translate(0 ${6 + i * 10})`}>
           <ellipse cx="10" cy="0" rx="6.4" ry="1.7" fill="none" stroke="#b9bcc4" strokeWidth="1.1" />
@@ -284,25 +325,10 @@ const loveLetterDef: CollageDef = {
       ))}
     </g>
   ),
-  over: (
-    <g>
-      <Deco id="pin" x={56} y={5} w={12} rot={6} />
-      <Deco id="bow" x={74} y={54} w={22} rot={-10} />
-      <Deco id="heart" x={78} y={114} w={14} rot={-8} />
-      <Deco id="heart" x={89} y={118} w={9} rot={10} />
-      <Deco id="tape-pink" x={30} y={114} w={34} rot={-6} />
-    </g>
-  ),
 }
 
-const polaroidBoardDef: CollageDef = {
-  label: 'Photo board', group: 'templates', w: 100, h: 112,
-  slots: [
-    { x: 8, y: 9, w: 36, h: 36, rot: -4, shape: 'polaroid' },
-    { x: 54, y: 7, w: 36, h: 36, rot: 3.5, shape: 'polaroid' },
-    { x: 11, y: 62, w: 36, h: 36, rot: 3, shape: 'polaroid' },
-    { x: 55, y: 60, w: 36, h: 36, rot: -3.5, shape: 'polaroid' },
-  ],
+const corkBoardDef: CollageDef = {
+  label: 'Kraft board', group: 'pieces', w: 100, h: 112, slots: [],
   under: (
     <g>
       <defs>
@@ -314,48 +340,30 @@ const polaroidBoardDef: CollageDef = {
       <path d="M4 4H96V108H4Z" fill="none" stroke="#fff" strokeOpacity=".35" strokeWidth=".5" strokeDasharray="2 1.6" />
     </g>
   ),
-  over: (
-    <g>
-      <Deco id="tape-yellow" x={10} y={4} w={26} rot={-8} />
-      <Deco id="tape-pink" x={60} y={2} w={26} rot={6} />
-      <Deco id="tape-blue" x={14} y={56} w={26} rot={5} />
-      <Deco id="tape-green-torn" x={58} y={54} w={26} rot={-6} />
-    </g>
-  ),
 }
 
-const ticketStubsDef: CollageDef = {
-  label: 'Ticket stubs', group: 'templates', w: 100, h: 104,
-  slots: [
-    { x: 29, y: 10.6, w: 54, h: 26.8, rot: -4, shape: 'plain' },
-    { x: 21, y: 58.6, w: 54, h: 26.8, rot: 3, shape: 'plain' },
-  ],
+const creamSheetDef: CollageDef = {
+  label: 'Cream paper', group: 'pieces', w: 100, h: 110, slots: [],
   under: (
     <g>
       <defs>
         <linearGradient id="ts-paper" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#f6f1e6" /><stop offset="1" stopColor="#ece4d2" /></linearGradient>
         {PAPER_NOISE('ts-n')}
       </defs>
-      <rect x="0" y="0" width="100" height="104" rx="2" fill="url(#ts-paper)" style={{ filter: 'drop-shadow(0 2px 4px rgba(60,40,20,.25))' }} />
-      <rect x="0" y="0" width="100" height="104" rx="2" fill="#000" filter="url(#ts-n)" opacity=".55" />
-      <Ticket kind="pink" x={6} y={6} w={90} h={40.5} rot={-4} id="a" />
-      <Ticket kind="teal" x={4} y={54} w={90} h={40.5} rot={3} id="b" />
-    </g>
-  ),
-  over: (
-    <g>
-      <Deco id="tape-yellow" x={38} y={-1} w={26} rot={-3} />
-      <Deco id="star" x={80} y={78} w={14} rot={12} />
+      <rect x="0" y="0" width="100" height="110" rx="2" fill="url(#ts-paper)" style={{ filter: 'drop-shadow(0 2px 4px rgba(60,40,20,.25))' }} />
+      <rect x="0" y="0" width="100" height="110" rx="2" fill="#000" filter="url(#ts-n)" opacity=".55" />
     </g>
   ),
 }
 
+const cameraDecoDef: CollageDef = { label: 'Instant camera', group: 'pieces', w: 100, h: 63, slots: [], over: <Camera x={0} y={0} w={100} /> }
+
 /* ---------- the list ---------- */
 
 export type CollageKind =
-  | 'camera3' | 'camera1' | 'polaroid' | 'stamp' | 'stampWide'
+  | 'camera3' | 'camera1' | 'polaroid' | 'stamp' | 'stampWide' | 'film4' | 'film3v'
   | 'ticketCream' | 'ticketPink' | 'ticketTeal' | 'ticketMustard' | 'ticketLilac'
-  | 'loveLetter' | 'photoBoard' | 'ticketStubs'
+  | 'paperLetter' | 'corkBoard' | 'creamSheet' | 'cameraDeco'
 
 export const COLLAGES: Record<CollageKind, CollageDef> = {
   camera3: cameraDef(3),
@@ -363,34 +371,19 @@ export const COLLAGES: Record<CollageKind, CollageDef> = {
   polaroid: polaroidDef,
   stamp: stampDef,
   stampWide: stampWideDef,
+  film4: filmDef(4, false, 'Film strip'),
+  film3v: filmDef(3, true, 'Film strip, upright'),
   ticketCream: ticketDef('cream', 'Ticket, cream'),
   ticketPink: ticketDef('pink', 'Ticket, pink'),
   ticketTeal: ticketDef('teal', 'Ticket, green'),
   ticketMustard: ticketDef('mustard', 'Ticket, mustard'),
   ticketLilac: ticketDef('lilac', 'Ticket, lilac'),
-  loveLetter: loveLetterDef,
-  photoBoard: polaroidBoardDef,
-  ticketStubs: ticketStubsDef,
+  paperLetter: paperLetterDef,
+  corkBoard: corkBoardDef,
+  creamSheet: creamSheetDef,
+  cameraDeco: cameraDecoDef,
 }
 
 export const FRAME_KINDS = (Object.keys(COLLAGES) as CollageKind[]).filter((k) => COLLAGES[k].group === 'frames')
-export const TEMPLATE_KINDS = (Object.keys(COLLAGES) as CollageKind[]).filter((k) => COLLAGES[k].group === 'templates')
 
 export { FrameArt }
-
-/* ---------- what a template adds besides its picture frames ---------- */
-
-export interface TemplateText { text: string; dx: number; dy: number; width: number; size: number; color: string; align: 'left' | 'center' | 'right'; rotation?: number; font?: 'display' | 'body' }
-/** extra text boxes, placed relative to the template's own box (fractions of its width and height from the centre) */
-export const TEMPLATE_TEXTS: Partial<Record<CollageKind, TemplateText[]>> = {
-  loveLetter: [
-    { text: 'Love!\nLove!\nLove!', dx: -0.28, dy: -0.27, width: 0.3, size: 26, color: '#ffffff', align: 'center', rotation: -4, font: 'display' },
-    { text: 'Can I say I love you today? If not, can I ask you again tomorrow?', dx: 0.2, dy: 0.25, width: 0.36, size: 11.5, color: '#f6e9e6', align: 'left', font: 'body' },
-  ],
-  photoBoard: [
-    { text: 'our little moments', dx: 0, dy: 0.02, width: 0.6, size: 18, color: '#4a3622', align: 'center', rotation: -2, font: 'display' },
-  ],
-  ticketStubs: [
-    { text: 'admit one', dx: 0, dy: 0.02, width: 0.5, size: 17, color: '#5a4a35', align: 'center', rotation: 2, font: 'display' },
-  ],
-}

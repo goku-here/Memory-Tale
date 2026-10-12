@@ -29,7 +29,10 @@ import { DrawStudio } from './DrawStudio'
 import { FramePicker } from './FramePicker'
 import { NOTE_COLORS } from './StickyNote'
 import { StickerTray } from './StickerTray'
-import { COLLAGES, TEMPLATE_TEXTS, type CollageKind } from '../lib/collages'
+import { CollageEditor } from './CollageEditor'
+import { COLLAGES, type CollageKind } from '../lib/collages'
+import type { TemplateDef } from '../lib/templates'
+import { SVG_STICKERS } from './stickers'
 import { stickerRatio } from './stickers'
 import { TextEditor } from './TextEditor'
 import { FloatingShapes, getTheme, themeVars } from './ThemeEngine'
@@ -61,7 +64,7 @@ interface CanvasProps {
   reveal?: { p: MotionValue<number>; rect: DOMRect }
 }
 
-type Sheet = 'frame' | 'sticker' | 'text' | 'draw' | 'location' | 'bubble' | null
+type Sheet = 'collage' | 'frame' | 'sticker' | 'text' | 'draw' | 'location' | 'bubble' | null
 
 function MenuItem({ icon, label, onClick, danger }: { icon: ReactNode; label: string; onClick: () => void; danger?: boolean }) {
   return (
@@ -134,6 +137,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [sheet, setSheet] = useState<Sheet>(null)
+  const [trayTab, setTrayTab] = useState<'frames' | 'templates' | undefined>()
   const [sheetHs, setSheetHs] = useState<Record<string, number>>({})
   const [canvasW, setCanvasW] = useState(() => Math.min(window.innerWidth, 520))
   const canvasWRef = useRef(canvasW)
@@ -348,6 +352,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       else if (it.type === 'text') openText()
       else if (it.type === 'note' || it.type === 'divider') { begin(); setEditingId(id) }
       else if (it.type === 'bubble') openBubble()
+      else if (it.type === 'collage' && COLLAGES[it.props.kind].slots.length) { begin(); setSheet('collage') }
       window.clearTimeout(viewTimer.current)
     },
   })
@@ -421,7 +426,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       if (it?.type === 'text' && !it.props.text.trim()) live((l) => l.filter((x) => x.id !== it.id))
       end()
       if (it?.type === 'text' && !it.props.text.trim()) setSelectedId(null)
-    } else if (sheet === 'frame' || sheet === 'bubble') end()
+    } else if (sheet === 'frame' || sheet === 'bubble' || sheet === 'collage') end()
     if (sheet === 'frame') tour.emit('frame-close')
     setSheet(null)
     setCaptionFocus(false)
@@ -683,7 +688,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   /** a photo frame from the Frames tab: lands in the middle of the screen with empty slots to fill */
   const addCollage = (kind: CollageKind, close = true) => {
     const def = COLLAGES[kind]
-    const w = Math.round(clamp(canvasW * (def.group === 'templates' ? 0.92 : def.w >= 100 && def.h > 200 ? 0.5 : kind.startsWith('ticket') ? 0.7 : 0.62), 150, 420))
+    const w = Math.round(clamp(canvasW * (def.w < def.h * 0.5 ? 0.3 : def.w >= 100 && def.h > 200 ? 0.5 : def.w / def.h > 3 ? 0.9 : kind.startsWith('ticket') ? 0.7 : 0.62), 150, 420))
     const id = addItem((z, c) => ({
       id: '', type: 'collage', zIndex: z, x: c.x, y: c.y, width: w, height: Math.round((w * def.h) / def.w), rotation: 0,
       props: { kind, photos: def.slots.map(() => '') },
@@ -691,21 +696,35 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     if (close) setSheet(null)
     return id
   }
-  /** a whole page design: the frames plus its text, placed together */
-  const addTemplate = (kind: CollageKind) => {
-    addCollage(kind, true)
-    const texts = TEMPLATE_TEXTS[kind] ?? []
-    const def = COLLAGES[kind]
-    const w = Math.round(clamp(canvasW * 0.92, 150, 420))
-    const h = Math.round((w * def.h) / def.w)
-    texts.forEach((t) => {
-      const c = viewCenter(true)
-      commit((list) => [...list, {
-        id: uid(), type: 'text', zIndex: nextZ(list), x: c.x + t.dx * (w / canvasW) * 100, y: c.y + t.dy * h, width: Math.round(w * t.width), height: Math.round(t.size * 1.4 * (t.text.split('\n').length || 1)),
-        rotation: t.rotation ?? 0,
-        props: { text: t.text, font: t.font === 'display' ? theme.font : "'Manrope', sans-serif", size: t.size, color: t.color, align: t.align },
-      }])
+  /** a whole page design: its paper, frames, stickers and text land as separate items, so each one can be changed on its own */
+  const addTemplate = (def: TemplateDef) => {
+    const W = Math.round(clamp(canvasW * 0.92, 150, 420))
+    const c = viewCenter(true)
+    commit((list) => {
+      let z = nextZ(list)
+      const made: CanvasItem[] = def.pieces.map((p) => {
+        const x = c.x + (p.dx * W / canvasW) * 100
+        const y = c.y + p.dy * W
+        const base = { id: uid(), x, y, rotation: p.rot ?? 0, zIndex: z++ }
+        if (p.type === 'collage') {
+          const d = COLLAGES[p.kind]
+          const w = Math.round(p.w * W)
+          return { ...base, type: 'collage', width: w, height: Math.round((w * d.h) / d.w), props: { kind: p.kind, photos: d.slots.map(() => '') } } as CanvasItem
+        }
+        if (p.type === 'sticker') {
+          const ratio = SVG_STICKERS[p.id]?.ratio ?? 1
+          const w = Math.round(p.w * W)
+          return { ...base, type: 'sticker', width: w, height: Math.round(w / ratio), props: { kind: 'svg', value: p.id } } as CanvasItem
+        }
+        return {
+          ...base, type: 'text', width: Math.round(p.w * W), height: Math.round(p.size * 1.4 * p.text.split('\n').length),
+          props: { text: p.text, font: p.font === 'display' ? theme.font : "'Manrope', sans-serif", size: p.size, color: p.color, align: p.align },
+        } as CanvasItem
+      })
+      return [...list, ...made]
     })
+    setSheet(null)
+    setSelectedId(null)
   }
 
   const addDivider = () => {
@@ -759,7 +778,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     switch (t) {
       case 'photo': fileInput.current?.click(); break
       case 'camera': setCameraOpen(true); break
-      case 'sticker': setSheet('sticker'); break
+      case 'sticker': setTrayTab(undefined); setSheet('sticker'); break
+      case 'templates': setTrayTab('templates'); setSheet('sticker'); break
       case 'text': addText(); break
       case 'draw': setSheet('draw'); break
       case 'note': addNote(); break
@@ -842,6 +862,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       selected.type === 'map' ? () => { setEditMapId(selected.id); setSheet('location') }
       : selected.type === 'text' ? openText
       : selected.type === 'bubble' ? openBubble
+      : selected.type === 'collage' && COLLAGES[selected.props.kind].slots.length ? () => { begin(); setSheet('collage') }
       : selected.type === 'draw' ? () => { setEditDrawId(selected.id); setSheet('draw') }
       : selected.type === 'note' || selected.type === 'divider' ? () => { begin(); setEditingId(selected.id) }
       : undefined,
@@ -975,6 +996,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
 
   const editMap = items.find((i) => i.id === editMapId)
   const bubbleItem = selected?.type === 'bubble' ? selected : undefined
+  const collageItem = selected?.type === 'collage' ? selected : undefined
   const textItem = selected?.type === 'text' ? selected : undefined
   const photoItem = selected?.type === 'photo' ? selected : undefined
 
@@ -1329,6 +1351,19 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       </ToolSheet>
 
       <ToolSheet
+        open={sheet === 'collage' && !!collageItem} onClose={closeSheet} title="Photo frame" snaps={[0.56, 0.88]} dim={0.18} z={55}
+        onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, collage: h }))}
+      >
+        {collageItem && (
+          <CollageEditor
+            value={collageItem.props} accent={accent}
+            onChange={(p) => patch(collageItem.id, { props: p })}
+            onPick={(i) => { slotTarget.current = { id: collageItem.id, index: i }; slotInput.current?.click() }}
+          />
+        )}
+      </ToolSheet>
+
+      <ToolSheet
         open={sheet === 'bubble' && !!bubbleItem} onClose={closeSheet} title="Chat bubble" snaps={[0.58, 0.88]} dim={0.18} z={55}
         onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, bubble: h }))}
       >
@@ -1341,7 +1376,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
         open={sheet === 'sticker'} onClose={closeSheet} title="Stickers" snaps={[0.94]} dim={0.18} z={55}
         onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, sticker: h }))}
       >
-        <StickerTray accent={accent} onPick={(s) => addSticker(s)} onPickMany={addStickers} onFrame={(k) => addCollage(k)} onTemplate={addTemplate} />
+        <StickerTray key={trayTab ?? 'all'} initialGroup={trayTab} accent={accent} onPick={(s) => addSticker(s)} onPickMany={addStickers} onFrame={(k) => addCollage(k)} onTemplate={addTemplate} />
       </ToolSheet>
 
       <ToolSheet

@@ -168,6 +168,8 @@ export interface ClotheslineProps {
 export interface CollageProps {
   kind: import('./lib/collages').CollageKind
   photos: string[]
+  /** the line of writing under each polaroid-style picture */
+  texts?: string[]
 }
 export interface ThreadProps {
   /** ids of the two connected items */

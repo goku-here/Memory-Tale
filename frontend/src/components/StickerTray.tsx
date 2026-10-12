@@ -7,9 +7,10 @@ import { compressImage } from '../lib/image'
 import { db } from '../data/db'
 import { uid } from '../lib/id'
 import { StickerMaker } from './StickerMaker'
-import { STICKER_GROUPS, STICKERS, StickerArt, stickerRatio, type StickerCategory, type StickerDef } from './stickers'
+import { STICKER_GROUPS, STICKERS, SVG_STICKERS, StickerArt, stickerRatio, type StickerCategory, type StickerDef } from './stickers'
 import { CollageBody } from './CollageBody'
-import { COLLAGES, FRAME_KINDS, TEMPLATE_KINDS, type CollageKind } from '../lib/collages'
+import { COLLAGES, FRAME_KINDS, type CollageKind } from '../lib/collages'
+import { TEMPLATES, type TemplateDef } from '../lib/templates'
 
 interface Props {
   accent: string
@@ -19,7 +20,9 @@ interface Props {
   /** a photo frame to put on the page */
   onFrame?: (kind: CollageKind) => void
   /** a whole page design */
-  onTemplate?: (kind: CollageKind) => void
+  onTemplate?: (def: TemplateDef) => void
+  /** which tab to open on */
+  initialGroup?: 'frames' | 'templates'
 }
 
 type GroupId = (typeof STICKER_GROUPS)[number]['id'] | 'frames' | 'templates' | 'mine'
@@ -34,8 +37,8 @@ const isWide = (s: StickerProps) => s.kind === 'svg' && (s.value.startsWith('w-'
  * Stickers in three groups (Characters, Emoji, Packs) plus your own. Tapping a category chip jumps to
  * that section; picking a sticker adds it and closes the sheet.
  */
-export function StickerTray({ accent, onPick, onPickMany, onFrame, onTemplate }: Props) {
-  const [group, setGroup] = useState<GroupId>('characters')
+export function StickerTray({ accent, onPick, onPickMany, onFrame, onTemplate, initialGroup }: Props) {
+  const [group, setGroup] = useState<GroupId>(initialGroup ?? 'characters')
   const cats: readonly StickerCategory[] = STICKER_GROUPS.find((g) => g.id === group)?.categories ?? []
   const [active, setActive] = useState<StickerCategory>(cats[0])
   const [busy, setBusy] = useState(false)
@@ -89,7 +92,8 @@ export function StickerTray({ accent, onPick, onPickMany, onFrame, onTemplate }:
     }
     return out
   })()
-  const foundFrames = q ? [...FRAME_KINDS, ...TEMPLATE_KINDS].filter((k) => COLLAGES[k].label.toLowerCase().includes(q) || 'frame template photo'.includes(q)) : []
+  const foundFrames = q ? FRAME_KINDS.filter((k) => COLLAGES[k].label.toLowerCase().includes(q) || 'frame photo'.includes(q)) : []
+  const foundTemplates = q ? TEMPLATES.filter((t) => t.label.toLowerCase().includes(q) || 'template page'.includes(q)) : []
 
   const sections = useRef<Partial<Record<StickerCategory, HTMLElement | null>>>({})
   const chipBar = useRef<HTMLDivElement>(null)
@@ -199,9 +203,10 @@ export function StickerTray({ accent, onPick, onPickMany, onFrame, onTemplate }:
 
       {q ? (
         <div className="px-4 pt-3">
-          {foundFrames.length > 0 && (
+          {(foundFrames.length > 0 || foundTemplates.length > 0) && (
             <div className="mb-3 grid grid-cols-2 gap-2.5">
-              {foundFrames.map((k) => <CollageCard key={k} kind={k} accent={accent} onPick={() => (COLLAGES[k].group === 'templates' ? onTemplate?.(k) : onFrame?.(k))} />)}
+              {foundFrames.map((k) => <CollageCard key={k} kind={k} accent={accent} onPick={() => onFrame?.(k)} />)}
+              {foundTemplates.map((t) => <TemplateCard key={t.id} def={t} accent={accent} onPick={() => onTemplate?.(t)} />)}
             </div>
           )}
           {found && found.length > 0 && (
@@ -223,15 +228,17 @@ export function StickerTray({ accent, onPick, onPickMany, onFrame, onTemplate }:
               })}
             </div>
           )}
-          {!foundFrames.length && !found?.length && <p className="m-0 px-2 pb-4 pt-8 text-center text-[14px] text-neutral-500">Nothing called “{query}”. Try a word like heart, tape, food or camera.</p>}
+          {!foundFrames.length && !foundTemplates.length && !found?.length && <p className="m-0 px-2 pb-4 pt-8 text-center text-[14px] text-neutral-500">Nothing called “{query}”. Try a word like heart, tape, food or camera.</p>}
         </div>
       ) : group === 'frames' || group === 'templates' ? (
         <div className="px-4 pt-3">
           <p className="m-0 px-1 pb-3 text-[13px] leading-snug text-neutral-500">
-            {group === 'frames' ? 'Tap one to put it on your page, then tap the plus to add your photo.' : 'Pick a whole page design, then tap each plus to put your own photos in.'}
+            {group === 'frames' ? 'Tap one to put it on your page, then tap the plus to add your photo.' : 'A template is a starting point: every piece lands as its own item, so you can swap photos, rewrite the text, move things, delete what you do not need and add more.'}
           </p>
           <div className="grid grid-cols-2 gap-2.5">
-            {(group === 'frames' ? FRAME_KINDS : TEMPLATE_KINDS).map((k) => <CollageCard key={k} kind={k} accent={accent} onPick={() => (group === 'frames' ? onFrame?.(k) : onTemplate?.(k))} />)}
+            {group === 'frames'
+              ? FRAME_KINDS.map((k) => <CollageCard key={k} kind={k} accent={accent} onPick={() => onFrame?.(k)} />)
+              : TEMPLATES.map((t) => <TemplateCard key={t.id} def={t} accent={accent} onPick={() => onTemplate?.(t)} />)}
           </div>
         </div>
       ) : group === 'mine' ? (
@@ -352,6 +359,38 @@ function CollageCard({ kind, accent, onPick }: { kind: CollageKind; accent: stri
       </span>
       <span className="text-[13px] font-bold text-[#17171a]">{d.label}</span>
       <span className="text-[11.5px] font-semibold" style={{ color: accent }}>{d.slots.length} photo{d.slots.length > 1 ? 's' : ''}</span>
+    </motion.button>
+  )
+}
+
+/** a page template as a card in the tray: its real pieces, drawn small */
+function TemplateCard({ def, accent, onPick }: { def: TemplateDef; accent: string; onPick: () => void }) {
+  return (
+    <motion.button
+      type="button" aria-label={def.label} whileTap={{ scale: 0.96 }} onClick={onPick}
+      className="flex flex-col items-center gap-2 rounded-2xl border-0 bg-[#f6f6f8] p-3 text-center"
+      style={{ boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.05)' }}
+    >
+      <span className="grid h-[168px] w-full place-items-center overflow-hidden">
+        <span className="pointer-events-none relative block" style={{ width: `min(100%, ${168 / def.aspect}px)`, aspectRatio: `1 / ${def.aspect}`, containerType: 'inline-size' }}>
+          {def.pieces.map((p, i) => {
+            const left = `${50 + p.dx * 100}%`
+            const top = `${((def.aspect / 2 + p.dy) / def.aspect) * 100}%`
+            const common = { position: 'absolute' as const, left, top, width: `${p.w * 100}%`, transform: `translate(-50%,-50%) rotate(${p.rot ?? 0}deg)` }
+            if (p.type === 'collage') {
+              const d = COLLAGES[p.kind]
+              return <span key={i} style={{ ...common, aspectRatio: `${d.w} / ${d.h}` }}><CollageBody collage={{ kind: p.kind, photos: d.slots.map(() => '') }} selected={false} /></span>
+            }
+            if (p.type === 'sticker') {
+              const r = SVG_STICKERS[p.id]?.ratio ?? 1
+              return <span key={i} style={{ ...common, aspectRatio: `${r}` }}><StickerArt sticker={{ kind: 'svg', value: p.id }} width={40} /></span>
+            }
+            return <span key={i} style={{ ...common, fontSize: `${(p.size / 360) * 100}cqw`, lineHeight: 1.25, textAlign: p.align, color: p.color, whiteSpace: 'pre-wrap', fontFamily: p.font === 'display' ? "'Caveat', cursive" : "'Manrope', sans-serif", fontWeight: p.font === 'display' ? 700 : 500 }}>{p.text}</span>
+          })}
+        </span>
+      </span>
+      <span className="text-[13px] font-bold text-[#17171a]">{def.label}</span>
+      <span className="text-[11.5px] font-semibold" style={{ color: accent }}>{def.photos} photo{def.photos === 1 ? '' : 's'}</span>
     </motion.button>
   )
 }
