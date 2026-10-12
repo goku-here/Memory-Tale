@@ -266,9 +266,9 @@ export function SelectionOverlay({
           {!locked && actions.onView && <TB w={bw} label="View full size" caption="View" onClick={actions.onView}><IcExpand /></TB>}
           {actions.onFrame && <TB w={bw} label="Frame" caption="Frame" onClick={actions.onFrame}><IcFrame /></TB>}
           {!locked && actions.onColor && <TB w={bw} label="Note colour" caption="Colour" onClick={() => setColorsOpen((v) => !v)}><IcPalette /></TB>}
-          {actions.onGroup && <TB w={bw} label={actions.onGroup.locked ? 'Unlock to edit the pieces' : 'Lock the pieces together'} caption={actions.onGroup.locked ? 'Unlock' : 'Lock'} active={!actions.onGroup.locked} onClick={actions.onGroup.run}>{actions.onGroup.locked ? <IcLock /> : <IcUnlock />}</TB>}
+          {actions.onGroup && <TB w={bw} label={actions.onGroup.locked ? 'Unlock to edit the pieces' : 'Lock the pieces together'} caption={actions.onGroup.locked ? 'Unlock' : 'Lock'} onClick={actions.onGroup.run}>{actions.onGroup.locked ? <IcLock /> : <IcUnlock />}</TB>}
           {!locked && actions.onEdit && <TB w={bw} label="Edit" caption="Edit" onClick={actions.onEdit}><IcEdit /></TB>}
-          {!locked && actions.onConnect && <TB w={bw} label={connecting ? 'Cancel the thread' : 'Tie with thread'} caption={connecting ? 'Pick 2nd' : 'Thread'} active={connecting} onClick={actions.onConnect}>{connecting ? <IcThreadOn /> : <IcThread />}</TB>}
+          {!locked && actions.onConnect && <TB w={bw} label={connecting ? 'Cancel the thread' : 'Tie with thread'} caption={connecting ? 'Pick 2nd' : 'Thread'} onClick={actions.onConnect}>{connecting ? <IcThreadOn /> : <IcThread />}</TB>}
           {!locked && <TB w={bw} label="Duplicate" caption="Copy" onClick={actions.onDuplicate}><IcCopy /></TB>}
           {!locked && actions.onForward && <TB w={bw} label="Bring forward" caption="Bring up" onClick={actions.onForward}><IcUp /></TB>}
           {!locked && actions.onBackward && <TB w={bw} label="Send backward" caption="Send down" onClick={actions.onBackward}><IcDown /></TB>}
