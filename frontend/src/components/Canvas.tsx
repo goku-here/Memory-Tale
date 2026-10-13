@@ -31,6 +31,7 @@ import { NOTE_COLORS } from './StickyNote'
 import { StickerTray } from './StickerTray'
 import { CollageEditor } from './CollageEditor'
 import { TemplateSheet } from './TemplateSheet'
+import { PrivacySheet } from './Privacy'
 import { COLLAGES, type CollageKind } from '../lib/collages'
 import type { TemplateDef } from '../lib/templates'
 import { SVG_STICKERS } from './stickers'
@@ -128,6 +129,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   const size: StorySize = getSize(sizeId)
   const [sizeOpen, setSizeOpen] = useState(false)
   const [peopleOpen, setPeopleOpen] = useState(false)
+  const [privacyOpen, setPrivacyOpen] = useState(false)
   const [guides, setGuides] = useState<Guides | null>(null)
   const [storyPreview, setStoryPreview] = useState(false)
   const [storyY, setStoryYState] = useState(0)
@@ -1133,6 +1135,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
                         {!readOnly && <MenuItem icon={<IcPalette />} label="Change theme" onClick={run(onTheme)} />}
                         <MenuItem icon={<IcShare />} label="Share" onClick={run(onShare)} />
                         {user && <MenuItem icon={<IcPeople />} label="People" onClick={run(() => setPeopleOpen(true))} />}
+                        {user && <MenuItem icon={<IcLock />} label={memory.e2ee ? 'Private book' : 'Privacy'} onClick={run(() => setPrivacyOpen(true))} />}
                         <MenuItem icon={<IcDownload />} label="Download book" onClick={run(() => void downloadBook())} />
                         <MenuItem danger icon={<IcTrash />} label="Delete" onClick={run(onDelete)} />
                       </motion.div>
@@ -1441,6 +1444,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
           />
         )}
       </ToolSheet>
+
+      <PrivacySheet open={privacyOpen} onClose={() => setPrivacyOpen(false)} memory={memory} accent={accent} />
 
       <TemplateSheet open={sheet === 'templates'} onClose={closeSheet} accent={accent} themeId={memory.themeId} onPick={addTemplate} />
 

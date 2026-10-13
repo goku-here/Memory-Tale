@@ -54,6 +54,8 @@ export interface Memory {
   memberIds?: string[]
   /** members who can look but not change anything (everyone else in memberIds can edit) */
   viewerIds?: string[]
+  /** private book: its pictures and layout are end-to-end encrypted (only the people in it have the key) */
+  e2ee?: boolean
   members?: Member[]
   canvasStyle?: CanvasStyle
 }

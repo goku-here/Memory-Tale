@@ -1,3 +1,4 @@
+import { forgetKeys } from './keys'
 import { disconnectDrive } from '../lib/drive'
 import { db } from './db'
 
@@ -13,6 +14,7 @@ export async function wipeLocalAccount() {
   await Promise.all([db.memories.clear(), db.canvases.clear(), db.assets.clear(), db.uploads.clear()])
   for (const k of Object.keys(localStorage)) if (PER_BOOK.some((p) => k.startsWith(p))) localStorage.removeItem(k)
   disconnectDrive()
+  await forgetKeys()
   localStorage.removeItem(LAST)
   window.dispatchEvent(new Event('mt-local-changed'))
 }

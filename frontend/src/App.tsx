@@ -9,6 +9,8 @@ import { DriveChip } from './components/DriveChip'
 import { SettingsSheet } from './components/SettingsSheet'
 import { InviteScreen } from './components/InviteScreen'
 import { ShareScreen } from './components/ShareScreen'
+import { stashInviteKey } from './data/privacy'
+import { PrivacyGate } from './components/Privacy'
 import { useAuth } from './data/useAuth'
 import { startOriginals, stopOriginals } from './data/originals'
 import { getTheme } from './components/ThemeEngine'
@@ -31,7 +33,11 @@ export default function App() {
   const { user } = useAuth()
   const { notices, dismiss } = useRemovals()
   // invite links look like /join/<token>
-  const [joinToken, setJoinToken] = useState<string | null>(() => window.location.pathname.match(/^\/join\/([A-Za-z0-9_-]+)/)?.[1] ?? null)
+  const [joinToken, setJoinToken] = useState<string | null>(() => {
+    const t = window.location.pathname.match(/^\/join\/([A-Za-z0-9_-]+)/)?.[1] ?? null
+    if (t) stashInviteKey(t)
+    return t
+  })
   const [pendingOpen, setPendingOpen] = useState<string | null>(null)
   const [shareId, setShareId] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Memory | null>(null)
@@ -173,6 +179,8 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      <PrivacyGate />
 
       <AnimatePresence>
         {byId(shareId) && <ShareScreen key="share" memory={byId(shareId)!} onClose={() => setShareId(null)} />}

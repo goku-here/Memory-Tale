@@ -15,6 +15,8 @@ import {
 import { getDb } from '../lib/firebase'
 import type { CanvasItem, Memory } from '../types'
 import { db as local } from './db'
+import { decryptText, encryptText, isEncrypted } from '../lib/crypto'
+import { getBookKey, getBookKeyRaw } from './keys'
 
 /* ---------- status shown in Settings ---------- */
 export type SyncStatus = { state: 'off' | 'syncing' | 'synced' | 'error'; message?: string }
@@ -32,6 +34,16 @@ export function reportError(e: unknown) {
     : (e as Error).message || 'Sync failed'
   console.warn('[sync]', e)
   setSyncStatus({ state: 'error', message })
+}
+
+/* ---------- private books ---------- */
+/** the key of a private book on this phone: null for an ordinary book; throws when the book is private but the key is missing */
+async function privateKey(memoryId: string): Promise<CryptoKey | null> {
+  const m = await local.memories.get(memoryId)
+  if (!m?.e2ee) return null
+  const k = await getBookKey(memoryId)
+  if (!k) { window.dispatchEvent(new CustomEvent('mt-locked', { detail: memoryId })); throw new Error('locked') }
+  return k
 }
 
 /* ---------- assets ---------- */
@@ -88,11 +100,13 @@ async function fit(data: string): Promise<string> {
 async function uploadAssets(memoryId: string, urls: string[]) {
   const d = getDb()
   if (!d) return
+  const key0 = await privateKey(memoryId)
   for (const url of urls) {
     const id = assetId(url)
     const key = `${memoryId}/${id}`
     if (uploaded.has(key)) continue
-    await setDoc(doc(d, 'memories', memoryId, 'assets', id), { data: await fit(url) })
+    const data = await fit(url)
+    await setDoc(doc(d, 'memories', memoryId, 'assets', id), key0 ? { enc: await encryptText(key0, data) } : { data })
     uploaded.add(key)
   }
 }
@@ -103,7 +117,11 @@ export async function loadAssetData(memoryId: string, id: string): Promise<strin
   const d = getDb()
   if (!d) return null
   const snap = await getDoc(doc(d, 'memories', memoryId, 'assets', id))
-  const data = snap.exists() ? (snap.data().data as string) : null
+  let data: string | null = null
+  if (snap.exists()) {
+    const raw = snap.data() as { data?: string; enc?: string }
+    if (raw.enc) { const k = await getBookKey(memoryId); data = k ? await decryptText(k, raw.enc).catch(() => null) : null } else data = raw.data ?? null
+  }
   if (data) {
     idCache.set(data, id) // so re-hashing the pulled image yields the same id (no ping-pong)
     uploaded.add(`${memoryId}/${id}`)
@@ -199,8 +217,11 @@ export async function pushCanvas(memoryId: string, items: CanvasItem[]) {
   const stale = new Set<string>()
   for (const c of changed) { const now = refsIn(c.json); refsIn(k.get(c.item.id)).forEach((r) => { if (!now.has(r)) stale.add(r) }) }
   for (const id of gone) refsIn(k.get(id)).forEach((r) => stale.add(r))
+  const key = await privateKey(memoryId)
   setSyncStatus({ state: 'syncing' })
   await uploadAssets(memoryId, changed.flatMap((c) => dataUrlsOf(c.item)))
+  const sealed = new Map<string, string>()
+  if (key) for (const c of changed) sealed.set(c.item.id, await encryptText(key, c.json))
   const ops = [
     ...changed.map((c) => ({ id: c.item.id, json: c.json as string | null })),
     ...gone.map((id) => ({ id, json: null })),
@@ -215,7 +236,7 @@ export async function pushCanvas(memoryId: string, items: CanvasItem[]) {
       for (const op of ops.slice(i, i + 400)) {
         const ref = doc(d, 'memories', memoryId, 'items', op.id)
         if (op.json === null) b.delete(ref)
-        else b.set(ref, { json: op.json, updatedAt: Date.now() })
+        else b.set(ref, key ? { enc: sealed.get(op.id)!, updatedAt: Date.now() } : { json: op.json, updatedAt: Date.now() })
       }
       await b.commit()
     }
@@ -264,10 +285,17 @@ export function subscribeCanvas(
       const removed: string[] = []
       for (const c of snap.docChanges()) {
         if (c.type === 'removed') { k.delete(c.doc.id); removed.push(c.doc.id); continue }
-        const data = c.doc.data({ serverTimestamps: 'estimate' }) as { json: string; updatedAt: number }
-        if (k.get(c.doc.id) === data.json) continue // our own write echoing back
-        k.set(c.doc.id, data.json)
-        upserts.push({ json: data.json, at: data.updatedAt })
+        const raw = c.doc.data({ serverTimestamps: 'estimate' }) as { json?: string; enc?: string; updatedAt: number }
+        let json = raw.json
+        if (raw.enc) {
+          const key = await getBookKey(memoryId)
+          if (!key) { window.dispatchEvent(new CustomEvent('mt-locked', { detail: memoryId })); continue }
+          try { json = await decryptText(key, raw.enc) } catch { continue }
+        }
+        if (json === undefined || isEncrypted(json)) continue
+        if (k.get(c.doc.id) === json) continue // our own write echoing back
+        k.set(c.doc.id, json)
+        upserts.push({ json, at: raw.updatedAt })
       }
       if (!upserts.length && !removed.length) return
       try {
@@ -340,7 +368,14 @@ export async function createInvite(who: Who, m: Memory, role: 'edit' | 'view' = 
     ownerName: who.name, ownerPhoto: who.photo ?? undefined, members, role,
   })
   await setDoc(doc(d, 'invites', token), invite)
-  return `${publicBase()}/join/${token}`
+  // a private book's key rides in the part of the link after #, which never reaches any server
+  let tail = ''
+  if (m.e2ee) {
+    const raw = await getBookKeyRaw(m.id)
+    if (!raw) throw new Error('locked')
+    tail = `#k=${raw}`
+  }
+  return `${publicBase()}/join/${token}${tail}`
 }
 
 export async function getInvite(token: string): Promise<Invite | null> {
@@ -367,4 +402,37 @@ export async function leaveMemory(uid: string, memoryId: string) {
   const d = getDb()
   if (!d) return
   await updateDoc(doc(d, 'memories', memoryId), { memberIds: arrayRemove(uid), updatedAt: Date.now() })
+}
+
+/* ---------- turning a book private ---------- */
+
+/** forget what we believe the cloud holds for a book, so the next push writes every item and photo again */
+export function resetBookCache(memoryId: string) {
+  known.delete(memoryId)
+  for (const k of [...uploaded]) if (k.startsWith(`${memoryId}/`)) uploaded.delete(k)
+}
+
+/**
+ * After a book's items and photos were rewritten encrypted: lock whatever readable copies are left in the cloud
+ * (photos other people added that this phone never held as data) and delete readable copies nothing refers to.
+ */
+export async function sealLeftovers(memoryId: string, key: CryptoKey, items: CanvasItem[]) {
+  const d = getDb()
+  if (!d) return
+  const ids = new Set(items.map((i) => i.id))
+  const used = JSON.stringify(items.map((i) => toJson(i)))
+  const docs = await getDocs(collection(d, 'memories', memoryId, 'items'))
+  for (const x of docs.docs) {
+    const v = x.data() as { json?: string; enc?: string }
+    if (v.enc && !v.json) continue
+    if (ids.has(x.id) && v.json) await setDoc(x.ref, { enc: await encryptText(key, v.json), updatedAt: Date.now() })
+    else await deleteDoc(x.ref)
+  }
+  const assets = await getDocs(collection(d, 'memories', memoryId, 'assets'))
+  for (const x of assets.docs) {
+    const v = x.data() as { data?: string; enc?: string }
+    if (v.enc && !v.data) continue
+    if (v.data && used.includes(x.id)) await setDoc(x.ref, { enc: await encryptText(key, v.data) })
+    else await deleteDoc(x.ref)
+  }
 }

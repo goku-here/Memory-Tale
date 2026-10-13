@@ -34,6 +34,10 @@ class KeepsakeDB extends Dexie {
   mockDrive!: Table<{ id: string; blob: Blob; shared: boolean }, string>
   /** stickers the person made from their own photos (this device) */
   myStickers!: Table<{ id: string; dataUrl: string; ratio: number; createdAt: number }, string>
+  /** keys of private (end-to-end encrypted) books, kept only on this device */
+  keys!: Table<{ memoryId: string; raw: string }, string>
+  /** small facts about this device (recovery-code state) */
+  meta!: Table<{ key: string; value: string }, string>
   constructor() {
     super('keepsake')
     this.version(1).stores({
@@ -46,6 +50,9 @@ class KeepsakeDB extends Dexie {
     })
     this.version(5).stores({
       memories: 'id, createdAt', canvases: 'memoryId', assets: 'id', uploads: 'id, memoryId, createdAt', mockDrive: 'id', myStickers: 'id, createdAt',
+    })
+    this.version(6).stores({
+      memories: 'id, createdAt', canvases: 'memoryId', assets: 'id', uploads: 'id, memoryId, createdAt', mockDrive: 'id', myStickers: 'id, createdAt', keys: 'memoryId', meta: 'key',
     })
     this.version(4).stores({
       memories: 'id, createdAt', canvases: 'memoryId', assets: 'id', uploads: 'id, memoryId, createdAt', mockDrive: 'id',

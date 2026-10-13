@@ -35,9 +35,9 @@ export function useMemories() {
           if (type === 'removed') { await repo.deleteMemory(memory.id); continue }
           const mine = await db.memories.get(memory.id)
           // who is in the book is decided in the cloud: always take it over, even when my copy is newer
-          const crew = { ownerId: memory.ownerId, memberIds: memory.memberIds, members: memory.members, viewerIds: memory.viewerIds }
+          const crew = { ownerId: memory.ownerId, memberIds: memory.memberIds, members: memory.members, viewerIds: memory.viewerIds, e2ee: memory.e2ee }
           delete (memory as { banned?: unknown }).banned
-          if (mine && ((mine.ownerId ?? '') !== (crew.ownerId ?? '') || JSON.stringify(mine.memberIds) !== JSON.stringify(crew.memberIds) || JSON.stringify(mine.members) !== JSON.stringify(crew.members) || JSON.stringify(mine.viewerIds ?? []) !== JSON.stringify(crew.viewerIds ?? []))) {
+          if (mine && ((mine.ownerId ?? '') !== (crew.ownerId ?? '') || JSON.stringify(mine.memberIds) !== JSON.stringify(crew.memberIds) || JSON.stringify(mine.members) !== JSON.stringify(crew.members) || JSON.stringify(mine.viewerIds ?? []) !== JSON.stringify(crew.viewerIds ?? []) || !!mine.e2ee !== !!crew.e2ee)) {
             await db.memories.update(memory.id, crew)
           }
           if (!mine && !first) {

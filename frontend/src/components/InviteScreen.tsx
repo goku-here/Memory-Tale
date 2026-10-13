@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { getInvite, joinMemory, reportError, type Invite } from '../data/sync'
 import { useAuth, type Profile } from '../data/useAuth'
 import { getTheme } from './ThemeEngine'
+import { saveBookKey } from '../data/keys'
+import { dropInviteKey, takeInviteKey } from '../data/privacy'
 import { rise, ShareLayout } from './ShareLayout'
 import { toast } from './ui'
 
@@ -51,6 +53,9 @@ export function InviteScreen({ token, knownIds, onJoined, onDismiss }: Props) {
       if (!knownIds.has(invite.memoryId)) {
         await joinMemory(token, invite.memoryId, { uid: who.uid, name: who.name, photo: who.photo }, getTheme(invite.themeId).palette[0], invite.role ?? 'edit')
       }
+      // a private book: keep its key on this phone (and in the person's recovery backup)
+      const bookKey = takeInviteKey(token)
+      if (bookKey) { await saveBookKey(who.uid, invite.memoryId, bookKey); dropInviteKey(token) }
       sessionStorage.removeItem(FLAG)
       onJoined(invite.memoryId)
     } catch (e) {
