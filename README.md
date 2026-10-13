@@ -114,3 +114,9 @@ Publish `backend/firestore.rules` after pulling: it adds `users/{uid}`, `publicK
 Without a server, Google only gives a one-hour sign-in that needs a tap each time. `frontend/api/drive-token.ts` (a Vercel function that stores nothing) trades the one-time sign-in code for a long-lived refresh token that stays on the phone, so Drive reconnects silently.
 
 Setup: Google Cloud Console > APIs & Services > Credentials > your Web OAuth client > copy the **Client secret**, add it in Vercel as the environment variable `GOOGLE_CLIENT_SECRET`, and redeploy. Everyone then signs in to Drive once more (Settings). Set the OAuth consent screen to **In production** (the `drive.file` scope is not a restricted scope), otherwise Google expires refresh tokens after 7 days.
+
+## Ideas and problem reports by email
+
+Settings > Send an idea posts to `frontend/api/feedback.ts` (a Vercel function that stores nothing), which emails the owner through Resend.
+Setup: create a free account at resend.com, make an API key, and add it in Vercel as `RESEND_API_KEY` (then redeploy). Mail goes to `FEEDBACK_TO`
+(default: the contact address in the privacy policy). Until the key is set, the button opens the person's own mail app with the message filled in.

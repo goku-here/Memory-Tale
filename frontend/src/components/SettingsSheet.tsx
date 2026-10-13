@@ -5,6 +5,7 @@ import { useAuth } from '../data/useAuth'
 import { renameEverywhere } from '../data/people'
 import { getSyncStatus, onSyncStatus } from '../data/sync'
 import { DriveSettings } from './DriveSettings'
+import { FeedbackForm } from './FeedbackForm'
 import { ToolSheet } from './ToolSheet'
 import { ConfirmDialog, toast } from './ui'
 import { TOUR_ENABLED, tour } from '../lib/tour'
@@ -35,7 +36,7 @@ function NavRow({ title, sub, onClick, divider }: { title: string; sub: string; 
 
 export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { configured, loading, user, signIn, logOut, rename } = useAuth()
-  const [page, setPage] = useState<'main' | 'backup' | 'about'>('main')
+  const [page, setPage] = useState<'main' | 'backup' | 'idea' | 'about'>('main')
   useEffect(() => { if (open) setPage('main') }, [open])
   const [editing, setEditing] = useState(false)
   const [confirmOut, setConfirmOut] = useState(false)
@@ -71,7 +72,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
   }
 
   return (
-    <ToolSheet open={open} onClose={onClose} title={page === 'backup' ? 'Backup and sync' : page === 'about' ? 'About' : 'Settings'} snaps={[0.62, 0.92]} z={65}>
+    <ToolSheet open={open} onClose={onClose} title={page === 'backup' ? 'Backup and sync' : page === 'idea' ? 'Send an idea' : page === 'about' ? 'About' : 'Settings'} snaps={[0.62, 0.92]} z={65}>
       <div className="space-y-4 px-5 pb-4 pt-1">
         {page !== 'main' && (
           <button type="button" onClick={() => setPage('main')} className="-ml-1 flex h-10 items-center gap-1 rounded-full border-0 bg-transparent pr-3 text-[14.5px] font-bold text-neutral-500">
@@ -138,7 +139,8 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
 
             <div className="overflow-hidden rounded-2xl bg-neutral-50">
               {user && <NavRow title="Backup and sync" sub="Cloud sync and your original photos in Google Drive" onClick={() => setPage('backup')} />}
-              <NavRow title="About" sub="Privacy policy, terms and open-source notices" onClick={() => setPage('about')} divider={!!user} />
+              <NavRow title="Send an idea" sub="Tell us what would make the app better" onClick={() => setPage('idea')} divider={!!user} />
+              <NavRow title="About" sub="Privacy policy, terms and open-source notices" onClick={() => setPage('about')} divider />
             </div>
 
         {user && (
@@ -168,6 +170,8 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
             <DriveSettings />
           </>
         )}
+
+        {page === 'idea' && <FeedbackForm accent="#17171a" />}
 
         {page === 'about' && (
           <>
