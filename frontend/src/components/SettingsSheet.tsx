@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Check, Loader2, LogOut, Pencil, Sparkles } from 'lucide-react'
+import { Check, ChevronRight, Loader2, LogOut, Pencil, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../data/useAuth'
 import { renameEverywhere } from '../data/people'
@@ -132,6 +132,25 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
           <Sparkles size={18} /> Replay the tour
         </motion.button>
 
+        <div>
+          <div className="mb-1.5 px-1 text-[12px] font-extrabold uppercase tracking-wider text-neutral-400">About and legal</div>
+          <div className="overflow-hidden rounded-2xl bg-neutral-50">
+            {([
+              ['/privacy', 'Privacy policy', 'What we store, and how private books are locked'],
+              ['/terms', 'Terms of service', 'The simple rules for using Memory Tale'],
+              ['/licenses', 'Open-source notices', 'The software and data this app is built with'],
+            ] as const).map(([href, title, sub], i) => (
+              <a key={href} href={href} className="flex min-h-14 items-center gap-3 px-4 py-2.5 text-[#17171a] no-underline" style={i ? { borderTop: '1px solid rgba(0,0,0,.06)' } : undefined}>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-bold">{title}</span>
+                  <span className="block truncate text-[12.5px] text-neutral-500">{sub}</span>
+                </span>
+                <ChevronRight size={18} className="shrink-0 text-neutral-400" />
+              </a>
+            ))}
+          </div>
+        </div>
+
         {user && (
           <motion.button
             type="button" whileTap={{ scale: 0.96 }} onClick={() => setConfirmOut(true)}
@@ -141,8 +160,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
           </motion.button>
         )}
         <p className="m-0 text-center text-[12px] text-neutral-400">
-          Memory Tale · build {__BUILD__}<br />
-          <a href="/privacy" className="text-neutral-500">Privacy</a> · <a href="/terms" className="text-neutral-500">Terms</a> · <a href="/licenses" className="text-neutral-500">Licenses</a>
+          Memory Tale · build {__BUILD__}
         </p>
       </div>
       <ConfirmDialog
