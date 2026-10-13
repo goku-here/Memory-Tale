@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Check, ChevronRight, Loader2, LogOut, Pencil, Sparkles } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Loader2, LogOut, Pencil, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../data/useAuth'
 import { renameEverywhere } from '../data/people'
@@ -20,18 +20,23 @@ function GoogleG() {
   )
 }
 
-/** a titled group in the settings sheet */
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/** a row that opens another page of the settings */
+function NavRow({ title, sub, onClick, divider }: { title: string; sub: string; onClick: () => void; divider?: boolean }) {
   return (
-    <section>
-      <h3 className="m-0 mb-2 px-1 text-[12px] font-extrabold uppercase tracking-wider text-neutral-400">{title}</h3>
-      <div className="space-y-3">{children}</div>
-    </section>
+    <button type="button" onClick={onClick} className="flex min-h-16 w-full items-center gap-3 border-0 bg-transparent px-4 py-2.5 text-left text-[#17171a]" style={divider ? { borderTop: '1px solid rgba(0,0,0,.06)' } : undefined}>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15.5px] font-bold">{title}</span>
+        <span className="block truncate text-[12.5px] text-neutral-500">{sub}</span>
+      </span>
+      <ChevronRight size={18} className="shrink-0 text-neutral-400" />
+    </button>
   )
 }
 
 export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { configured, loading, user, signIn, logOut, rename } = useAuth()
+  const [page, setPage] = useState<'main' | 'backup' | 'about'>('main')
+  useEffect(() => { if (open) setPage('main') }, [open])
   const [editing, setEditing] = useState(false)
   const [confirmOut, setConfirmOut] = useState(false)
   const [draft, setDraft] = useState('')
@@ -66,9 +71,16 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
   }
 
   return (
-    <ToolSheet open={open} onClose={onClose} title="Settings" snaps={[0.62, 0.92]} z={65}>
-      <div className="space-y-7 px-5 pb-4 pt-1">
-        <Section title="Account">
+    <ToolSheet open={open} onClose={onClose} title={page === 'backup' ? 'Backup and sync' : page === 'about' ? 'About' : 'Settings'} snaps={[0.62, 0.92]} z={65}>
+      <div className="space-y-4 px-5 pb-4 pt-1">
+        {page !== 'main' && (
+          <button type="button" onClick={() => setPage('main')} className="-ml-1 flex h-10 items-center gap-1 rounded-full border-0 bg-transparent pr-3 text-[14.5px] font-bold text-neutral-500">
+            <ChevronLeft size={20} /> Settings
+          </button>
+        )}
+
+        {page === 'main' && (
+          <>
         {user ? (
           <div className="flex items-center gap-4 rounded-3xl bg-neutral-50 p-4">
             {user.photo ? (
@@ -123,6 +135,12 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
           </div>
         )}
 
+
+            <div className="overflow-hidden rounded-2xl bg-neutral-50">
+              {user && <NavRow title="Backup and sync" sub="Cloud sync and your original photos in Google Drive" onClick={() => setPage('backup')} />}
+              <NavRow title="About" sub="Privacy policy, terms and open-source notices" onClick={() => setPage('about')} divider={!!user} />
+            </div>
+
         {user && (
           <motion.button
             type="button" whileTap={{ scale: 0.96 }} onClick={() => setConfirmOut(true)}
@@ -131,10 +149,11 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
             <LogOut size={18} /> Sign out
           </motion.button>
         )}
-        </Section>
+          </>
+        )}
 
-        {user && (
-          <Section title="Backup and sync">
+        {page === 'backup' && user && (
+          <>
         {user && (
           <div className="rounded-2xl bg-neutral-50 px-4 py-3 text-[13.5px]" role="status">
             <div className="flex items-center gap-2 font-bold">
@@ -147,10 +166,11 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
         )}
 
             <DriveSettings />
-          </Section>
+          </>
         )}
 
-        <Section title="About">
+        {page === 'about' && (
+          <>
         {TOUR_ENABLED && (
         <motion.button
           type="button" whileTap={{ scale: 0.96 }} onClick={() => { onClose(); window.setTimeout(() => tour.start(), 350) }}
@@ -181,7 +201,8 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
         <p className="m-0 text-center text-[12px] text-neutral-400">
           Memory Tale · build {__BUILD__}
         </p>
-        </Section>
+          </>
+        )}
       </div>
       <ConfirmDialog
         open={confirmOut} title="Sign out?" confirmLabel="Sign out"
