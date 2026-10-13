@@ -382,8 +382,9 @@ export interface OriginalFix { id: string; props: Partial<PhotoProps>; oldPath?:
  * Returns what to change on the photo items, and the old Supabase paths that are now safe to delete from the dashboard.
  * Safe to run again: photos that already have a key are skipped.
  */
-export async function lockOldOriginals(memoryId: string, uid: string, items: CanvasItem[], onProgress?: (done: number, total: number) => void): Promise<OriginalFix[]> {
-  const todo = items.filter((i): i is Extract<CanvasItem, { type: 'photo' }> => i.type === 'photo' && !i.props.originalKey && !!(i.props.original || i.props.originalId))
+export async function lockOldOriginals(memoryId: string, uid: string, items: CanvasItem[], onProgress?: (done: number, total: number) => void, drive = true): Promise<OriginalFix[]> {
+  // Supabase files are always locked (nobody should be able to look at a photo there); Drive files only for private books
+  const todo = items.filter((i): i is Extract<CanvasItem, { type: 'photo' }> => i.type === 'photo' && !i.props.originalKey && !!(i.props.original || (drive && i.props.originalId)))
   const fixes: OriginalFix[] = []
   let n = 0
   for (const it of todo) {

@@ -8,6 +8,7 @@ import { useCanvas } from '../data/useCanvas'
 import { uid } from '../lib/id'
 import { compressImage } from '../lib/image'
 import { uploadOriginal } from '../lib/supabase'
+import { lockOldOriginals } from '../data/originals'
 import { newFileKey } from '../lib/crypto'
 import { connectDrive, driveConfigured, isConnected } from '../lib/drive'
 import { discardOriginal, loadOriginalBlob, markForDiscard, missingCopies, prefs, purgeFlagged, queueOriginal, replicateBook, runPendingDiscards, unmarkDiscard } from '../data/originals'
@@ -119,6 +120,21 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   const { items, itemsRef, height, commit, live, begin, end, setHeight } = cv
   const heightRef = useRef(height)
   heightRef.current = height
+
+  // originals that were stored readable (an older version, or before this book was made private) get locked once, here
+  const relocked = useRef('')
+  useEffect(() => {
+    if (!user || !cv.loaded || readOnly || relocked.current === memory.id) return
+    relocked.current = memory.id
+    const t = window.setTimeout(() => {
+      void lockOldOriginals(memory.id, user.uid, itemsRef.current, undefined, !!memory.e2ee).then((fixes) => {
+        if (!fixes.length) return
+        live((list) => list.map((it) => { const f = fixes.find((x) => x.id === it.id); return f && it.type === 'photo' ? { ...it, props: { ...it.props, ...f.props } } : it }))
+      }).catch(() => {})
+    }, 4000)
+    return () => window.clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, cv.loaded, readOnly, memory.id])
 
   const [menu, setMenu] = useState(false)
   const [story, setStory] = useState(false)
@@ -522,8 +538,10 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       } else if (user && !driveConfigured) {
         void (async () => {
           for (let i = 0; i < list.length; i++) {
-            const path = await uploadOriginal(list[i], `${user.uid}/${memory.id}`, fks[i])
-            if (path) patch(ids[i], { props: { original: path } })
+            // Supabase only ever receives locked files, for every book
+            const sk = newFileKey()
+            const path = await uploadOriginal(list[i], `${user.uid}/${memory.id}`, sk)
+            if (path) patch(ids[i], { props: { original: path, originalKey: sk } })
           }
         })()
       } else if (user && driveConfigured && !isConnected()) {
@@ -572,8 +590,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
         patch(target.id, { props: { originalId: pid, original: undefined, originalKey: fk } })
         void queueOriginal(file, memory.id, pid, fk)
       } else if (user && !driveConfigured) {
-        const fk = memory.e2ee ? newFileKey() : undefined
-        void uploadOriginal(file, `${user.uid}/${memory.id}`, fk).then((path) => { if (path) patch(target.id, { props: { original: path, originalKey: fk } }) })
+        const sk = newFileKey()
+        void uploadOriginal(file, `${user.uid}/${memory.id}`, sk).then((path) => { if (path) patch(target.id, { props: { original: path, originalKey: sk } }) })
       }
     } catch {
       toast("Couldn't read that photo")

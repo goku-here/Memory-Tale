@@ -25,3 +25,11 @@ create policy "originals_select" on storage.objects
 -- only ever holds scrambled `.mtenc` files for them. The read policy above is therefore harmless for those files.
 -- Older, readable files (from before a book was made private) can be deleted from the dashboard after the owner has made
 -- the book private: the app shows the list of their paths.
+
+-- From now on the app locks EVERY original before it reaches this bucket (private or not), so new files are scrambled
+-- `.mtenc` files. Older readable files are converted by the members' phones when they open their books. When you are
+-- confident everyone has opened their books on the new version, run this once to delete every file that is still readable:
+--
+--   delete from storage.objects where bucket_id = 'Originals' and name not like '%.mtenc';
+--
+-- (Check first with:  select count(*) from storage.objects where bucket_id = 'Originals' and name not like '%.mtenc';)
