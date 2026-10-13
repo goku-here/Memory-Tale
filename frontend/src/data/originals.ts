@@ -9,7 +9,7 @@
  */
 import { collection, deleteDoc, deleteField, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore'
 import { getDb } from '../lib/firebase'
-import { DriveError, deleteFromDrive, downloadOwn, downloadShared, isConnected, myFileExists, shareByLink, uploadToDrive, getToken } from '../lib/drive'
+import { DriveError, deleteFromDrive, ensureBookFolder, moveToFolder, downloadOwn, downloadShared, isConnected, myFileExists, shareByLink, uploadToDrive, getToken } from '../lib/drive'
 import { downloadOriginal } from '../lib/supabase'
 import { newFileKey, openBlob, sealBlob } from '../lib/crypto'
 import { uploadOriginal } from '../lib/supabase'
@@ -78,6 +78,26 @@ const onCellular = () => (navigator as unknown as { connection?: { type?: string
 const wifiBlocked = () => prefs.wifiOnly() && onCellular()
 const blockedReason = (): DriveStatus['blocked'] => (prefs.paused() ? 'paused' : navigator.onLine === false ? 'offline' : wifiBlocked() ? 'wifi' : null)
 
+/** the Drive folder named after a book (falls back to the app's main folder if it cannot be made) */
+const folderFor = async (memoryId: string) => ensureBookFolder(memoryId, (await db.memories.get(memoryId))?.title ?? '')
+
+/** One time: files saved before books had their own folders move into them. */
+async function organiseDrive(uid: string) {
+  const KEY = 'mt-drive-organised-v1'
+  if (localStorage.getItem(KEY) === uid || !isConnected()) return
+  try {
+    for (const m of await db.memories.toArray()) {
+      const recs = await getRecords(m.id).catch(() => [])
+      const mine = recs.filter((r) => r.copies[uid])
+      if (!mine.length) continue
+      const folder = await folderFor(m.id)
+      if (!folder) continue
+      for (const r of mine) await moveToFolder(r.copies[uid].fileId, folder).catch(() => {})
+    }
+    localStorage.setItem(KEY, uid)
+  } catch { /* tried again next start */ }
+}
+
 /* ---------- records ---------- */
 const col = (memoryId: string) => { const d = getDb(); return d ? collection(d, 'memories', memoryId, 'originals') : null }
 
@@ -103,6 +123,7 @@ export function startOriginals(uid: string) {
   uidNow = uid
   void refreshQueued()
   kick()
+  void organiseDrive(uid)
   window.addEventListener('online', kick)
 }
 /** Pause or resume all saving of originals on this device. */
@@ -159,7 +180,8 @@ export async function processUploads() {
         let fileId = job.fileId
         if (!fileId) {
           // a private book's original is locked first: Google only ever holds scrambled bytes and a meaningless name
-          fileId = job.fk ? await uploadToDrive(await sealBlob(job.fk, job.blob), `${job.id}.mtenc`, 'application/octet-stream') : await uploadToDrive(job.blob, job.name, job.mime)
+          const folder = await folderFor(job.memoryId)
+          fileId = job.fk ? await uploadToDrive(await sealBlob(job.fk, job.blob), `${job.id}.mtenc`, 'application/octet-stream', folder) : await uploadToDrive(job.blob, job.name, job.mime, folder)
           await shareByLink(fileId)
           await db.uploads.update(job.id, { fileId })
         }
@@ -258,7 +280,7 @@ export async function replicateBook(memoryId: string, uid: string, opts: { repai
       for (const c of Object.values(r.copies)) { blob = await downloadShared(c.fileId); if (blob) break }
       if (!blob) skipped++
       else {
-        const fileId = await uploadToDrive(blob, r.name, r.enc ? 'application/octet-stream' : r.mime)
+        const fileId = await uploadToDrive(blob, r.name, r.enc ? 'application/octet-stream' : r.mime, await folderFor(memoryId))
         await shareByLink(fileId)
         if (d) await updateDoc(doc(d, 'memories', memoryId, 'originals', r.id), { [`copies.${uid}`]: { fileId, at: Date.now() } })
         done++
@@ -381,7 +403,7 @@ export async function lockOldOriginals(memoryId: string, uid: string, items: Can
           const blob = await downloadOwn(mine.fileId)
           if (blob) {
             const fk = newFileKey()
-            const fileId = await uploadToDrive(await sealBlob(fk, blob), `${rec.id}.mtenc`, 'application/octet-stream')
+            const fileId = await uploadToDrive(await sealBlob(fk, blob), `${rec.id}.mtenc`, 'application/octet-stream', await folderFor(memoryId))
             await shareByLink(fileId)
             const d = getDb()
             if (d) await setDoc(doc(d, 'memories', memoryId, 'originals', rec.id), { name: `${rec.id}.mtenc`, enc: true, copies: { [uid]: { fileId, at: Date.now() } } }, { merge: true })

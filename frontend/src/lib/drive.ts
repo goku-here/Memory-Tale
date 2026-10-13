@@ -117,8 +117,63 @@ async function ensureFolder(t: string): Promise<string> {
   return id
 }
 
-/** Saves a file into the app's Drive folder (resumable upload, fine for big photos). Returns the Drive file id. */
-export async function uploadToDrive(blob: Blob, name: string, mime: string): Promise<string> {
+const FOLDER_MIME = 'application/vnd.google-apps.folder'
+const bookKey = (memoryId: string) => `mt-drive-book:${memoryId}`
+const quote = (s: string) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+
+/**
+ * The Drive folder of one book, inside "Memory Tale": found again later by the id this phone remembers, else by its
+ * name, else created. If the book was renamed, the folder is renamed too.
+ */
+export async function ensureBookFolder(memoryId: string, title: string): Promise<string | undefined> {
+  if (driveMock) return undefined
+  const t = await getToken(false)
+  if (!t) return undefined
+  const name = (title || 'Untitled').replace(/[\\/]/g, '-').slice(0, 90)
+  const root = await ensureFolder(t)
+  try {
+    const cached = localStorage.getItem(bookKey(memoryId))
+    if (cached) {
+      const r = await fetch(`${API}/files/${cached}?fields=id,name,trashed,parents`, { headers: auth(t) })
+      if (r.ok) {
+        const f = await r.json()
+        if (!f.trashed) {
+          if (f.name !== name) await fetch(`${API}/files/${cached}`, { method: 'PATCH', headers: { ...auth(t), 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
+          return cached
+        }
+      }
+    }
+    const q = encodeURIComponent(`name='${quote(name)}' and '${root}' in parents and mimeType='${FOLDER_MIME}' and trashed=false`)
+    const found = await (await check(await fetch(`${API}/files?q=${q}&fields=files(id)`, { headers: auth(t) }))).json()
+    let id: string | undefined = found.files?.[0]?.id
+    if (!id) {
+      id = (await (await check(await fetch(`${API}/files?fields=id`, {
+        method: 'POST', headers: { ...auth(t), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, mimeType: FOLDER_MIME, parents: [root] }),
+      }))).json()).id as string
+    }
+    localStorage.setItem(bookKey(memoryId), id)
+    return id
+  } catch (e) {
+    if (e instanceof DriveError && e.status === 401) throw e
+    return undefined // fall back to the main folder rather than failing the upload
+  }
+}
+
+/** Moves one of the app's files into another folder of the app. */
+export async function moveToFolder(fileId: string, folderId: string) {
+  if (driveMock) return
+  const t = await getToken(false)
+  if (!t) return
+  const info = await fetch(`${API}/files/${fileId}?fields=parents`, { headers: auth(t) })
+  if (!info.ok) return
+  const parents: string[] = (await info.json()).parents ?? []
+  if (parents.includes(folderId)) return
+  await fetch(`${API}/files/${fileId}?addParents=${folderId}${parents.length ? `&removeParents=${parents.join(',')}` : ''}`, { method: 'PATCH', headers: auth(t) })
+}
+
+/** Saves a file into a Drive folder (the book's, or the app's main one): resumable upload, fine for big photos. Returns the file id. */
+export async function uploadToDrive(blob: Blob, name: string, mime: string, folderId?: string): Promise<string> {
   const t = await getToken(false)
   if (!t) throw new DriveError(401, 'Drive is not connected')
   if (driveMock) {
@@ -126,7 +181,7 @@ export async function uploadToDrive(blob: Blob, name: string, mime: string): Pro
     await db.mockDrive.put({ id, blob, shared: false })
     return id
   }
-  const folder = await ensureFolder(t)
+  const folder = folderId ?? (await ensureFolder(t))
   const start = await check(await fetch(`${UPLOAD}/files?uploadType=resumable&fields=id`, {
     method: 'POST',
     headers: { ...auth(t), 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': mime, 'X-Upload-Content-Length': String(blob.size) },
