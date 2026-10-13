@@ -20,6 +20,16 @@ function GoogleG() {
   )
 }
 
+/** a titled group in the settings sheet */
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h3 className="m-0 mb-2 px-1 text-[12px] font-extrabold uppercase tracking-wider text-neutral-400">{title}</h3>
+      <div className="space-y-3">{children}</div>
+    </section>
+  )
+}
+
 export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { configured, loading, user, signIn, logOut, rename } = useAuth()
   const [editing, setEditing] = useState(false)
@@ -57,7 +67,8 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
 
   return (
     <ToolSheet open={open} onClose={onClose} title="Settings" snaps={[0.62, 0.92]} z={65}>
-      <div className="space-y-4 px-5 pb-4 pt-1">
+      <div className="space-y-7 px-5 pb-4 pt-1">
+        <Section title="Account">
         {user ? (
           <div className="flex items-center gap-4 rounded-3xl bg-neutral-50 p-4">
             {user.photo ? (
@@ -112,8 +123,18 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
           </div>
         )}
 
-        {user && <DriveSettings />}
+        {user && (
+          <motion.button
+            type="button" whileTap={{ scale: 0.96 }} onClick={() => setConfirmOut(true)}
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full border-0 bg-neutral-100 text-[15px] font-semibold text-[#d6455d]"
+          >
+            <LogOut size={18} /> Sign out
+          </motion.button>
+        )}
+        </Section>
 
+        {user && (
+          <Section title="Backup and sync">
         {user && (
           <div className="rounded-2xl bg-neutral-50 px-4 py-3 text-[13.5px]" role="status">
             <div className="flex items-center gap-2 font-bold">
@@ -125,6 +146,11 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
           </div>
         )}
 
+            <DriveSettings />
+          </Section>
+        )}
+
+        <Section title="About">
         {TOUR_ENABLED && (
         <motion.button
           type="button" whileTap={{ scale: 0.96 }} onClick={() => { onClose(); window.setTimeout(() => tour.start(), 350) }}
@@ -135,7 +161,6 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
         )}
 
         <div>
-          <div className="mb-1.5 px-1 text-[12px] font-extrabold uppercase tracking-wider text-neutral-400">About and legal</div>
           <div className="overflow-hidden rounded-2xl bg-neutral-50">
             {([
               ['/privacy', 'Privacy policy', 'What we store, and how private books are locked'],
@@ -153,17 +178,10 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
           </div>
         </div>
 
-        {user && (
-          <motion.button
-            type="button" whileTap={{ scale: 0.96 }} onClick={() => setConfirmOut(true)}
-            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full border-0 bg-neutral-100 text-[15px] font-semibold text-[#d6455d]"
-          >
-            <LogOut size={18} /> Sign out
-          </motion.button>
-        )}
         <p className="m-0 text-center text-[12px] text-neutral-400">
           Memory Tale · build {__BUILD__}
         </p>
+        </Section>
       </div>
       <ConfirmDialog
         open={confirmOut} title="Sign out?" confirmLabel="Sign out"
