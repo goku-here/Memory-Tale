@@ -22,26 +22,40 @@ export function PrivacyPage() {
       <H>What we collect</H>
       <ul className="m-0 space-y-2 pl-5">
         <li><b>Your Google account basics:</b> name, email address and profile photo, when you sign in with Google. They are used to show who you are in a book and on invites.</li>
-        <li><b>What you add:</b> books, photos, text, stickers, drawings and locations you place on a canvas.</li>
+        <li><b>What you add:</b> books, photos, text, stickers, drawings, frames, templates and locations you place on a canvas.</li>
+        <li><b>Who is looking:</b> while a book is open on your phone, a small note says you are there, so other members can see who is online. It is removed when you leave the book.</li>
         <li><b>Your original photos,</b> if you connect Google Drive (see below).</li>
+        <li><b>For private books:</b> a public key for your account and a locked backup of your book keys (see &quot;Private books&quot; below).</li>
       </ul>
       <H>Where it is stored</H>
       <ul className="m-0 space-y-2 pl-5">
-        <li>On your own device (in the browser or installed app), so the app works offline.</li>
+        <li>On your own device (in the browser or installed app), so the app works offline. This copy is not locked by the app itself; your phone&apos;s screen lock protects it.</li>
         <li>In our cloud database (Google Firebase) when you are signed in, so your books sync across your devices and can be shared with people you invite. Photos there are smaller copies, not your originals.</li>
-        <li>In <b>your own Google Drive</b>, if you choose to connect it: full-quality originals are saved in a folder called &quot;Memory Tale&quot;.</li>
+        <li>In <b>your own Google Drive</b>, if you choose to connect it: full-quality originals are saved in a folder called &quot;Memory Tale&quot;, with one folder per book.</li>
+        <li>In <b>Supabase Storage</b>, in some cases: when Google Drive is not used, full-quality originals can be kept there. Every file is locked on your phone before it is uploaded, so Supabase only holds scrambled data.</li>
       </ul>
       <H>Google Drive access</H>
-      <p>If you connect Google Drive, Memory Tale asks only for the <code>drive.file</code> permission. It lets the app see and manage <b>only the files it creates itself</b>. It cannot read, list or change any other file in your Drive. Original photos are marked &quot;anyone with the link can view&quot; using a long random link, so that other members of a shared book can fetch a copy into their own Drive. You can disconnect Drive at any time in Settings and delete the folder from your Drive.</p>
+      <p>If you connect Google Drive, Memory Tale asks only for the <code>drive.file</code> permission. It lets the app see and manage <b>only the files it creates itself</b>. It cannot read, list or change any other file in your Drive. Original photos are marked &quot;anyone with the link can view&quot; using a long random link, so that other members of a shared book can fetch a copy into their own Drive. In a private book those files are locked, so the link alone shows nothing readable.</p>
+      <p>To keep you connected without asking every hour, a small function on our hosting (Vercel) exchanges Google&apos;s sign-in code for a long-lived sign-in. It stores nothing; your phone keeps the result. You can disconnect Drive at any time in Settings, remove the app&apos;s access in your Google Account permissions, and delete the folder from your Drive.</p>
+      <H>Private books (end-to-end encryption)</H>
+      <p>The owner of a book can make it private. For a private book, its pictures, layout, title and cover are locked on your phone before they leave it, with a key that only the people in the book have. Full-quality originals are locked the same way before they are saved to Google Drive or Supabase. We, and the services we use, cannot read what is locked.</p>
+      <ul className="m-0 space-y-2 pl-5">
+        <li><b>Invites:</b> the key travels inside the invite link, after the &quot;#&quot;, which is never sent to any server. Whoever has the link has the key, so share it only with people you trust.</li>
+        <li><b>Your recovery code:</b> one code per person, shown once, which opens your private books on a new phone. It is never sent to us and we cannot recover it. If you lose both your phone and the code, the private books cannot be opened. The app asks you to type it again from time to time so you do not forget it.</li>
+        <li><b>Removing someone:</b> the book gets a new key that goes only to the people left, and what is added afterwards is out of the removed person&apos;s reach. They keep anything they had already seen or saved.</li>
+        <li><b>Not locked:</b> the names and profile photos of members, who is in a book and with which role, dates and theme, and technical details such as file sizes and times. Books that are not made private are stored so that the service operator could technically read them.</li>
+        <li><b>What it cannot do:</b> it cannot stop someone in the book from taking a screenshot or saving a photo.</li>
+      </ul>
       <H>Sharing</H>
-      <p>A book is visible only to the people in it. When you share a book, the app creates a unique invite link. Anyone who opens the link can see a preview of the book (its title, cover and the people in it) and, after signing in, join it and edit it. People in a book can see the photos and the names and profile photos of the other members.</p>
+      <p>A book is visible only to the people in it. When the owner shares a book, the app creates a unique invite link, and the owner chooses whether people who join can edit or only view. Links made by anyone else in the book are view-only; the owner can change each person&apos;s access, remove people, and a removed person cannot rejoin with any link. Anyone who opens a link can see a preview of the book (its title, cover and the people in it; locked for private books, where the key in the link opens it) and, after signing in, join it. People in a book can see the photos and the names and profile photos of the other members.</p>
       <H>Other services</H>
-      <p>Place search and routes use OpenStreetMap services. Map pictures are loaded from OpenStreetMap. Sign-in, database and hosting are provided by Google Firebase and Vercel. We do not sell your data and we do not show ads.</p>
+      <p>Place search and routes use OpenStreetMap services. Map pictures are loaded from OpenStreetMap. Sign-in, database and hosting are provided by Google Firebase and Vercel, and optional original-photo storage by Supabase and Google Drive. We do not sell your data and we do not show ads.</p>
       <H>Your choices</H>
       <ul className="m-0 space-y-2 pl-5">
         <li>Delete a photo or a whole book at any time. Deleting a book you own removes it for everyone in it.</li>
         <li>Leave a book someone shared with you; it disappears from your shelf and the others keep it.</li>
         <li>Disconnect Google Drive in Settings, and remove the app&apos;s access in your Google Account permissions.</li>
+        <li>Make a book private, or ask the owner to, to lock it end to end.</li>
         <li>To have your account data removed, email <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.</li>
       </ul>
       <H>Contact</H>
@@ -59,7 +73,9 @@ export function TermsPage() {
       <H>Be kind and lawful</H>
       <p>Only add content you have the right to share, and do not add anything illegal, hateful or that invades someone&apos;s privacy. We may remove content or accounts that break these rules.</p>
       <H>Sharing</H>
-      <p>Anyone with an invite link can join the book it belongs to, so share links only with people you trust. You are responsible for what you share.</p>
+      <p>Anyone with an invite link can join the book it belongs to, with the access the owner chose (edit or view only), so share links only with people you trust. You are responsible for what you share.</p>
+      <H>Private books and your recovery code</H>
+      <p>Private books are locked so that only the people in them can open them. That also means we cannot open them for you or recover them. Keep your recovery code safe: if you lose it and your phone, a private book cannot be restored.</p>
       <H>The service</H>
       <p>Memory Tale is provided as is, without promises that it will always be available or error-free. Keep your own copy of anything precious: the app can sync and back up photos, but it is not a guaranteed archive. We may change or stop the service.</p>
       <H>Contact</H>
