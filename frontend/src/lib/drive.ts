@@ -12,7 +12,7 @@ export const driveConfigured = driveMock || Boolean(CLIENT_ID && API_KEY)
 
 const SCOPE = 'https://www.googleapis.com/auth/drive.file'
 const FOLDER_NAME = 'Memory Tale'
-const KEY = { connected: 'mt-drive-connected', folder: 'mt-drive-folder' }
+const KEY = { connected: 'mt-drive-connected', folder: 'mt-drive-folder', refresh: 'mt-drive-refresh', token: 'mt-drive-token' }
 
 /* ---------- connection state ---------- */
 export const isConnected = () => driveConfigured && localStorage.getItem(KEY.connected) === '1'
@@ -54,14 +54,81 @@ async function client() {
   return tokenClient!
 }
 
+/* ---------- staying connected: a refresh token, handled by /api/drive-token ---------- */
+let codeFlow: boolean | null = null
+/** is the little server function set up (it needs GOOGLE_CLIENT_SECRET)? Without it the older one-hour sign-in is used. */
+async function codeFlowReady() {
+  if (codeFlow !== null) return codeFlow
+  try { const r = await fetch('/api/drive-token'); codeFlow = r.ok && (await r.json()).ready === true } catch { codeFlow = false }
+  return codeFlow
+}
+
+const remember = (value: string, expiresIn?: number) => {
+  token = { value, exp: Date.now() + (expiresIn ?? 3600) * 1000 - 60_000 }
+  try { localStorage.setItem(KEY.token, JSON.stringify(token)) } catch { /* private mode */ }
+  return value
+}
+function recall(): string | null {
+  try {
+    const t = JSON.parse(localStorage.getItem(KEY.token) || 'null') as Token | null
+    if (t && t.exp > Date.now()) { token = t; return t.value }
+  } catch { /* ignore */ }
+  return null
+}
+
+async function viaRefresh(): Promise<string | null> {
+  const rt = localStorage.getItem(KEY.refresh)
+  if (!rt) return null
+  try {
+    const r = await fetch('/api/drive-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'refresh', refresh_token: rt }) })
+    if (r.status === 400) { localStorage.removeItem(KEY.refresh); return null } // revoked or expired: sign in once more
+    if (!r.ok) return null
+    const j = await r.json() as { access_token: string; expires_in?: number }
+    return remember(j.access_token, j.expires_in)
+  } catch { return null }
+}
+
+/** the one-time sign-in popup that gives the app a long-lived hold on the Drive folder */
+async function connectWithCode(hint?: string): Promise<string | null> {
+  await loadGis()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const g = (window as any).google
+  const code = await new Promise<string | null>((resolve) => {
+    const c = g.accounts.oauth2.initCodeClient({
+      client_id: CLIENT_ID, scope: SCOPE, ux_mode: 'popup', hint,
+      callback: (r: { code?: string }) => resolve(r.code ?? null),
+      error_callback: () => resolve(null),
+    })
+    c.requestCode()
+  })
+  if (!code) return null
+  try {
+    const r = await fetch('/api/drive-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'code', code }) })
+    if (!r.ok) return null
+    const j = await r.json() as { access_token: string; expires_in?: number; refresh_token?: string }
+    if (j.refresh_token) localStorage.setItem(KEY.refresh, j.refresh_token)
+    return remember(j.access_token, j.expires_in)
+  } catch { return null }
+}
+
 /**
  * Returns a valid access token, or null if one cannot be had without the user
  * (interactive = true may open Google's permission popup, so call it from a tap).
+ * With the server function set up the phone keeps a refresh token, so after the first sign-in this never asks again.
  */
 export async function getToken(interactive = false, hint?: string): Promise<string | null> {
   if (driveMock) return 'mock'
   if (!driveConfigured) return null
   if (token && token.exp > Date.now()) return token.value
+  const saved = recall()
+  if (saved) return saved
+  if (await codeFlowReady()) {
+    const fresh = await viaRefresh()
+    if (fresh) return fresh
+    if (!interactive) return null
+    return connectWithCode(hint)
+  }
+  // older way: a one-hour token from Google's popup (needs a tap)
   if (!interactive && !isConnected()) return null
   const c = await client()
   return new Promise((resolve) => {
@@ -78,6 +145,8 @@ export async function connectDrive(hint?: string): Promise<boolean> {
 
 export function disconnectDrive() {
   localStorage.removeItem(KEY.connected)
+  localStorage.removeItem(KEY.refresh)
+  localStorage.removeItem(KEY.token)
   localStorage.removeItem(KEY.folder)
   token = null
 }

@@ -107,3 +107,10 @@ A book can be made private (menu > Privacy). Then, on the owner's phone:
 - removing someone gives the book a new key, handed (via per-person public keys) to everyone left, and re-locks the cloud copy
 
 Publish `backend/firestore.rules` after pulling: it adds `users/{uid}`, `publicKeys/{uid}` and `memories/{id}/keyShares/{uid}`.
+
+
+## Staying signed in to Google Drive
+
+Without a server, Google only gives a one-hour sign-in that needs a tap each time. `frontend/api/drive-token.ts` (a Vercel function that stores nothing) trades the one-time sign-in code for a long-lived refresh token that stays on the phone, so Drive reconnects silently.
+
+Setup: Google Cloud Console > APIs & Services > Credentials > your Web OAuth client > copy the **Client secret**, add it in Vercel as the environment variable `GOOGLE_CLIENT_SECRET`, and redeploy. Everyone then signs in to Drive once more (Settings). Set the OAuth consent screen to **In production** (the `drive.file` scope is not a restricted scope), otherwise Google expires refresh tokens after 7 days.

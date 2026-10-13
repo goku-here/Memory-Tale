@@ -85,6 +85,7 @@ const folderFor = async (memoryId: string) => ensureBookFolder(memoryId, (await 
 async function organiseDrive(uid: string) {
   const KEY = 'mt-drive-organised-v1'
   if (localStorage.getItem(KEY) === uid || !isConnected()) return
+  if (!(await getToken(false))) return // no sign-in available right now: try again next time
   try {
     for (const m of await db.memories.toArray()) {
       const recs = await getRecords(m.id).catch(() => [])
