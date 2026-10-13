@@ -1,10 +1,11 @@
 -- Run once in Supabase: SQL Editor -> New query -> paste -> Run.
 -- Bucket `Originals` must already exist (private).
 
--- Limit what the bucket accepts: images only, max 20 MB each.
+-- Limit what the bucket accepts: images and locked files (private-book originals are locked on the phone first and
+-- travel as application/octet-stream), max 20 MB each.
 update storage.buckets
 set file_size_limit = 20971520,
-    allowed_mime_types = array['image/*']
+    allowed_mime_types = array['image/*', 'application/octet-stream']
 where id = 'Originals';
 
 -- Firebase login is not a Supabase login, so the browser talks to Storage with the publishable (anon) key.
