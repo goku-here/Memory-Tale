@@ -20,6 +20,7 @@ export function FeedbackForm({ accent }: { accent: string }) {
   const [email, setEmail] = useState('')
   const [website, setWebsite] = useState('') // hidden: only a bot fills it
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
+  const [why, setWhy] = useState('')
 
   const device = `${navigator.userAgent.slice(0, 120)} · ${window.innerWidth}x${window.innerHeight}`
   const replyTo = user ? (reply ? user.email : '') : email.trim()
@@ -40,8 +41,9 @@ export function FeedbackForm({ accent }: { accent: string }) {
         setState('idle')
         return
       }
+      if (!r.ok) { const j = await r.json().catch(() => null) as { error?: string; detail?: string } | null; setWhy(j?.detail || j?.error || `error ${r.status}`) }
       setState(r.ok ? 'sent' : 'failed')
-    } catch { setState('failed') }
+    } catch { setWhy('no connection to the server'); setState('failed') }
   }
 
   if (state === 'sent') {
@@ -95,6 +97,7 @@ export function FeedbackForm({ accent }: { accent: string }) {
       {state === 'failed' && (
         <p role="alert" className="m-0 text-[13px] font-semibold text-[#d6455d]">
           Couldn&apos;t send it just now. Check your connection and try again, or write to <a href={`mailto:${MAILTO}`} className="text-[#d6455d]">{MAILTO}</a>.
+          {why && <span className="mt-1 block text-[11.5px] font-medium opacity-80">Reason: {why}</span>}
         </p>
       )}
       <motion.button

@@ -69,7 +69,10 @@ export default async function handler(req: Req, res: Res) {
         ...(replyTo ? { reply_to: replyTo } : {}),
       }),
     })
-    if (!r.ok) return res.status(502).json({ error: 'mail' })
+    if (!r.ok) {
+      const j = (await r.json().catch(() => ({}))) as { message?: string; name?: string }
+      return res.status(502).json({ error: 'mail', detail: String(j.message ?? j.name ?? r.status).slice(0, 200) })
+    }
     return res.status(200).json({ ok: true })
   } catch {
     return res.status(502).json({ error: 'network' })
