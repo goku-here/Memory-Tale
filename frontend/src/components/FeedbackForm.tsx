@@ -58,8 +58,8 @@ export function FeedbackForm({ accent }: { accent: string }) {
   }
 
   return (
-    <div className="space-y-3.5">
-      <p className="m-0 px-1 text-[14.5px] leading-snug text-neutral-600">What would make Memory Tale better for you? Tell us in your own words. It goes straight to us.</p>
+    <div className="space-y-5 pb-6">
+      <p className="m-0 mb-6 px-1 text-[14.5px] leading-snug text-neutral-600">What would make Memory Tale better for you? Tell us in your own words. It goes straight to us.</p>
       <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="What kind of message">
         {KINDS.map((k) => (
           <button

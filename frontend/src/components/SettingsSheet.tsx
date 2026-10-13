@@ -72,7 +72,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
   }
 
   return (
-    <ToolSheet open={open} onClose={onClose} title={page === 'backup' ? 'Backup and sync' : page === 'idea' ? 'Send an idea' : page === 'about' ? 'About' : 'Settings'} snaps={[0.62, 0.92]} z={65}>
+    <ToolSheet open={open} onClose={onClose} title={page === 'backup' ? 'Backup and sync' : page === 'idea' ? 'Send an idea' : page === 'about' ? 'About' : 'Settings'} snaps={[0.62, 0.92]} snapTo={page === 'idea' ? 1 : 0} z={65}>
       <div className="space-y-4 px-5 pb-4 pt-1">
         {page !== 'main' && (
           <button type="button" onClick={() => setPage('main')} className="-ml-1 flex h-10 items-center gap-1 rounded-full border-0 bg-transparent pr-3 text-[14.5px] font-bold text-neutral-500">

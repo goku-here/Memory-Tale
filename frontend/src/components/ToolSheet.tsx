@@ -28,6 +28,8 @@ export interface ToolSheetProps {
   onVisibleHeight?: (px: number) => void
   /** let taps on the backdrop through to what is underneath (tool sheets over the canvas) */
   passThrough?: boolean
+  /** move to this snap point while the sheet is open (e.g. a page inside it needs more room) */
+  snapTo?: number
 }
 
 /**
@@ -36,7 +38,7 @@ export interface ToolSheetProps {
  */
 export function ToolSheet({
   open, onClose, children, title, snaps = [0.5, 0.92], initialSnap = 0,
-  dim = 0.32, z = 50, onVisibleHeight, passThrough,
+  dim = 0.32, z = 50, onVisibleHeight, passThrough, snapTo,
 }: ToolSheetProps) {
   const vh = useViewportHeight()
   const top = snaps[snaps.length - 1]
@@ -65,6 +67,15 @@ export function ToolSheet({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
+
+  // a page inside the sheet asks for another height
+  useEffect(() => {
+    if (!open || !mounted || snapTo === undefined || snapTo === idxRef.current) return
+    setIdx(snapTo)
+    const c = animate(y, yFor(snapTo), SPRING)
+    return () => c.stop()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapTo])
 
   // keep the position correct when the viewport changes (rotation / keyboard)
   useEffect(() => {
