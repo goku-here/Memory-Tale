@@ -141,16 +141,19 @@ export function useRemovals() {
   useEffect(() => {
     const d = getDb()
     if (!uid || !d) { setNotices([]); return }
-    return onSnapshot(query(collection(d, 'removals'), where('uid', '==', uid)), async (snap) => {
+    return onSnapshot(query(collection(d, 'removals'), where('uid', '==', uid)), (snap) => {
       const list = snap.docs.map((x) => ({ ...(x.data() as RemovalNotice), id: x.id })).sort((a, b) => a.at - b.at)
+      // show the notice straight away; the clean-up (the book, then the Drive copies, which can take a while) runs behind it
       for (const n of list) {
         if (!handled.current.has(n.id)) {
           handled.current.set(n.id, -1)
-          const r = await wipeBook(n)
-          handled.current.set(n.id, r.pending)
+          void wipeBook(n).then((r) => {
+            handled.current.set(n.id, r.pending)
+            setNotices((cur) => cur.map((x) => (x.id === n.id ? { ...x, pending: r.pending } : x)))
+          }).catch(() => { handled.current.set(n.id, 0); setNotices((cur) => cur.map((x) => (x.id === n.id ? { ...x, pending: 0 } : x))) })
         }
       }
-      setNotices(list.map((n) => ({ ...n, pending: Math.max(0, handled.current.get(n.id) ?? 0) })))
+      setNotices(list.map((n) => ({ ...n, pending: handled.current.get(n.id) ?? -1 })))
     }, (e) => console.warn('[removals]', e)) // stays quiet until the newest rules are published
   }, [uid])
 
