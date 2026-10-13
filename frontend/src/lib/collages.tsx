@@ -7,7 +7,7 @@ import { SVG_STICKERS } from '../components/stickers'
  * photo goes. Tapping an empty slot on the canvas adds a picture.
  */
 
-export type SlotShape = 'polaroid' | 'stamp' | 'plain' | 'film' | 'bare'
+export type SlotShape = 'polaroid' | 'stamp' | 'plain' | 'film' | 'bare' | 'disc'
 export interface Slot {
   /** the picture area, in the drawing's own units */
   x: number
@@ -83,6 +83,19 @@ function FrameArt({ s }: { s: Slot }) {
     )
   }
   if (s.shape === 'bare') return null
+  if (s.shape === 'disc') {
+    // a silver disc with a clear centre: this is what shows until a picture is added
+    const c = { x: s.x + s.w / 2, y: s.y + s.h / 2 }, R = s.w / 2, r = R * 0.36
+    const ring = (rr: number) => `M${c.x - rr} ${c.y}a${rr} ${rr} 0 1 0 ${rr * 2} 0a${rr} ${rr} 0 1 0 ${-rr * 2} 0Z`
+    return (
+      <g style={{ filter: SHADOW }}>
+        <defs>
+          <radialGradient id="cd-base" cx=".5" cy=".5" r=".5"><stop offset=".3" stopColor="#dfe3e6" /><stop offset=".75" stopColor="#b9c1c5" /><stop offset="1" stopColor="#aab3b8" /></radialGradient>
+        </defs>
+        <path d={`${ring(R)} ${ring(r)}`} fillRule="evenodd" fill="url(#cd-base)" />
+      </g>
+    )
+  }
   if (s.shape === 'film') return <rect x={s.x} y={s.y} width={s.w} height={s.h} fill="#dcdce1" />
   return <rect x={s.x} y={s.y} width={s.w} height={s.h} rx="1.2" fill="#ececef" transform={`rotate(${s.rot ?? 0} ${cx} ${cy})`} />
 }
@@ -238,6 +251,32 @@ function ticketDef(kind: TicketKind, label: string): CollageDef {
 
 /* ---------- single frames ---------- */
 
+/** a CD: the picture is printed on the disc, with a clear plastic centre and a rainbow sheen over it */
+const discDef: CollageDef = {
+  label: 'CD disc', group: 'frames', w: 100, h: 100,
+  slots: [{ x: 1.5, y: 1.5, w: 97, h: 97, shape: 'disc' }],
+  over: (
+    <g>
+      <defs>
+        <linearGradient id="cd-sheen1" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#ffffff" stopOpacity="0" /><stop offset=".25" stopColor="#ff9ad5" stopOpacity=".55" /><stop offset=".5" stopColor="#ffffff" stopOpacity=".7" /><stop offset=".75" stopColor="#7fe7ff" stopOpacity=".55" /><stop offset="1" stopColor="#ffffff" stopOpacity="0" /></linearGradient>
+        <linearGradient id="cd-sheen2" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#ffffff" stopOpacity="0" /><stop offset=".3" stopColor="#ffe48a" stopOpacity=".5" /><stop offset=".55" stopColor="#ffffff" stopOpacity=".65" /><stop offset=".8" stopColor="#b79bff" stopOpacity=".5" /><stop offset="1" stopColor="#ffffff" stopOpacity="0" /></linearGradient>
+        <clipPath id="cd-clip"><circle cx="50" cy="50" r="48.5" /></clipPath>
+      </defs>
+      {/* light catching the surface: two soft wedges opposite each other */}
+      <g clipPath="url(#cd-clip)" style={{ mixBlendMode: 'screen' }}>
+        <path d="M50 50 L-8 18 L-8 60Z" fill="url(#cd-sheen1)" opacity=".85" />
+        <path d="M50 50 L108 40 L108 82Z" fill="url(#cd-sheen2)" opacity=".85" />
+        <path d="M50 50 L22 -8 L62 -8Z" fill="url(#cd-sheen1)" opacity=".35" />
+        <path d="M50 50 L40 108 L80 108Z" fill="url(#cd-sheen2)" opacity=".3" />
+      </g>
+      {/* the clear plastic ring in the middle and the hole */}
+      <path d="M50 32.5a17.5 17.5 0 1 0 .01 0Z M50 42.5a7.5 7.5 0 1 1-.01 0Z" fillRule="evenodd" fill="#f4f6f8" fillOpacity=".62" stroke="#cdd3d8" strokeWidth=".5" />
+      <circle cx="50" cy="50" r="7.5" fill="none" stroke="#9aa3a9" strokeWidth=".7" />
+      <circle cx="50" cy="50" r="48.5" fill="none" stroke="#fff" strokeOpacity=".7" strokeWidth=".8" />
+    </g>
+  ),
+}
+
 const stampDef: CollageDef = {
   label: 'Stamp frame', group: 'frames', w: 100, h: 122,
   slots: [{ x: 11, y: 11, w: 78, h: 100, rot: -3, shape: 'stamp' }],
@@ -361,7 +400,7 @@ const cameraDecoDef: CollageDef = { label: 'Instant camera', group: 'pieces', w:
 /* ---------- the list ---------- */
 
 export type CollageKind =
-  | 'camera3' | 'camera1' | 'polaroid' | 'stamp' | 'stampWide' | 'film4' | 'film3v'
+  | 'camera3' | 'camera1' | 'polaroid' | 'stamp' | 'stampWide' | 'film4' | 'film3v' | 'disc'
   | 'ticketCream' | 'ticketPink' | 'ticketTeal' | 'ticketMustard' | 'ticketLilac'
   | 'paperLetter' | 'corkBoard' | 'creamSheet' | 'cameraDeco'
 
@@ -371,6 +410,7 @@ export const COLLAGES: Record<CollageKind, CollageDef> = {
   polaroid: polaroidDef,
   stamp: stampDef,
   stampWide: stampWideDef,
+  disc: discDef,
   film4: filmDef(4, false, 'Film strip'),
   film3v: filmDef(3, true, 'Film strip, upright'),
   ticketCream: ticketDef('cream', 'Ticket, cream'),

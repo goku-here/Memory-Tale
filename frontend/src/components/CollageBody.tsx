@@ -43,7 +43,7 @@ export function CollageBody({
                 else onView?.(i)
               }}
               className="absolute inset-0 grid place-items-center overflow-hidden border-0 p-0"
-              style={{ borderRadius: s.shape === 'plain' || s.shape === 'bare' ? '1.4cqw' : 0, cursor: 'pointer', background: !src && onSlot && s.shape === 'bare' ? 'rgba(255,255,255,.38)' : 'transparent' }}
+              style={{ borderRadius: s.shape === 'disc' ? '50%' : s.shape === 'plain' || s.shape === 'bare' ? '1.4cqw' : 0, cursor: 'pointer', ...(s.shape === 'disc' ? { WebkitMaskImage: 'radial-gradient(circle closest-side at center, transparent 0 36%, #000 36.6%)', maskImage: 'radial-gradient(circle closest-side at center, transparent 0 36%, #000 36.6%)' } : {}), background: !src && onSlot && s.shape === 'bare' ? 'rgba(255,255,255,.38)' : 'transparent' }}
             >
               {src ? (
                 <AssetImg src={src} />
