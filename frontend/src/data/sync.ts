@@ -373,7 +373,8 @@ export async function createInvite(who: Who, m: Memory, role: 'edit' | 'view' = 
   if (m.e2ee) {
     const raw = await getBookKeyRaw(m.id)
     if (!raw) throw new Error('locked')
-    tail = `#k=${raw}`
+    const epoch = (await local.keys.get(m.id))?.epoch ?? 0
+    tail = `#k=${raw}${epoch ? `&e=${epoch}` : ''}`
   }
   return `${publicBase()}/join/${token}${tail}`
 }
@@ -434,5 +435,27 @@ export async function sealLeftovers(memoryId: string, key: CryptoKey, items: Can
     if (v.enc && !v.data) continue
     if (v.data && used.includes(x.id)) await setDoc(x.ref, { enc: await encryptText(key, v.data) })
     else await deleteDoc(x.ref)
+  }
+}
+
+/** a new key for a private book: every item and photo in the cloud is opened with the old key and locked again with the new one */
+export async function rekeyCloud(memoryId: string, oldKey: CryptoKey, newKey: CryptoKey, onStep?: (what: string) => void) {
+  const d = getDb()
+  if (!d) return
+  onStep?.('Locking the layout with the new key')
+  const items = await getDocs(collection(d, 'memories', memoryId, 'items'))
+  for (const x of items.docs) {
+    const v = x.data() as { enc?: string }
+    if (!v.enc) continue
+    const json = await decryptText(oldKey, v.enc)
+    await setDoc(x.ref, { enc: await encryptText(newKey, json), updatedAt: Date.now() })
+  }
+  onStep?.('Locking the pictures with the new key')
+  const assets = await getDocs(collection(d, 'memories', memoryId, 'assets'))
+  for (const x of assets.docs) {
+    const v = x.data() as { enc?: string }
+    if (!v.enc) continue
+    const data = await decryptText(oldKey, v.enc)
+    await setDoc(x.ref, { enc: await encryptText(newKey, data) })
   }
 }

@@ -199,6 +199,14 @@ export function PrivacyGate() {
     return () => { alive = false }
   }, [user])
 
+  // the owner replaced a book's key (someone was removed) and this phone just received the new one
+  useEffect(() => {
+    if (!user) return
+    const on = () => { toast('This book got a new key. Refreshing…'); window.setTimeout(() => window.location.reload(), 900) }
+    window.addEventListener('mt-rekeyed', on)
+    return () => window.removeEventListener('mt-rekeyed', on)
+  }, [user])
+
   // a private book arrived and this phone has no key for it
   useEffect(() => {
     if (!user) return

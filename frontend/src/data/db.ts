@@ -37,7 +37,7 @@ class KeepsakeDB extends Dexie {
   /** stickers the person made from their own photos (this device) */
   myStickers!: Table<{ id: string; dataUrl: string; ratio: number; createdAt: number }, string>
   /** keys of private (end-to-end encrypted) books, kept only on this device */
-  keys!: Table<{ memoryId: string; raw: string }, string>
+  keys!: Table<{ memoryId: string; raw: string; epoch?: number }, string>
   /** small facts about this device (recovery-code state) */
   meta!: Table<{ key: string; value: string }, string>
   constructor() {

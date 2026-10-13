@@ -1,3 +1,5 @@
+import { catchUpKey } from './privacy'
+import { ensureIdentity } from './keys'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { repo } from './repo'
 import { db } from './db'
@@ -29,17 +31,19 @@ export function useMemories() {
   /* ---- cloud: pull changes, upload existing local books on first sign-in ---- */
   useEffect(() => {
     if (!uid) { setSyncStatus({ state: 'off' }); return }
+    void ensureIdentity(uid)
     const unsub = subscribeMemories(uid, async (changes, first) => {
       try {
         for (const { type, memory } of changes) {
           if (type === 'removed') { await repo.deleteMemory(memory.id); continue }
           const mine = await db.memories.get(memory.id)
           // who is in the book is decided in the cloud: always take it over, even when my copy is newer
-          const crew = { ownerId: memory.ownerId, memberIds: memory.memberIds, members: memory.members, viewerIds: memory.viewerIds, e2ee: memory.e2ee }
+          const crew = { ownerId: memory.ownerId, memberIds: memory.memberIds, members: memory.members, viewerIds: memory.viewerIds, e2ee: memory.e2ee, keyEpoch: memory.keyEpoch }
           delete (memory as { banned?: unknown }).banned
-          if (mine && ((mine.ownerId ?? '') !== (crew.ownerId ?? '') || JSON.stringify(mine.memberIds) !== JSON.stringify(crew.memberIds) || JSON.stringify(mine.members) !== JSON.stringify(crew.members) || JSON.stringify(mine.viewerIds ?? []) !== JSON.stringify(crew.viewerIds ?? []) || !!mine.e2ee !== !!crew.e2ee)) {
+          if (mine && ((mine.ownerId ?? '') !== (crew.ownerId ?? '') || JSON.stringify(mine.memberIds) !== JSON.stringify(crew.memberIds) || JSON.stringify(mine.members) !== JSON.stringify(crew.members) || JSON.stringify(mine.viewerIds ?? []) !== JSON.stringify(crew.viewerIds ?? []) || !!mine.e2ee !== !!crew.e2ee || (mine.keyEpoch ?? 0) !== (crew.keyEpoch ?? 0))) {
             await db.memories.update(memory.id, crew)
           }
+          if (memory.e2ee) void catchUpKey(uid, memory)
           if (!mine && !first) {
             // a book that was just shared with me: put it first on my shelf
             const orders = (await db.memories.toArray()).map((m) => m.order ?? 0)

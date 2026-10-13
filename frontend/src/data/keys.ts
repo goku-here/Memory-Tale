@@ -8,7 +8,7 @@
  *  - every 30 days the app asks for the code again so it does not get forgotten
  */
 import { collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore'
-import { decryptText, encryptText, exportKey, importKey, makeRecoveryCode, newSalt, vaultKeyFromCode } from '../lib/crypto'
+import { decryptText, encryptText, exportJwk, exportKey, giveKey, importKey, importPrivate, importPublic, makeRecoveryCode, newIdentity, newSalt, takeKey, vaultKeyFromCode } from '../lib/crypto'
 import { getDb } from '../lib/firebase'
 import { db } from './db'
 
@@ -36,8 +36,8 @@ export async function getBookKey(memoryId: string): Promise<CryptoKey | null> {
 export async function getBookKeyRaw(memoryId: string) { return (await db.keys.get(memoryId))?.raw ?? null }
 
 /** keep a book's key on this phone, and in the person's cloud backup when their recovery code is set up */
-export async function saveBookKey(uid: string | undefined, memoryId: string, raw: string) {
-  await db.keys.put({ memoryId, raw })
+export async function saveBookKey(uid: string | undefined, memoryId: string, raw: string, epoch = 0) {
+  await db.keys.put({ memoryId, raw, epoch })
   bookKeys.set(memoryId, await importKey(raw))
   window.dispatchEvent(new CustomEvent('mt-key', { detail: memoryId }))
   if (uid) await backupBookKey(uid, memoryId, raw).catch(() => {})
@@ -47,7 +47,8 @@ async function backupBookKey(uid: string, memoryId: string, raw: string) {
   const d = getDb()
   const vk = await loadVaultKey()
   if (!d || !vk) return
-  await setDoc(doc(d, 'users', uid, 'keys', memoryId), { wrapped: await encryptText(vk, raw), at: Date.now() })
+  const epoch = (await db.keys.get(memoryId))?.epoch ?? 0
+  await setDoc(doc(d, 'users', uid, 'keys', memoryId), { wrapped: await encryptText(vk, raw), epoch, at: Date.now() })
 }
 
 /* ---------- the vault (recovery code) ---------- */
@@ -93,6 +94,7 @@ async function installVault(uid: string, code: string, salt: string) {
   await meta.set('codeAskedAt', String(Date.now()))
   // back up every book key this phone has
   for (const row of await db.keys.toArray()) await backupBookKey(uid, row.memoryId, row.raw).catch(() => {})
+  await backupIdentity(uid).catch(() => {})
 }
 
 async function codeKey(uid: string, code: string): Promise<{ vk: CryptoKey; salt: string } | null> {
@@ -116,11 +118,14 @@ export async function unlockVault(uid: string, code: string): Promise<boolean> {
   await meta.set('vaultKey', await exportKey(ck.vk))
   await meta.set('vaultUid', uid)
   await meta.set('codeAskedAt', String(Date.now()))
+  const pubSnap = await getDoc(doc(d, 'publicKeys', uid)).catch(() => null)
+  if (pubSnap?.exists()) await meta.set('idPub', pubSnap.data().jwk as string)
   const snap = await getDocs(collection(d, 'users', uid, 'keys'))
   for (const x of snap.docs) {
     try {
       const raw = await decryptText(ck.vk, x.data().wrapped as string)
-      await db.keys.put({ memoryId: x.id, raw })
+      if (x.id === IDENTITY_DOC) { await meta.set('idPriv', raw); continue }
+      await db.keys.put({ memoryId: x.id, raw, epoch: Number(x.data().epoch) || 0 })
       bookKeys.set(x.id, await importKey(raw))
       window.dispatchEvent(new CustomEvent('mt-key', { detail: x.id }))
     } catch { /* a key that cannot be read is skipped */ }
@@ -157,4 +162,79 @@ export async function forgetKeys() {
   vaultKey = null
   await db.keys.clear().catch(() => {})
   await db.meta.clear().catch(() => {})
+}
+
+/* ---------- my key pair: lets the owner hand me a new book key without anyone else seeing it ---------- */
+const IDENTITY_DOC = '_identity'
+
+async function backupIdentity(uid: string) {
+  const d = getDb()
+  const vk = await loadVaultKey()
+  const priv = await meta.get('idPriv')
+  if (!d || !vk || !priv) return
+  await setDoc(doc(d, 'users', uid, 'keys', IDENTITY_DOC), { wrapped: await encryptText(vk, priv), at: Date.now() })
+}
+
+/**
+ * Makes sure I have a key pair and my public half is published (so an owner can hand me a book key).
+ * On a new phone the pair comes back with the recovery code, so a second pair is never made when one already exists.
+ */
+export async function ensureIdentity(uid: string) {
+  const d = getDb()
+  if (!d) return
+  try {
+    const pubRef = doc(d, 'publicKeys', uid)
+    if (await meta.get('idPriv')) {
+      const pub = await meta.get('idPub')
+      if (pub && !(await getDoc(pubRef)).exists()) await setDoc(pubRef, { jwk: pub, at: Date.now() })
+      return
+    }
+    if ((await getDoc(pubRef)).exists()) return // a pair exists on another phone: it arrives with the recovery code
+    const pair = await newIdentity()
+    const priv = await exportJwk(pair.privateKey), pub = await exportJwk(pair.publicKey)
+    await meta.set('idPriv', priv)
+    await meta.set('idPub', pub)
+    await setDoc(pubRef, { jwk: pub, at: Date.now() })
+    await backupIdentity(uid)
+  } catch { /* offline or rules not published yet: tried again next time */ }
+}
+
+async function myPrivate() { const j = await meta.get('idPriv'); return j ? importPrivate(j) : null }
+async function myPublicJwk() { return (await meta.get('idPub')) ?? null }
+
+/** Owner: hand the new key of a book to each remaining person. Returns the people who could not be reached (no public key yet). */
+export async function shareNewKey(ownerUid: string, memoryId: string, raw: string, epoch: number, memberIds: string[]) {
+  const d = getDb()
+  const priv = await myPrivate()
+  const pubJwk = await myPublicJwk()
+  if (!d || !priv || !pubJwk) throw new Error('no-identity')
+  const missed: string[] = []
+  for (const uid of memberIds) {
+    try {
+      const snap = await getDoc(doc(d, 'publicKeys', uid))
+      if (!snap.exists()) { missed.push(uid); continue }
+      const theirs = await importPublic(snap.data().jwk as string)
+      await setDoc(doc(d, 'memories', memoryId, 'keyShares', uid), { epoch, from: pubJwk, wrapped: await giveKey(priv, theirs, raw), at: Date.now() })
+    } catch { missed.push(uid) }
+  }
+  void ownerUid
+  return missed
+}
+
+/** A book got a new key: if the owner left one for me, take it. Returns true when a new key was installed. */
+export async function takeNewKey(uid: string, memoryId: string, epoch: number): Promise<boolean> {
+  const d = getDb()
+  if (!d) return false
+  const row = await db.keys.get(memoryId)
+  if (!row || (row.epoch ?? 0) >= epoch) return false
+  const priv = await myPrivate()
+  if (!priv) return false
+  try {
+    const snap = await getDoc(doc(d, 'memories', memoryId, 'keyShares', uid))
+    if (!snap.exists() || Number(snap.data().epoch) <= (row.epoch ?? 0)) return false
+    const data = snap.data() as { from: string; wrapped: string; epoch: number }
+    const raw = await takeKey(priv, await importPublic(data.from), data.wrapped)
+    await saveBookKey(uid, memoryId, raw, data.epoch)
+    return true
+  } catch { return false }
 }

@@ -14,6 +14,7 @@ import { db } from './db'
 import { getRecords } from './originals'
 import { repo } from './repo'
 import { reportError } from './sync'
+import { rotateBookKey } from './privacy'
 import { useAuth } from './useAuth'
 
 export interface RemovalNotice {
@@ -47,7 +48,7 @@ export function peopleOf(memory: Memory, me?: { uid: string; name: string; photo
  * Owner only. Takes `targetUid` out of the book: they lose access straight away and cannot rejoin with an old link.
  * Their Drive copies of other people's photos are listed in a notice so their own app can delete them.
  */
-export async function removeMember(owner: { uid: string; name: string; photo: string | null }, memory: Memory, targetUid: string) {
+export async function removeMember(owner: { uid: string; name: string; photo: string | null }, memory: Memory, targetUid: string): Promise<string[]> {
   const d = getDb()
   if (!d) throw new Error('Cloud is not configured')
   const records = await getRecords(memory.id).catch(() => [])
@@ -66,6 +67,12 @@ export async function removeMember(owner: { uid: string; name: string; photo: st
   const members = ((cur.data()?.members ?? []) as Member[]).filter((m) => m.id !== targetUid)
   // (no clean() here: it would flatten the arrayRemove/arrayUnion markers)
   await updateDoc(ref, { memberIds: arrayRemove(targetUid), banned: arrayUnion(targetUid), members: clean(members), updatedAt: Date.now() })
+  // a private book gets a new key, handed only to the people who are left
+  if (memory.e2ee) {
+    const left = (memory.memberIds ?? []).filter((m) => m !== targetUid)
+    try { return await rotateBookKey(owner.uid, memory, left) } catch (e) { console.warn('[rekey]', e); return ['rekey-failed'] }
+  }
+  return []
 }
 
 /** Owner only. Lets `targetUid` change the book ('edit') or only look at it ('view'). Takes effect for them straight away. */

@@ -6,6 +6,8 @@ rules_version = '2';
 // memories/{id}/originals/{photoId} { uploaderUid, name, mime, size, copies: { uid: { fileId } } }
 // memories/{id}/presence/{uid}  { name, photo, at }  who has the book open right now (own doc only)
 // memories/{id}.e2ee        private book (end-to-end encrypted): items hold { enc }, assets hold { enc }; only the owner changes the flag
+// publicKeys/{uid}          { jwk }  my public key, so an owner can hand me a new book key
+// memories/{id}/keyShares/{uid}  { epoch, from, wrapped }  the book's new key, locked for that one person
 // users/{uid}                { vault: { salt, check } }  and users/{uid}/keys/{bookId} { wrapped }  recovery-code backup of book keys
 // removals/{uid}_{memoryId}     { uid, memoryId, title, ownerName, fileIds: [driveFileId] }  notice for a removed person
 // invites/{token}                { memoryId, createdBy, title, cover, ownerName, ... }  public preview, unguessable token
@@ -53,6 +55,12 @@ service cloud.firestore {
 
       allow delete: if isOwner(resource.data);
 
+      // the owner hands a new book key to each remaining person, locked so only that person can open it
+      match /keyShares/{who} {
+        allow read: if signedIn() && request.auth.uid == who;
+        allow write: if isOwner(get(/databases/$(database)/documents/memories/$(memoryId)).data);
+      }
+
       match /{sub}/{docId} {
         allow read: if sub in ['items', 'assets', 'originals', 'presence']
           && isMember(get(/databases/$(database)/documents/memories/$(memoryId)).data);
@@ -73,6 +81,12 @@ service cloud.firestore {
       match /keys/{bookId} {
         allow read, write: if signedIn() && request.auth.uid == uid;
       }
+    }
+
+    // everyone's public key (the half that is meant to be shared); only that person can publish theirs
+    match /publicKeys/{uid} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && request.auth.uid == uid;
     }
 
     // a notice for someone who was removed from a book: only the book's owner writes it, only that person reads/clears it

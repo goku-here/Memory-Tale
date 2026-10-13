@@ -5,12 +5,12 @@
  * never sent to any server, so only people who were given the link get the key.
  */
 import { doc, updateDoc } from 'firebase/firestore'
-import { exportKey, newBookKey } from '../lib/crypto'
+import { exportKey, importKey, newBookKey } from '../lib/crypto'
 import { getDb } from '../lib/firebase'
 import type { CanvasItem, Memory } from '../types'
 import { db } from './db'
-import { getBookKey, getBookKeyRaw, saveBookKey } from './keys'
-import { pushCanvas, resetBookCache, sealLeftovers } from './sync'
+import { ensureIdentity, getBookKey, getBookKeyRaw, saveBookKey, shareNewKey, takeNewKey } from './keys'
+import { pushCanvas, rekeyCloud, resetBookCache, sealLeftovers } from './sync'
 
 /** Owner only. Locks the book: new key, everything re-uploaded encrypted, readable copies removed from the cloud. */
 export async function makeBookPrivate(uid: string, memory: Memory, onStep?: (what: string) => void) {
@@ -38,8 +38,8 @@ export async function makeBookPrivate(uid: string, memory: Memory, onStep?: (wha
 
 /** the part of an invite link after "#k=", read once when the page opens */
 export function keyFromHash(): string | null {
-  const m = /[#&]k=([A-Za-z0-9_-]{40,})/.exec(window.location.hash)
-  return m ? m[1] : null
+  const m = /[#&]k=([A-Za-z0-9_-]{40,})(?:&e=(\d+))?/.exec(window.location.hash)
+  return m ? (m[2] ? `${m[1]}.${m[2]}` : m[1]) : null
 }
 const keep = (token: string) => `mt-invite-key:${token}`
 /** remember the key for the length of this tab (a Google sign-in redirect reloads the page) and clear it from the address bar */
@@ -54,3 +54,37 @@ export function takeInviteKey(token: string): string | null {
   try { return sessionStorage.getItem(keep(token)) } catch { return null }
 }
 export function dropInviteKey(token: string) { try { sessionStorage.removeItem(keep(token)) } catch { /* ignore */ } }
+
+/**
+ * Owner only, right after someone is removed from a private book: the book gets a new key, handed to everyone who is
+ * left, and everything in the cloud is locked again with it. The person who was removed keeps only what they
+ * already had; whatever is added from now on is out of their reach.
+ * Returns the people who could not be handed the key yet (they have not opened the app since the update): the owner
+ * sends them a fresh invite link, which carries the new key.
+ */
+export async function rotateBookKey(uid: string, memory: Memory, remaining: string[], onStep?: (what: string) => void): Promise<string[]> {
+  const d = getDb()
+  if (!d || !memory.e2ee) return []
+  const oldKey = await getBookKey(memory.id)
+  if (!oldKey) throw new Error('locked')
+  await ensureIdentity(uid)
+  const raw = await exportKey(await newBookKey())
+  const newKey = await importKey(raw)
+  const epoch = (memory.keyEpoch ?? 0) + 1
+  onStep?.('Handing the new key to everyone left')
+  const missed = await shareNewKey(uid, memory.id, raw, epoch, remaining)
+  await rekeyCloud(memory.id, oldKey, newKey, onStep)
+  await saveBookKey(uid, memory.id, raw, epoch)
+  resetBookCache(memory.id)
+  await db.memories.update(memory.id, { keyEpoch: epoch })
+  await updateDoc(doc(d, 'memories', memory.id), { keyEpoch: epoch, updatedAt: Date.now() })
+  return missed
+}
+
+/** A member's phone: the book has a newer key than this phone holds, so fetch it from the owner's hand-over. */
+export async function catchUpKey(uid: string, memory: Memory): Promise<boolean> {
+  if (!memory.e2ee || !memory.keyEpoch) return false
+  const got = await takeNewKey(uid, memory.id, memory.keyEpoch)
+  if (got) window.dispatchEvent(new CustomEvent('mt-rekeyed', { detail: memory.id }))
+  return got
+}

@@ -55,7 +55,7 @@ export function InviteScreen({ token, knownIds, onJoined, onDismiss }: Props) {
       }
       // a private book: keep its key on this phone (and in the person's recovery backup)
       const bookKey = takeInviteKey(token)
-      if (bookKey) { await saveBookKey(who.uid, invite.memoryId, bookKey); dropInviteKey(token) }
+      if (bookKey) { const [raw, epoch] = bookKey.split('.'); await saveBookKey(who.uid, invite.memoryId, raw, Number(epoch) || 0); dropInviteKey(token) }
       sessionStorage.removeItem(FLAG)
       onJoined(invite.memoryId)
     } catch (e) {

@@ -87,3 +87,20 @@ export async function openBlob(rawKey: string, sealed: Blob, type = 'image/jpeg'
   const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: all.subarray(0, 12) }, k, all.subarray(12))
   return new Blob([pt], { type })
 }
+
+/* ---------- a key pair per person: hand a book key to one person without anything else seeing it ---------- */
+export const newIdentity = () => crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey'])
+export const exportJwk = async (k: CryptoKey) => JSON.stringify(await crypto.subtle.exportKey('jwk', k))
+export const importPublic = (jwk: string) => crypto.subtle.importKey('jwk', JSON.parse(jwk), { name: 'ECDH', namedCurve: 'P-256' }, true, [])
+export const importPrivate = (jwk: string) => crypto.subtle.importKey('jwk', JSON.parse(jwk), { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey'])
+
+const pairKey = (mine: CryptoKey, theirs: CryptoKey) =>
+  crypto.subtle.deriveKey({ name: 'ECDH', public: theirs }, mine, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
+
+/** lock a book key so only the person with the matching private key can open it */
+export async function giveKey(myPrivate: CryptoKey, theirPublic: CryptoKey, rawBookKey: string) {
+  return encryptText(await pairKey(myPrivate, theirPublic), rawBookKey)
+}
+export async function takeKey(myPrivate: CryptoKey, theirPublic: CryptoKey, packed: string) {
+  return decryptText(await pairKey(myPrivate, theirPublic), packed)
+}

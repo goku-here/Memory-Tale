@@ -43,8 +43,10 @@ export function PeopleSheet({ open, onClose, memory }: { open: boolean; onClose:
     setTarget(null)
     setBusy(t.id)
     try {
-      await removeMember(user, memory, t.id)
-      toast(`${t.name} was removed`)
+      const missed = await removeMember(user, memory, t.id)
+      toast(missed.length
+        ? `${t.name} was removed. The book has a new key, but ${missed.length === 1 && missed[0] === 'rekey-failed' ? 'it could not be shared: try again from People' : `${missed.length} ${missed.length === 1 ? 'person has' : 'people have'} not opened the latest app yet: send ${missed.length === 1 ? 'them' : 'each'} a fresh invite link`}.`
+        : memory.e2ee ? `${t.name} was removed and the book got a new key` : `${t.name} was removed`)
     } catch (e) {
       reportError(e)
       const code = (e as { code?: string }).code
