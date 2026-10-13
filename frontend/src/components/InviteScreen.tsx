@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion'
 import { Eye, Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { getInvite, joinMemory, reportError, type Invite } from '../data/sync'
+import { getInvite, joinMemory, openMeta, reportError, type Invite } from '../data/sync'
+import { importKey } from '../lib/crypto'
 import { useAuth, type Profile } from '../data/useAuth'
 import { getTheme } from './ThemeEngine'
 import { saveBookKey } from '../data/keys'
@@ -41,7 +42,15 @@ export function InviteScreen({ token, knownIds, onJoined, onDismiss }: Props) {
 
   useEffect(() => {
     let alive = true
-    getInvite(token).then((i) => alive && setInvite(i)).catch((e) => { reportError(e); if (alive) setInvite(null) })
+    getInvite(token).then(async (i) => {
+      // a private book's preview is locked: the key in the link opens it
+      const raw = takeInviteKey(token)
+      if (i?.meta && raw) {
+        const opened = await openMeta(await importKey(raw.split('.')[0]), i.meta)
+        if (opened) i = { ...i, title: opened.title, cover: opened.cover }
+      }
+      if (alive) setInvite(i)
+    }).catch((e) => { reportError(e); if (alive) setInvite(null) })
     return () => { alive = false }
   }, [token])
 

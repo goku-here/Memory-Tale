@@ -9,11 +9,12 @@ import { exportKey, importKey, newBookKey } from '../lib/crypto'
 import { getDb } from '../lib/firebase'
 import type { CanvasItem, Memory } from '../types'
 import { db } from './db'
+import { lockOldOriginals } from './originals'
 import { ensureIdentity, getBookKey, getBookKeyRaw, saveBookKey, shareNewKey, takeNewKey } from './keys'
-import { pushCanvas, rekeyCloud, resetBookCache, sealLeftovers } from './sync'
+import { PRIVATE_COVER, PRIVATE_TITLE, pushCanvas, rekeyCloud, resetBookCache, sealLeftovers, sealMeta } from './sync'
 
 /** Owner only. Locks the book: new key, everything re-uploaded encrypted, readable copies removed from the cloud. */
-export async function makeBookPrivate(uid: string, memory: Memory, onStep?: (what: string) => void) {
+export async function makeBookPrivate(uid: string, memory: Memory, onStep?: (what: string) => void): Promise<string[]> {
   const d = getDb()
   if (!d) throw new Error('Cloud is not configured')
   if (memory.ownerId && memory.ownerId !== uid) throw new Error('Only the owner can do this')
@@ -29,9 +30,20 @@ export async function makeBookPrivate(uid: string, memory: Memory, onStep?: (wha
   onStep?.('Removing readable copies')
   const key = (await getBookKey(memory.id))!
   await sealLeftovers(memory.id, key, items)
-  // only now tell everyone the book is private
-  await updateDoc(doc(d, 'memories', memory.id), { e2ee: true, updatedAt: Date.now() })
+  // only now tell everyone the book is private (and lock its title and cover)
+  onStep?.('Locking the full-quality originals')
+  const fixes = await lockOldOriginals(memory.id, uid, items, (n, t) => onStep?.(`Locking the originals (${n} of ${t})`))
+  if (fixes.length) {
+    const cur = ((await db.canvases.get(memory.id))?.items ?? []) as CanvasItem[]
+    const next = cur.map((it) => { const f = fixes.find((x) => x.id === it.id); return f && it.type === 'photo' ? { ...it, props: { ...it.props, ...f.props } } : it })
+    await db.canvases.update(memory.id, { items: next, updatedAt: Date.now() })
+    await pushCanvas(memory.id, next)
+  }
+  onStep?.('Locking the title and cover')
+  await updateDoc(doc(d, 'memories', memory.id), { e2ee: true, meta: await sealMeta(key, memory), title: PRIVATE_TITLE, cover: PRIVATE_COVER, updatedAt: Date.now() })
   window.dispatchEvent(new Event('mt-local-changed'))
+  // readable files left in Supabase (their locked copies now exist): the owner of the project can delete these
+  return fixes.flatMap((f) => (f.oldPath ? [f.oldPath] : []))
 }
 
 /* ---------- the key in the link ---------- */

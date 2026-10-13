@@ -20,3 +20,8 @@ create policy "originals_insert" on storage.objects
 create policy "originals_select" on storage.objects
   for select to anon, authenticated
   using (bucket_id = 'Originals');
+
+-- Private books (end-to-end encrypted): the app locks each original photo on the phone BEFORE uploading, so this bucket
+-- only ever holds scrambled `.mtenc` files for them. The read policy above is therefore harmless for those files.
+-- Older, readable files (from before a book was made private) can be deleted from the dashboard after the owner has made
+-- the book private: the app shows the list of their paths.

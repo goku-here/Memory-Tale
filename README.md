@@ -94,3 +94,16 @@ Setup (Google Cloud Console, project `memory-tale`):
 6. Publish `backend/firestore.rules` again (adds the `originals` records).
 
 For local testing without Google, set `VITE_DRIVE_MOCK=1` in `.env.local` (Settings shows TEST MODE).
+
+
+## Private books (end-to-end encryption)
+
+A book can be made private (menu > Privacy). Then, on the owner's phone:
+
+- items, photos, title and cover are locked with a per-book AES-256-GCM key before they reach Firestore
+- each full-quality original is locked with its own key before it reaches Google Drive or Supabase (the key lives in the photo item, which is encrypted)
+- the key travels in invite links after the `#` (never sent to a server)
+- each person has one recovery code (shown once, asked again every 30 days) that locks a cloud backup of their book keys
+- removing someone gives the book a new key, handed (via per-person public keys) to everyone left, and re-locks the cloud copy
+
+Publish `backend/firestore.rules` after pulling: it adds `users/{uid}`, `publicKeys/{uid}` and `memories/{id}/keyShares/{uid}`.

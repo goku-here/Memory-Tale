@@ -13,7 +13,7 @@ import type { Memory, Member } from '../types'
 import { db } from './db'
 import { getRecords } from './originals'
 import { repo } from './repo'
-import { reportError } from './sync'
+import { PRIVATE_COVER, PRIVATE_TITLE, reportError } from './sync'
 import { rotateBookKey } from './privacy'
 import { useAuth } from './useAuth'
 
@@ -55,9 +55,9 @@ export async function removeMember(owner: { uid: string; name: string; photo: st
   // copies of photos somebody else added; the person's own uploads stay theirs
   const theirs = records.filter((r) => r.copies[targetUid] && r.uploaderUid !== targetUid)
   await setDoc(doc(d, 'removals', `${targetUid}_${memory.id}`), clean({
-    uid: targetUid, memoryId: memory.id, title: memory.title, themeId: memory.themeId, date: memory.date,
+    uid: targetUid, memoryId: memory.id, title: memory.e2ee ? PRIVATE_TITLE : memory.title, themeId: memory.themeId, date: memory.date,
     // the book as they knew it, so they recognise it (a huge photo falls back to its average colour to fit the notice)
-    cover: memory.cover.type === 'image' && memory.cover.value.length > 380_000 ? { type: 'color', value: memory.cover.avg ?? '#9DB7D5', tone: memory.cover.tone } : memory.cover,
+    cover: memory.e2ee ? PRIVATE_COVER : memory.cover.type === 'image' && memory.cover.value.length > 380_000 ? { type: 'color', value: memory.cover.avg ?? '#9DB7D5', tone: memory.cover.tone } : memory.cover,
     ownerName: owner.name, ownerPhoto: owner.photo ?? undefined, at: Date.now(),
     fileIds: theirs.map((r) => r.copies[targetUid].fileId),
   }))

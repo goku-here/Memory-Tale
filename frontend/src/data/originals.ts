@@ -11,7 +11,8 @@ import { collection, deleteDoc, deleteField, doc, getDoc, getDocs, query, setDoc
 import { getDb } from '../lib/firebase'
 import { DriveError, deleteFromDrive, downloadOwn, downloadShared, isConnected, myFileExists, shareByLink, uploadToDrive, getToken } from '../lib/drive'
 import { downloadOriginal } from '../lib/supabase'
-import { openBlob, sealBlob } from '../lib/crypto'
+import { newFileKey, openBlob, sealBlob } from '../lib/crypto'
+import { uploadOriginal } from '../lib/supabase'
 import type { CanvasItem, PhotoProps } from '../types'
 import { uid as newId } from '../lib/id'
 import { db } from './db'
@@ -346,4 +347,53 @@ export async function runPendingDiscards(memoryId: string, uid: string, stillUse
     if (!stillUsed(oid)) await discardOriginal(memoryId, oid, uid).catch(reportError)
     unmarkDiscard(memoryId, oid)
   }
+}
+
+
+/* ---------- a book became private: lock the originals that were stored readable ---------- */
+export interface OriginalFix { id: string; props: Partial<PhotoProps>; oldPath?: string }
+
+/**
+ * For photos of a private book whose original is still readable (Supabase, or the Drive file I uploaded): download it,
+ * lock it with a new file key, upload the locked copy and remove the readable one from my Drive.
+ * Returns what to change on the photo items, and the old Supabase paths that are now safe to delete from the dashboard.
+ * Safe to run again: photos that already have a key are skipped.
+ */
+export async function lockOldOriginals(memoryId: string, uid: string, items: CanvasItem[], onProgress?: (done: number, total: number) => void): Promise<OriginalFix[]> {
+  const todo = items.filter((i): i is Extract<CanvasItem, { type: 'photo' }> => i.type === 'photo' && !i.props.originalKey && !!(i.props.original || i.props.originalId))
+  const fixes: OriginalFix[] = []
+  let n = 0
+  for (const it of todo) {
+    try {
+      if (it.props.original) {
+        // readable file in Supabase
+        const blob = await downloadOriginal(it.props.original)
+        if (blob) {
+          const fk = newFileKey()
+          const path = await uploadOriginal(new File([blob], 'original', { type: blob.type }), `${uid}/${memoryId}`, fk)
+          if (path) fixes.push({ id: it.id, props: { original: path, originalKey: fk }, oldPath: it.props.original })
+        }
+      } else if (it.props.originalId && isConnected()) {
+        // a readable file in my own Drive (only the person who uploaded it can replace it)
+        const rec = await getRecord(memoryId, it.props.originalId)
+        const mine = rec?.copies[uid]
+        if (rec && !rec.enc && rec.uploaderUid === uid && mine) {
+          const blob = await downloadOwn(mine.fileId)
+          if (blob) {
+            const fk = newFileKey()
+            const fileId = await uploadToDrive(await sealBlob(fk, blob), `${rec.id}.mtenc`, 'application/octet-stream')
+            await shareByLink(fileId)
+            const d = getDb()
+            if (d) await setDoc(doc(d, 'memories', memoryId, 'originals', rec.id), { name: `${rec.id}.mtenc`, enc: true, copies: { [uid]: { fileId, at: Date.now() } } }, { merge: true })
+            // other members' copies of the readable file are no longer valid: they copy the locked one again
+            if (d) await updateDoc(doc(d, 'memories', memoryId, 'originals', rec.id), { copies: { [uid]: { fileId, at: Date.now() } } })
+            await deleteFromDrive(mine.fileId).catch(() => {})
+            fixes.push({ id: it.id, props: { originalKey: fk } })
+          }
+        }
+      }
+    } catch (e) { reportError(e) }
+    onProgress?.(++n, todo.length)
+  }
+  return fixes
 }

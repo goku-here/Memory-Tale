@@ -3,7 +3,7 @@ import { Check, Copy, Loader2, Lock, ShieldCheck } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { codeCheckDue, createVault, replaceCode, snoozeCodeCheck, unlockVault, vaultState, verifyCode, type VaultState } from '../data/keys'
 import { makeBookPrivate } from '../data/privacy'
-import { reportError } from '../data/sync'
+import { hydrateMeta, reportError } from '../data/sync'
 import { useAuth } from '../data/useAuth'
 import { normaliseCode } from '../lib/crypto'
 import type { Memory } from '../types'
@@ -55,17 +55,19 @@ export function PrivacySheet({ open, onClose, memory, accent }: { open: boolean;
   const { user } = useAuth()
   const isOwner = !!user && (memory.ownerId ?? user.uid) === user.uid
   const [vault, setVault] = useState<VaultState>('unknown')
-  const [step, setStep] = useState<'info' | 'enter' | 'code' | 'working'>('info')
+  const [step, setStep] = useState<'info' | 'enter' | 'code' | 'working' | 'done'>('info')
   const [code, setCode] = useState('')
   const [typed, setTyped] = useState('')
   const [what, setWhat] = useState('')
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [checked, setChecked] = useState<'' | 'ok' | 'bad'>('')
+  /** readable files that are still in Supabase after their locked copies were made */
+  const [oldPaths, setOldPaths] = useState<string[]>([])
 
   useEffect(() => {
     if (!open || !user) return
-    setStep('info'); setCode(''); setTyped(''); setErr(''); setChecked('')
+    setStep('info'); setCode(''); setTyped(''); setErr(''); setChecked(''); setOldPaths([])
     void vaultState(user.uid).then(setVault)
   }, [open, user])
 
@@ -73,9 +75,8 @@ export function PrivacySheet({ open, onClose, memory, accent }: { open: boolean;
     if (!user) return
     setStep('working'); setErr('')
     try {
-      await makeBookPrivate(user.uid, memory, setWhat)
-      toast('This book is now private')
-      onClose()
+      const old = await makeBookPrivate(user.uid, memory, setWhat)
+      if (old.length) { setOldPaths(old); setStep('done') } else { toast('This book is now private'); onClose() }
     } catch (e) {
       reportError(e)
       const c = (e as { code?: string }).code
@@ -120,6 +121,18 @@ export function PrivacySheet({ open, onClose, memory, accent }: { open: boolean;
         <p className="m-0 px-6 py-8 text-center text-[14.5px] text-neutral-500">Sign in to use private books.</p>
       ) : step === 'code' ? (
         <ShowCode code={code} accent={accent} busy={false} onSaved={() => (memory.e2ee ? (toast('New recovery code saved'), onClose()) : void lockBook())} />
+      ) : step === 'done' ? (
+        <div className="space-y-3 px-5 pb-6">
+          <div className="flex items-center gap-3 rounded-2xl bg-[#eaf6ee] p-3.5">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#2db574] text-white"><ShieldCheck size={22} /></span>
+            <div className="text-[15.5px] font-extrabold text-[#17171a]">This book is now private</div>
+          </div>
+          <p className="m-0 text-[13.5px] leading-snug text-neutral-600">
+            {oldPaths.length} of its full-quality photos used to be stored readable in Supabase. Locked copies now exist, so the old ones can be deleted. Only the person who runs the Supabase project can do that: open Storage → Originals and delete these files.
+          </p>
+          <button type="button" onClick={() => { void navigator.clipboard?.writeText(oldPaths.join(String.fromCharCode(10))).then(() => toast('List copied')).catch(() => toast('Could not copy')) }} className="flex h-11 w-full items-center justify-center gap-2 rounded-full border-0 bg-neutral-100 text-[14px] font-bold text-[#17171a]"><Copy size={16} /> Copy the list of old files</button>
+          <button type="button" onClick={onClose} className="h-12 w-full rounded-full border-0 bg-[#17171a] text-[15px] font-semibold text-white">Done</button>
+        </div>
       ) : step === 'working' ? (
         <div className="grid place-items-center gap-3 px-6 py-12 text-center">
           <Loader2 size={30} className="animate-spin" style={{ color: accent }} />
@@ -152,7 +165,7 @@ export function PrivacySheet({ open, onClose, memory, accent }: { open: boolean;
                   <li>• Photos and the page layout are locked on your phone before they go to the cloud, so nobody else, not even us, can read them.</li>
                   <li>• People you invite with a link get the key inside the link. They do not type any code.</li>
                   <li>• You get a <b>recovery code</b> to open your private books on a new phone. We ask for it now and then so you do not forget it. If you lose both your phone and the code, the book cannot be recovered.</li>
-                  <li>• The title, cover and full-quality Drive copies are not locked yet.</li>
+                  <li>• The title, cover and the full-quality originals (Google Drive or Supabase) are locked too.</li>
                 </ul>
                 {err && <p role="alert" className="m-0 text-[13px] font-semibold text-[#d6455d]">{err}</p>}
                 <motion.button type="button" whileTap={{ scale: 0.97 }} disabled={busy || vault === 'unknown'} onClick={() => void start()} className="flex h-13 min-h-12 w-full items-center justify-center gap-2 rounded-full border-0 bg-[#17171a] text-[15.5px] font-semibold text-white disabled:opacity-35">
@@ -197,6 +210,14 @@ export function PrivacyGate() {
     let alive = true
     void codeCheckDue(user.uid).then((due) => { if (alive && due) setMode('check') })
     return () => { alive = false }
+  }, [user])
+
+  // a key arrived for a book: show its real title and cover
+  useEffect(() => {
+    if (!user) return
+    const on = (e: Event) => { void hydrateMeta((e as CustomEvent<string>).detail).catch(() => {}) }
+    window.addEventListener('mt-key', on)
+    return () => window.removeEventListener('mt-key', on)
   }, [user])
 
   // the owner replaced a book's key (someone was removed) and this phone just received the new one

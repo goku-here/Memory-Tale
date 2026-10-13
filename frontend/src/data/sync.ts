@@ -37,6 +37,16 @@ export function reportError(e: unknown) {
 }
 
 /* ---------- private books ---------- */
+/** what the cloud shows instead of a private book's title and cover */
+export const PRIVATE_TITLE = 'Private book'
+export const PRIVATE_COVER = { type: 'color' as const, value: '#8A8F9C', tone: 'light' as const }
+
+/** the title and cover of a private book, locked into one string */
+export const sealMeta = (key: CryptoKey, m: Pick<Memory, 'title' | 'cover'>) => encryptText(key, JSON.stringify({ title: m.title, cover: m.cover }))
+export async function openMeta(key: CryptoKey, packed: string): Promise<{ title: string; cover: Memory['cover'] } | null> {
+  try { return JSON.parse(await decryptText(key, packed)) } catch { return null }
+}
+
 /** the key of a private book on this phone: null for an ordinary book; throws when the book is private but the key is missing */
 async function privateKey(memoryId: string): Promise<CryptoKey | null> {
   const m = await local.memories.get(memoryId)
@@ -152,8 +162,19 @@ export function subscribeMemories(
   setSyncStatus({ state: 'syncing' })
   return onSnapshot(
     query(collection(d, 'memories'), where('memberIds', 'array-contains', uid)),
-    (snap) => {
-      onChange(snap.docChanges().map((c) => ({ type: c.type, memory: { ...(c.doc.data() as Memory), id: c.doc.id } })), first)
+    async (snap) => {
+      const changes = await Promise.all(snap.docChanges().map(async (c) => {
+        const memory = { ...(c.doc.data() as Memory & { meta?: string }), id: c.doc.id }
+        // a private book's title and cover arrive locked: open them with this phone's key (without it the placeholder stays)
+        if (memory.meta) {
+          const key = await getBookKey(memory.id)
+          const opened = key ? await openMeta(key, memory.meta) : null
+          if (opened) { memory.title = opened.title; memory.cover = opened.cover }
+          delete memory.meta
+        }
+        return { type: c.type, memory: memory as Memory }
+      }))
+      onChange(changes, first)
       first = false
       setSyncStatus({ state: snap.metadata.hasPendingWrites ? 'syncing' : 'synced' })
     },
@@ -173,6 +194,12 @@ export async function pushMemory(uid: string, m: Memory) {
   delete (details as { joinToken?: string }).joinToken
   let exists = false
   try { exists = (await getDoc(ref)).exists() } catch { /* offline and not cached: treat as new */ }
+  if (m.e2ee) {
+    // a private book: the title and cover go up locked, never as readable text
+    const key = await getBookKey(m.id)
+    const d2 = details as Partial<Memory> & { meta?: string }
+    if (key) { d2.meta = await sealMeta(key, m); d2.title = PRIVATE_TITLE; d2.cover = PRIVATE_COVER } else { delete d2.title; delete d2.cover } // no key: leave them as they are in the cloud
+  }
   if (exists) {
     await setDoc(ref, clean({ ...details, updatedAt: m.updatedAt ?? Date.now() }), { merge: true })
   } else {
@@ -330,6 +357,8 @@ export interface Invite {
   members?: Memory['members']
   /** what the person who opens the link may do (older links: edit) */
   role?: 'edit' | 'view'
+  /** private book: the real title and cover, locked (the link's key opens them) */
+  meta?: string
 }
 interface Who { uid: string; name: string; photo?: string | null }
 
@@ -363,8 +392,15 @@ export async function createInvite(who: Who, m: Memory, role: 'edit' | 'view' = 
   if (!real.some((x) => x.id === who.uid)) real.unshift({ id: who.uid, name: who.name, color, photo: who.photo ?? undefined })
   const members = real.slice(0, 6)
   try { await updateDoc(doc(d, 'memories', m.id), clean({ members, updatedAt: Date.now() })) } catch { /* guests can't rewrite the list; the invite still carries it */ }
+  let preview: { title: string; cover: Memory['cover']; meta?: string } = { title: m.title, cover }
+  if (m.e2ee) {
+    const key = await getBookKey(m.id)
+    if (!key) throw new Error('locked')
+    // the preview is locked too: the link's own key opens it on the other person's phone
+    preview = { title: PRIVATE_TITLE, cover: PRIVATE_COVER, meta: await sealMeta(key, { title: m.title, cover }) }
+  }
   const invite = clean({
-    memoryId: m.id, createdBy: who.uid, createdAt: Date.now(), title: m.title, themeId: m.themeId, date: m.date, cover,
+    memoryId: m.id, createdBy: who.uid, createdAt: Date.now(), ...preview, themeId: m.themeId, date: m.date,
     ownerName: who.name, ownerPhoto: who.photo ?? undefined, members, role,
   })
   await setDoc(doc(d, 'invites', token), invite)
@@ -458,4 +494,15 @@ export async function rekeyCloud(memoryId: string, oldKey: CryptoKey, newKey: Cr
     const data = await decryptText(oldKey, v.enc)
     await setDoc(x.ref, { enc: await encryptText(newKey, data) })
   }
+}
+
+/** a key just arrived for a private book: read its real title and cover from the cloud into the local copy */
+export async function hydrateMeta(memoryId: string) {
+  const d = getDb()
+  const key = await getBookKey(memoryId)
+  if (!d || !key) return
+  const snap = await getDoc(doc(d, 'memories', memoryId))
+  const meta = (snap.data() as { meta?: string } | undefined)?.meta
+  const opened = meta ? await openMeta(key, meta) : null
+  if (opened) { await local.memories.update(memoryId, { title: opened.title, cover: opened.cover }); window.dispatchEvent(new Event('mt-local-changed')) }
 }
