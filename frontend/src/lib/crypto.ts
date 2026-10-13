@@ -67,3 +67,23 @@ export async function vaultKeyFromCode(code: string, salt: string) {
   const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: unb64u(salt), iterations: 250_000 }, base, 256)
   return importKey(b64u(new Uint8Array(bits)))
 }
+
+/* ---------- original photos: each file gets its own key ---------- */
+export const newFileKey = () => b64u(crypto.getRandomValues(new Uint8Array(32)))
+
+/** iv + ciphertext, as one blob: this is all the cloud ever receives */
+export async function sealBlob(rawKey: string, blob: Blob): Promise<Blob> {
+  const k = await importKey(rawKey)
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, k, await blob.arrayBuffer()))
+  const out = new Uint8Array(iv.length + ct.length)
+  out.set(iv); out.set(ct, iv.length)
+  return new Blob([out], { type: 'application/octet-stream' })
+}
+
+export async function openBlob(rawKey: string, sealed: Blob, type = 'image/jpeg'): Promise<Blob> {
+  const k = await importKey(rawKey)
+  const all = new Uint8Array(await sealed.arrayBuffer())
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: all.subarray(0, 12) }, k, all.subarray(12))
+  return new Blob([pt], { type })
+}

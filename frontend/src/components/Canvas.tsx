@@ -8,6 +8,7 @@ import { useCanvas } from '../data/useCanvas'
 import { uid } from '../lib/id'
 import { compressImage } from '../lib/image'
 import { uploadOriginal } from '../lib/supabase'
+import { newFileKey } from '../lib/crypto'
 import { connectDrive, driveConfigured, isConnected } from '../lib/drive'
 import { discardOriginal, loadOriginalBlob, markForDiscard, missingCopies, prefs, purgeFlagged, queueOriginal, replicateBook, runPendingDiscards, unmarkDiscard } from '../data/originals'
 import { reportError } from '../data/sync'
@@ -488,6 +489,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       const ids = imgs.map(() => uid())
       const driveOn = !!user && isConnected() && prefs.backup()
       const pids = ids.map(() => uid())
+      // a private book: every original gets its own key and is locked before it leaves this phone
+      const fks = ids.map(() => (memory.e2ee ? newFileKey() : undefined))
       const sizes = imgs.map((img) => ({ width: w, height: frameHeight('polaroid', w, img.width / img.height), rotation: Math.round(rnd(-2, 2) * 10) / 10 }))
       // start under the header, at the top of what is visible, then flow downward in selection order
       const r = surface.current!.getBoundingClientRect()
@@ -498,7 +501,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
         return [...cur, ...imgs.map((img, i) => ({
           id: ids[i], type: 'photo' as const, zIndex: z++, width: sizes[i].width, height: sizes[i].height, rotation: sizes[i].rotation,
           x: spots[i].x, y: spots[i].y,
-          props: { src: img.dataUrl, thumb: img.thumb, aspect: img.width / img.height, frame: 'polaroid' as FrameId, radius: 4, caption: '', originalId: driveOn ? pids[i] : undefined },
+          props: { src: img.dataUrl, thumb: img.thumb, aspect: img.width / img.height, frame: 'polaroid' as FrameId, radius: 4, caption: '', originalId: driveOn ? pids[i] : undefined, originalKey: fks[i] },
         }))]
       })
       setSelectedId(ids[0])
@@ -515,11 +518,11 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       setBusy(null)
       // keep the untouched originals in the cloud, one by one, in the background
       if (driveOn) {
-        for (let i = 0; i < list.length; i++) void queueOriginal(list[i], memory.id, pids[i])
+        for (let i = 0; i < list.length; i++) void queueOriginal(list[i], memory.id, pids[i], fks[i])
       } else if (user && !driveConfigured) {
         void (async () => {
           for (let i = 0; i < list.length; i++) {
-            const path = await uploadOriginal(list[i], `${user.uid}/${memory.id}`)
+            const path = await uploadOriginal(list[i], `${user.uid}/${memory.id}`, fks[i])
             if (path) patch(ids[i], { props: { original: path } })
           }
         })()
@@ -565,9 +568,13 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       patch(target.id, { height: frameHeight(target.props.frame, target.width, aspect), props: { src: img.dataUrl, thumb: img.thumb, aspect, original: undefined } }, true)
       if (user && isConnected() && prefs.backup()) {
         const pid = uid()
-        patch(target.id, { props: { originalId: pid, original: undefined } })
-        void queueOriginal(file, memory.id, pid)
-      } else if (user && !driveConfigured) void uploadOriginal(file, `${user.uid}/${memory.id}`).then((path) => { if (path) patch(target.id, { props: { original: path } }) })
+        const fk = memory.e2ee ? newFileKey() : undefined
+        patch(target.id, { props: { originalId: pid, original: undefined, originalKey: fk } })
+        void queueOriginal(file, memory.id, pid, fk)
+      } else if (user && !driveConfigured) {
+        const fk = memory.e2ee ? newFileKey() : undefined
+        void uploadOriginal(file, `${user.uid}/${memory.id}`, fk).then((path) => { if (path) patch(target.id, { props: { original: path, originalKey: fk } }) })
+      }
     } catch {
       toast("Couldn't read that photo")
     }

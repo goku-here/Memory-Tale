@@ -11,6 +11,7 @@ import { collection, deleteDoc, deleteField, doc, getDoc, getDocs, query, setDoc
 import { getDb } from '../lib/firebase'
 import { DriveError, deleteFromDrive, downloadOwn, downloadShared, isConnected, myFileExists, shareByLink, uploadToDrive, getToken } from '../lib/drive'
 import { downloadOriginal } from '../lib/supabase'
+import { openBlob, sealBlob } from '../lib/crypto'
 import type { CanvasItem, PhotoProps } from '../types'
 import { uid as newId } from '../lib/id'
 import { db } from './db'
@@ -23,6 +24,8 @@ export interface OriginalRecord {
   mime: string
   size: number
   createdAt: number
+  /** the stored file is locked (private book): only the book's key holders can open it */
+  enc?: boolean
   copies: Record<string, { fileId: string; at: number }>
 }
 
@@ -124,9 +127,9 @@ const kick = () => { processUploads().catch((e) => { console.warn('[originals]',
 async function refreshQueued() { setStatus({ queued: await db.uploads.count() }) }
 
 /** Called when a photo is added: remember the untouched file and start saving it to Drive. */
-export async function queueOriginal(file: Blob & { name?: string }, memoryId: string, photoId: string) {
+export async function queueOriginal(file: Blob & { name?: string }, memoryId: string, photoId: string, fileKey?: string) {
   await db.uploads.put({
-    id: photoId, memoryId, name: file.name || `${photoId}.jpg`, mime: file.type || 'image/jpeg', blob: file, tries: 0, createdAt: Date.now(),
+    id: photoId, memoryId, name: file.name || `${photoId}.jpg`, mime: file.type || 'image/jpeg', blob: file, tries: 0, createdAt: Date.now(), fk: fileKey,
   })
   await refreshQueued()
   kick()
@@ -154,14 +157,15 @@ export async function processUploads() {
       try {
         let fileId = job.fileId
         if (!fileId) {
-          fileId = await uploadToDrive(job.blob, job.name, job.mime)
+          // a private book's original is locked first: Google only ever holds scrambled bytes and a meaningless name
+          fileId = job.fk ? await uploadToDrive(await sealBlob(job.fk, job.blob), `${job.id}.mtenc`, 'application/octet-stream') : await uploadToDrive(job.blob, job.name, job.mime)
           await shareByLink(fileId)
           await db.uploads.update(job.id, { fileId })
         }
         const d = getDb()
         if (d) {
           await setDoc(doc(d, 'memories', job.memoryId, 'originals', job.id), {
-            uploaderUid: uid, name: job.name, mime: job.mime, size: job.blob.size, createdAt: Date.now(),
+            uploaderUid: uid, name: job.fk ? `${job.id}.mtenc` : job.name, mime: job.mime, size: job.blob.size, createdAt: Date.now(), ...(job.fk ? { enc: true } : {}),
             copies: { [uid]: { fileId, at: Date.now() } },
           }, { merge: true })
         }
@@ -190,6 +194,11 @@ export async function processUploads() {
 /* ---------- reading an original ---------- */
 /** Best available full-quality file: queued on this phone, my Drive copy, a member's shared copy, or the old Supabase one. */
 export async function loadOriginalBlob(memoryId: string, photo: PhotoProps, uid?: string): Promise<Blob | null> {
+  // private books: the stored file is scrambled; the photo carries the key that opens it
+  const open = async (b: Blob | null, type?: string) => {
+    if (!b || !photo.originalKey) return b
+    try { return await openBlob(photo.originalKey, b, type) } catch { return null }
+  }
   if (photo.originalId) {
     const queued = await db.uploads.get(photo.originalId)
     if (queued) return queued.blob
@@ -197,16 +206,16 @@ export async function loadOriginalBlob(memoryId: string, photo: PhotoProps, uid?
       const rec = await getRecord(memoryId, photo.originalId)
       if (rec) {
         const mine = uid ? rec.copies[uid] : undefined
-        if (mine) { const b = await downloadOwn(mine.fileId); if (b) return b }
+        if (mine) { const b = await open(await downloadOwn(mine.fileId), rec.mime); if (b) return b }
         for (const [u, c] of Object.entries(rec.copies)) {
           if (u === uid) continue
-          const b = await downloadShared(c.fileId)
+          const b = await open(await downloadShared(c.fileId), rec.mime)
           if (b) return b
         }
       }
     } catch (e) { reportError(e) }
   }
-  if (photo.original) return downloadOriginal(photo.original)
+  if (photo.original) return downloadOriginal(photo.original, photo.originalKey)
   return null
 }
 
@@ -248,7 +257,7 @@ export async function replicateBook(memoryId: string, uid: string, opts: { repai
       for (const c of Object.values(r.copies)) { blob = await downloadShared(c.fileId); if (blob) break }
       if (!blob) skipped++
       else {
-        const fileId = await uploadToDrive(blob, r.name, r.mime)
+        const fileId = await uploadToDrive(blob, r.name, r.enc ? 'application/octet-stream' : r.mime)
         await shareByLink(fileId)
         if (d) await updateDoc(doc(d, 'memories', memoryId, 'originals', r.id), { [`copies.${uid}`]: { fileId, at: Date.now() } })
         done++

@@ -76,6 +76,8 @@ export interface PhotoProps {
   original?: string
   /** id of the original's record (originals live in members' Google Drives) */
   originalId?: string
+  /** private books: the key that unlocks this photo's original (the item itself is encrypted, so this stays secret) */
+  originalKey?: string
   /** tiny blurred preview (data URL) shown while the photo loads */
   thumb?: string
   /** used as a background: full canvas width, behind everything else, only moves up and down */

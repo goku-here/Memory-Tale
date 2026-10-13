@@ -22,6 +22,8 @@ export interface UploadJob {
   createdAt: number
   /** set once the file is in Drive, so a retry never uploads it twice */
   fileId?: string
+  /** private book: the file is locked with this key before it leaves the phone */
+  fk?: string
 }
 
 class KeepsakeDB extends Dexie {
