@@ -96,7 +96,7 @@ export function FeedbackForm({ accent }: { accent: string }) {
 
       {state === 'failed' && (
         <p role="alert" className="m-0 text-[13px] font-semibold text-[#d6455d]">
-          Couldn&apos;t send it just now. Check your connection and try again, or write to <a href={`mailto:${MAILTO}`} className="text-[#d6455d]">{MAILTO}</a>.
+          Couldn&apos;t send it just now. Check your connection and try again, or <a href={`mailto:${MAILTO}`} className="text-[#d6455d]">email the developer</a>.
           {why && <span className="mt-1 block text-[11.5px] font-medium opacity-80">Reason: {why}</span>}
         </p>
       )}
