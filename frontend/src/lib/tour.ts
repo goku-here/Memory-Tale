@@ -13,12 +13,15 @@ let state: TourState = { active: false, script: 'main', step: 0, phase: 'intro' 
 const subs = new Set<() => void>()
 const set = (s: TourState) => { state = s; subs.forEach((f) => f()) }
 
-export const tourSeen = (script: Script = 'main') => { try { return localStorage.getItem(KEYS[script]) !== null } catch { return true } }
+/** the guided tour is switched off for now: set to true to bring it back (first-run tour, tips and "Replay the tour") */
+export const TOUR_ENABLED = false
+
+export const tourSeen = (script: Script = 'main') => { if (!TOUR_ENABLED) return true; try { return localStorage.getItem(KEYS[script]) !== null } catch { return true } }
 const mark = (script: Script) => { try { localStorage.setItem(KEYS[script], 'done') } catch { /* private mode */ } }
 
 export const tour = {
   /** begin (or replay) a tour from the first step */
-  start(script: Script = 'main') { set({ active: true, script, step: 0, phase: 'intro' }) },
+  start(script: Script = 'main') { if (!TOUR_ENABLED) return; set({ active: true, script, step: 0, phase: 'intro' }) },
   /** leave the tour for good (skip or finish) */
   stop() { mark(state.script); set({ ...state, active: false, step: 0, phase: 'intro' }) },
   /** never show the first-run tour to this person (they already have books) */

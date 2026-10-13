@@ -7,7 +7,7 @@ import { getSyncStatus, onSyncStatus } from '../data/sync'
 import { DriveSettings } from './DriveSettings'
 import { ToolSheet } from './ToolSheet'
 import { ConfirmDialog, toast } from './ui'
-import { tour } from '../lib/tour'
+import { TOUR_ENABLED, tour } from '../lib/tour'
 
 function GoogleG() {
   return (
@@ -125,12 +125,14 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
           </div>
         )}
 
+        {TOUR_ENABLED && (
         <motion.button
           type="button" whileTap={{ scale: 0.96 }} onClick={() => { onClose(); window.setTimeout(() => tour.start(), 350) }}
           className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full border-0 bg-neutral-100 text-[15px] font-semibold text-[#17171a]"
         >
           <Sparkles size={18} /> Replay the tour
         </motion.button>
+        )}
 
         <div>
           <div className="mb-1.5 px-1 text-[12px] font-extrabold uppercase tracking-wider text-neutral-400">About and legal</div>
