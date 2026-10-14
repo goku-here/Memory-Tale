@@ -147,7 +147,7 @@ export default function App() {
       <Home
         memories={memories}
         loading={loading}
-        hiddenId={opening?.mode === 'open' ? opening.memory.id : null}
+        hiddenId={opening ? opening.memory.id : null}
         onSettings={() => setSettingsOpen(true)}
         onReorder={(ids) => void reorder(ids)}
         onAdd={() => { setSheet({ mode: 'create' }); tour.emit('create-open') }}

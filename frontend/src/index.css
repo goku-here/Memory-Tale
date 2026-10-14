@@ -47,3 +47,12 @@ body {
 
 @keyframes float-shape { 0%,100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-14px) rotate(6deg); } }
 .float-shape { animation: float-shape 7s ease-in-out infinite; will-change: transform; }
+
+/* the "Add memory" button: a turning blend of blue, light blue, violet and pink behind its label */
+.mt-aurora {
+  position: absolute; left: 50%; top: 50%; width: 320%; aspect-ratio: 1; pointer-events: none;
+  background: conic-gradient(from 0deg, #2f6bff, #5bc8ff, #8b5cf6, #ff6fb5, #2f6bff);
+  transform: translate(-50%, -50%); animation: mt-aurora-turn 3s linear infinite;
+}
+@keyframes mt-aurora-turn { to { transform: translate(-50%, -50%) rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .mt-aurora { animation: none; } }
