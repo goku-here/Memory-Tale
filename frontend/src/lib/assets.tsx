@@ -10,6 +10,13 @@ export const isRef = (s?: string): s is string => !!s && s.startsWith(REF)
 
 /** id -> data URL, kept for the session so scrolling back never re-fetches */
 const mem = new Map<string, string>()
+/** the oldest pictures are dropped from memory beyond this many (they are fetched again when needed) */
+const MEM_MAX = 150
+const remember = (id: string, data: string) => {
+  mem.delete(id)
+  mem.set(id, data)
+  while (mem.size > MEM_MAX) mem.delete(mem.keys().next().value as string)
+}
 
 export async function resolveRef(memoryId: string, src: string): Promise<string> {
   if (!isRef(src)) return src
@@ -17,7 +24,7 @@ export async function resolveRef(memoryId: string, src: string): Promise<string>
   const hit = mem.get(id)
   if (hit) return hit
   const data = await loadAssetData(memoryId, id)
-  if (data) mem.set(id, data)
+  if (data) remember(id, data)
   return data ?? ''
 }
 

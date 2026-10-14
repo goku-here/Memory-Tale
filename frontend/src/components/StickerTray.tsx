@@ -276,7 +276,7 @@ export function StickerTray({ accent, onPick, onPickMany, onFrame }: Props) {
         </div>
       ) : (
         cats.map((c) => (
-          <section key={c} data-cat={c} ref={(el) => { sections.current[c] = el }} className="px-4 pt-4">
+          <section key={c} data-cat={c} ref={(el) => { sections.current[c] = el }} className="px-4 pt-4" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 420px' }}>
             <h3 className="m-0 mb-1 px-1 text-[13px] font-extrabold uppercase tracking-wider text-neutral-400">{c}</h3>
             <div className="grid grid-cols-4 gap-1">
               {STICKERS[c].map((s, i) => {

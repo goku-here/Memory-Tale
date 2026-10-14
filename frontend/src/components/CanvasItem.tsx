@@ -16,6 +16,8 @@ interface ItemProps {
   item: CanvasItem
   canvasW: number
   selected: boolean
+  /** scrolled far off screen: keep the box, draw nothing (frees pictures and filters, keeps long books smooth) */
+  far?: boolean
   onSlot: (id: string, index: number) => void
   onViewSlot: (id: string, index: number) => void
   onItemClick: (id: string) => void
@@ -116,8 +118,8 @@ export function ItemBody({
 }
 
 /** One item on the canvas. Positioned by centre (x in %, y in px). */
-export const CanvasItemView = memo(function CanvasItemView({ item, canvasW, selected, onSlot, onViewSlot, onItemClick, dragging, editing, onPointerDown, onMeasure, onEditText, onEditDone }: ItemProps) {
-  const body = (
+export const CanvasItemView = memo(function CanvasItemView({ item, canvasW, selected, far, onSlot, onViewSlot, onItemClick, dragging, editing, onPointerDown, onMeasure, onEditText, onEditDone }: ItemProps) {
+  const body = far ? null : (
     <ItemBody item={item} editing={editing} selected={selected} onSlot={(i) => onSlot(item.id, i)} onView={(i) => onViewSlot(item.id, i)} onMeasure={onMeasure} onEditText={onEditText} onEditDone={onEditDone} />
   )
 
@@ -130,7 +132,7 @@ export const CanvasItemView = memo(function CanvasItemView({ item, canvasW, sele
         left: 0, top: 0, width: item.width, height: item.type === 'text' ? 'auto' : item.height,
         marginLeft: -item.width / 2, marginTop: -item.height / 2,
         x: (item.x / 100) * canvasW, y: item.y, rotate: item.rotation, zIndex: item.zIndex,
-        touchAction: selected ? 'none' : 'pan-x pan-y', cursor: dragging ? 'grabbing' : 'grab', willChange: 'transform',
+        touchAction: selected ? 'none' : 'pan-x pan-y', cursor: dragging ? 'grabbing' : 'grab', willChange: far ? undefined : 'transform',
         // a background does not catch taps until it is chosen (from its "Background" tab)
         pointerEvents: item.type === 'photo' && item.props.background && !selected ? 'none' : undefined,
       }}

@@ -52,7 +52,8 @@ export function useCanvas(memoryId: string, uid?: string, readOnly = false) {
 
   const schedule = useCallback(() => {
     window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => void flush(), 600)
+    // a long book is a lot to write: wait a little longer between saves
+    timer.current = window.setTimeout(() => void flush(), ref.current.length > 80 ? 1800 : 600)
   }, [flush])
 
   useEffect(() => {

@@ -88,7 +88,15 @@ function dataUrlsOf(item: CanvasItem) {
   return out
 }
 
-const toJson = (item: CanvasItem) => JSON.stringify(swapAssets(item, (v) => (isData(v) ? REF + assetId(v) : v)))
+/** an item that did not change is the same object as before, so its JSON is reused instead of being rebuilt */
+const jsonCache = new WeakMap<object, string>()
+const toJson = (item: CanvasItem) => {
+  const hit = jsonCache.get(item)
+  if (hit !== undefined) return hit
+  const out = JSON.stringify(swapAssets(item, (v) => (isData(v) ? REF + assetId(v) : v)))
+  jsonCache.set(item, out)
+  return out
+}
 
 /** Re-encode an oversized image so it fits in a 1 MB Firestore document. */
 async function fit(data: string): Promise<string> {

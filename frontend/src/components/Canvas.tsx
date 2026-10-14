@@ -186,6 +186,22 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   const [threadTap, setThreadTap] = useState<{ id: string; x: number; y: number } | null>(null)
   const selectedThread = useMemo(() => (readOnly ? undefined : items.find((i): i is Extract<CanvasItem, { type: 'thread' }> => i.id === selectedId && i.type === 'thread')), [items, selectedId, readOnly])
   const visibleItems = useMemo(() => vItems.filter((i) => i.type !== 'thread'), [vItems])
+  /** the stretch of the page (canvas px) that is on screen or close to it: everything else is not drawn */
+  const [range, setRange] = useState({ top: -1e9, bottom: 1e9 })
+  const rangeRef = useRef(range)
+  const updateRange = useCallback(() => {
+    const sc = scroller.current
+    if (!sc) return
+    const z = zoomRef.current
+    const vh = sc.clientHeight / z
+    const top = (sc.scrollTop - (wrap.current?.offsetTop ?? 0)) / z
+    const next = { top: top - vh * 1.3, bottom: top + vh * 2.3 }
+    const cur = rangeRef.current
+    // only redraw when the window has moved a good part of a screen
+    if (Math.abs(next.top - cur.top) < vh * 0.45 && Math.abs(next.bottom - cur.bottom) < vh * 0.45) return
+    rangeRef.current = next
+    setRange(next)
+  }, [])
   const photoCount = useMemo(() => items.filter((i) => i.type === 'photo').length, [items])
   const drawing = sheet === 'draw'
   const [editDrawId, setEditDrawId] = useState<string | null>(null)
@@ -995,9 +1011,18 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     if (selectedId && !items.some((i) => i.id === selectedId)) setSelectedId(null)
   }, [items, selectedId])
 
+  // keep the drawn window right when the page opens, is zoomed or changes size
+  useEffect(() => { rangeRef.current = { top: -1e9, bottom: 1e9 }; updateRange() }, [zoom, canvasW, cv.loaded, updateRange])
+  const isFar = (it: CanvasItem) => {
+    if (it.id === selectedId || it.id === draggingId || it.id === editingId || (selected?.groupId && it.groupId === selected.groupId)) return false
+    const half = Math.max(it.width, it.height) * 0.75
+    return it.y + half < range.top || it.y - half > range.bottom
+  }
+
   const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget
     scrollY.set(el.scrollTop)
+    updateRange()
     if (el.scrollTop + el.clientHeight > heightRef.current * zoomRef.current - 700) setHeight(heightRef.current + 1200)
   }
 
@@ -1249,6 +1274,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
                 <CanvasItemView
                   key={it.id} item={it} canvasW={canvasW}
                   selected={selectedId === it.id}
+                  far={isFar(it)}
                   onSlot={onSlot}
                   onViewSlot={onViewSlot}
                   onItemClick={onItemClick}
