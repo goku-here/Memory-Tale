@@ -153,7 +153,7 @@ export interface DividerProps {
   color: string
 }
 
-export type BubbleShape = 'speech' | 'thought' | 'shout' | 'whisper' | 'box'
+export type BubbleShape = 'speech' | 'tall' | 'squircle' | 'two' | 'offscreen' | 'shout' | 'announce' | 'fade' | 'whisper' | 'think' | 'thought' | 'dream' | 'box' | 'dark'
 export interface BubbleProps {
   text: string
   shape: BubbleShape

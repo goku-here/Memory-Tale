@@ -112,7 +112,9 @@ export default function App() {
     }, 900)
   }, [startOpen])
 
-  const submit = async (m: Memory, isNew: boolean) => {
+  /** a book just created as private: its Privacy sheet opens when the book does */
+  const [privacyFor, setPrivacyFor] = useState<string | null>(null)
+  const submit = async (m: Memory, isNew: boolean, opts?: { makePrivate?: boolean }) => {
     if (isNew) {
       m = { ...m, order: Math.min(0, ...memories.map((x) => x.order ?? 0)) - 1 }
       if (user) m = { ...m, members: [{ id: user.uid, name: user.name, color: getTheme(m.themeId).palette[0], photo: user.photo ?? undefined }] }
@@ -130,6 +132,7 @@ export default function App() {
         burst(0.15, 60)
         burst(0.85, 120)
       }
+      if (opts?.makePrivate) setPrivacyFor(m.id)
       openWhenReady(m)
       tour.emit('memory-created')
     } else {
@@ -167,6 +170,8 @@ export default function App() {
             onShare={() => setShareId(openMemory.id)}
             onDelete={() => setConfirmDelete(openMemory)}
             onCanvasStyle={(cs) => void save({ ...openMemory, canvasStyle: cs })}
+            askPrivacy={privacyFor === openMemory.id}
+            onAskedPrivacy={() => setPrivacyFor(null)}
           />
         )}
       </AnimatePresence>
@@ -197,7 +202,7 @@ export default function App() {
         state={sheet}
         memory={sheetMemory}
         onClose={() => { setSheet(null); tour.emit('create-close') }}
-        onSubmit={(m, isNew) => void submit(m, isNew)}
+        onSubmit={(m, isNew, opts) => void submit(m, isNew, opts)}
       />
 
       <ConfirmDialog

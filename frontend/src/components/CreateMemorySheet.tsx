@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check, ChevronLeft, ImagePlus, Loader2 } from 'lucide-react'
+import { Check, ChevronLeft, ImagePlus, Loader2, Lock } from 'lucide-react'
 import { useRef, useState } from 'react'
 import type { CategoryId, Cover, Memory } from '../types'
 import { uid } from '../lib/id'
@@ -9,6 +9,7 @@ import { BookCover } from './BookCard'
 import { CATEGORY_ORDER, COVER_COLORS, THEMES, getTheme } from './ThemeEngine'
 import { ToolSheet } from './ToolSheet'
 import { PillButton } from './ui'
+import { useAuth } from '../data/useAuth'
 
 export type SheetState =
   | { mode: 'create' }
@@ -19,7 +20,8 @@ interface Props {
   state: SheetState | null
   memory?: Memory
   onClose: () => void
-  onSubmit: (m: Memory, isNew: boolean) => void
+  /** `makePrivate`: the person asked for the new book to be end-to-end locked */
+  onSubmit: (m: Memory, isNew: boolean, opts?: { makePrivate?: boolean }) => void
 }
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -66,6 +68,8 @@ function Form({ state, memory, onSubmit }: { state: SheetState } & Omit<Props, '
   const [cover, setCover] = useState<Cover>(memory?.cover ?? { type: 'color', value: THEMES.romantic.cover, tone: 'dark' })
   const [coverTouched, setCoverTouched] = useState(!isCreate)
   const [busy, setBusy] = useState(false)
+  const [priv, setPriv] = useState(false)
+  const { user } = useAuth()
   const fileRef = useRef<HTMLInputElement>(null)
   const theme = getTheme(themeId)
 
@@ -108,6 +112,7 @@ function Form({ state, memory, onSubmit }: { state: SheetState } & Omit<Props, '
         members: base.members ?? [{ id: 'me', name: 'You', color: THEMES[themeId].palette[0] }],
       },
       isCreate,
+      { makePrivate: isCreate && priv && !!user },
     )
   }
 
@@ -239,6 +244,24 @@ function Form({ state, memory, onSubmit }: { state: SheetState } & Omit<Props, '
               </div>
               <p className="m-0 mt-1 text-[12px] text-neutral-400">Photos are cropped to the 3:4 cover.</p>
             </div>
+
+            {isCreate && (
+              <button
+                type="button" role="switch" aria-checked={priv && !!user} disabled={!user} onClick={() => setPriv((v) => !v)}
+                className="mx-5 flex min-h-16 items-center gap-3 rounded-2xl border-0 bg-neutral-50 px-4 py-2.5 text-left disabled:opacity-60" style={{ width: 'calc(100% - 40px)' }}
+              >
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full" style={{ background: priv && user ? '#2db574' : '#e4e4ea', color: '#fff' }}><Lock size={18} /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-bold text-[#17171a]">Make it private</span>
+                  <span className="block text-[12.5px] leading-snug text-neutral-500">
+                    {user ? 'Locked end to end: only the people you invite can see its photos.' : 'Sign in with Google to make private books.'}
+                  </span>
+                </span>
+                <span className="relative h-7 w-12 shrink-0 rounded-full transition-colors" style={{ background: priv && user ? '#17171a' : '#d4d4da' }}>
+                  <span className="absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all" style={{ left: priv && user ? 22 : 2 }} />
+                </span>
+              </button>
+            )}
 
             <div className="px-5 pt-1">
               <PillButton className="w-full" onClick={submit} disabled={busy}>

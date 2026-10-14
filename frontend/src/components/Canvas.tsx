@@ -41,7 +41,7 @@ import { stickerRatio } from './stickers'
 import { TextEditor } from './TextEditor'
 import { FloatingShapes, getTheme, themeVars } from './ThemeEngine'
 import { ToolSheet } from './ToolSheet'
-import { BubbleEditor } from './Bubble'
+import { BUBBLE_SHAPES, BubbleEditor } from './Bubble'
 import { CameraCapture } from './CameraCapture'
 import { Lightbox, type ViewerImage } from './Lightbox'
 import { ToolSheet as Sheet } from './ToolSheet'
@@ -66,6 +66,9 @@ interface CanvasProps {
   onCanvasStyle: (cs: CanvasStyle) => void
   /** while the book opens/closes the canvas shows through a window shaped like the book */
   reveal?: { p: MotionValue<number>; rect: DOMRect }
+  /** a book just made as private: open its Privacy sheet once it is on screen */
+  askPrivacy?: boolean
+  onAskedPrivacy?: () => void
 }
 
 type Sheet = 'templates' | 'collage' | 'frame' | 'sticker' | 'text' | 'draw' | 'location' | 'bubble' | null
@@ -89,7 +92,7 @@ const ZMAX = 3
 /** phones open photos with a tap; the expand button is only for mouse users */
 const hasMouse = () => typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches && !window.matchMedia('(pointer: coarse)').matches
 
-export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onCanvasStyle, reveal }: CanvasProps) {
+export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onCanvasStyle, reveal, askPrivacy, onAskedPrivacy }: CanvasProps) {
   const theme = getTheme(memory.themeId)
   const [cstyle, setCstyle] = useState<CanvasStyle | undefined>(memory.canvasStyle)
   const [styleOpen, setStyleOpen] = useState(false)
@@ -147,6 +150,12 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   const [sizeOpen, setSizeOpen] = useState(false)
   const [peopleOpen, setPeopleOpen] = useState(false)
   const [privacyOpen, setPrivacyOpen] = useState(false)
+  useEffect(() => {
+    if (!askPrivacy || reveal) return
+    const t = window.setTimeout(() => { setPrivacyOpen(true); onAskedPrivacy?.() }, 500)
+    return () => window.clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askPrivacy, !!reveal])
   const [guides, setGuides] = useState<Guides | null>(null)
   const [storyPreview, setStoryPreview] = useState(false)
   const [storyY, setStoryYState] = useState(0)
@@ -1518,7 +1527,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
         onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, bubble: h }))}
       >
         {bubbleItem && (
-          <BubbleEditor value={bubbleItem.props as BubbleProps} accent={accent} onChange={(p) => patch(bubbleItem.id, { props: p })} />
+          <BubbleEditor value={bubbleItem.props as BubbleProps} accent={accent} onChange={(p) => patch(bubbleItem.id, { props: p, ...(p.shape ? { height: Math.round(bubbleItem.width * (BUBBLE_SHAPES.find((s) => s.id === p.shape)?.ratio ?? 0.72)) } : {}) })} />
         )}
       </ToolSheet>
 

@@ -5,26 +5,15 @@ const flyEase = cubicBezier(0.3, 0.1, 0.2, 1)
 export const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 
 /** the first part of the timeline: the book flies to the middle of the screen; the rest: it opens from there */
-const FLY = 0.24
-
-/** how many pages turn after the cover (they flip one after another, like leafing through the book) */
-export const LEAVES = 5
+const FLY = 0.3
 
 /** progress of the opening part alone, 0 .. 1 */
 const openAt = (v: number) => bookEase(clamp01((v - FLY) / (1 - FLY)))
 
-/** the angle of page `i` (0 = the one right under the cover): it turns after the cover has started, one after the other */
-export function leafSwing(v: number, i: number) {
-  // in plain (not eased) time, so the pages turn at an even, readable pace
-  const t = clamp01((v - FLY) / (1 - FLY))
-  const start = 0.06 + i * 0.12
-  return -170 * bookEase(clamp01((t - start) / 0.3))
-}
-
 /**
  * Where the book is at progress `v` (0 = on the shelf, 1 = open and filling the screen):
  *  - 0 .. FLY   it lifts off its slot and flies to the middle of the screen, growing to a comfortable size
- *  - FLY .. 1   it opens from the middle: the cover swings away on its spine, the pages turn, and the page grows to fill the screen
+ *  - FLY .. 1   it opens from the middle: the cover swings away on its spine, and the page grows to fill the screen
  * Going back (v from 1 to 0) plays the same thing in reverse.
  */
 export function bookPose(rect: DOMRect, v: number) {
