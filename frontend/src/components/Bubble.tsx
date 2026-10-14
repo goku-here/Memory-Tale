@@ -222,109 +222,147 @@ export function BubbleBody({
 interface EditorProps {
   value: BubbleProps
   accent: string
+  /** the bubble's box on the page, so the preview has the same proportions */
+  box: { width: number; height: number }
   onChange: (p: Partial<BubbleProps>) => void
 }
 
-export function BubbleEditor({ value, accent, onChange }: EditorProps) {
+const label = 'mb-2.5 block text-[12px] font-extrabold uppercase tracking-wider text-neutral-400'
+
+export function BubbleEditor({ value, accent, box, onChange }: EditorProps) {
   const ta = useRef<HTMLTextAreaElement>(null)
   useEffect(() => {
-    const t = setTimeout(() => { ta.current?.focus(); ta.current?.select() }, 380)
+    const t = setTimeout(() => { ta.current?.focus(); ta.current?.select() }, 420)
     return () => clearTimeout(t)
   }, [])
   const tails: { id: BubbleProps['tail']; label: string }[] = [
-    { id: 'left', label: 'Tail left' }, { id: 'right', label: 'Tail right' }, { id: 'none', label: 'No tail' },
+    { id: 'left', label: 'Left' }, { id: 'right', label: 'Right' }, { id: 'none', label: 'None' },
   ]
   const tailOk = BUBBLE_SHAPES.find((s) => s.id === value.shape)?.tail ?? false
+  // the preview shows the bubble the way it sits on the page, shrunk to fit the card
+  const k = Math.min(1, 250 / box.width, 150 / box.height)
+  const pw = Math.round(box.width * k)
+  const ph = Math.round(box.height * k)
+  const shapes = BUBBLE_SHAPES.filter((s) => !s.hidden || s.id === value.shape)
 
   return (
-    <div className="space-y-5 pb-2">
-      <div className="px-5">
-        <textarea
-          ref={ta} rows={2} value={value.text} onChange={(e) => onChange({ text: e.target.value })}
-          placeholder="What are they saying?" aria-label="Bubble text"
-          className="w-full resize-none rounded-2xl border-0 bg-neutral-100 p-4 text-[17px] text-[#17171a] outline-none"
-        />
+    <div className="px-5 pb-10">
+      {/* stays in view while the options below are changed */}
+      <div className="sticky top-0 z-10 -mx-5 bg-white px-5 pb-3 pt-1">
+        <div
+          className="grid h-[188px] place-items-center overflow-hidden rounded-3xl"
+          style={{ background: '#f4f3ef', backgroundImage: 'radial-gradient(rgba(23,23,26,.13) 1.2px, transparent 1.6px)', backgroundSize: '18px 18px', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.05)' }}
+          aria-label="How the bubble looks"
+        >
+          <div style={{ width: pw, height: ph }}>
+            <BubbleBody bubble={value} width={pw} height={ph} />
+          </div>
+        </div>
       </div>
 
-      <div className="no-scrollbar flex gap-2.5 overflow-x-auto px-5" style={{ touchAction: 'pan-x' }} role="radiogroup" aria-label="Bubble shape">
-        {BUBBLE_SHAPES.filter((s) => !s.hidden || s.id === value.shape).map((s) => {
-          const on = value.shape === s.id
-          const w = s.ratio > 1 ? 44 : 68
-          return (
-            <motion.button
-              key={s.id} type="button" role="radio" aria-checked={on} whileTap={{ scale: 0.94 }} onClick={() => onChange({ shape: s.id })}
-              className="flex w-[92px] shrink-0 flex-col items-center gap-1.5 rounded-2xl border-0 p-2"
-              style={{ background: on ? `${accent}18` : '#f6f6f8', boxShadow: on ? `inset 0 0 0 2px ${accent}` : 'none' }}
-            >
-              <div className="grid place-items-center" style={{ width: 72, height: 62 }}>
-                <div style={{ width: w, height: Math.min(60, w * s.ratio) }}>
-                  <BubbleBody bubble={{ ...value, shape: s.id, text: '', tail: s.tail ? (value.tail === 'none' ? 'left' : value.tail) : 'none' }} width={w} height={Math.min(60, w * s.ratio)} />
-                </div>
-              </div>
-              <span className="text-[11px] font-bold text-neutral-500">{s.label}</span>
-            </motion.button>
-          )
-        })}
-      </div>
+      <div className="space-y-7 pt-3">
+        <section>
+          <label className={label} htmlFor="bubble-text">Words</label>
+          <textarea
+            id="bubble-text" ref={ta} rows={2} value={value.text} onChange={(e) => onChange({ text: e.target.value })}
+            placeholder="What are they saying?"
+            className="w-full resize-none rounded-2xl border-0 bg-neutral-100 px-4 py-3.5 text-[17px] leading-snug text-[#17171a] outline-none"
+          />
+        </section>
 
-      <div className="flex gap-2 px-5" role="radiogroup" aria-label="Tail" style={{ opacity: tailOk ? 1 : 0.4 }}>
-        {tails.map((t) => (
-          <motion.button
-            key={t.id} type="button" role="radio" aria-checked={value.tail === t.id} disabled={!tailOk} whileTap={{ scale: 0.95 }}
-            onClick={() => onChange({ tail: t.id })}
-            className="h-11 flex-1 rounded-full border-0 text-[13px] font-bold"
-            style={value.tail === t.id ? { background: '#17171a', color: '#fff' } : { background: '#f1f1f3', color: '#55555f' }}
-          >
-            {t.label}
-          </motion.button>
-        ))}
-      </div>
+        <section>
+          <span className={label}>Shape</span>
+          <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label="Bubble shape">
+            {shapes.map((s) => {
+              const on = value.shape === s.id
+              const w = s.ratio > 1 ? 34 : 54
+              const h = Math.min(44, w * s.ratio)
+              return (
+                <motion.button
+                  key={s.id} type="button" role="radio" aria-checked={on} whileTap={{ scale: 0.94 }} onClick={() => onChange({ shape: s.id })}
+                  className="flex flex-col items-center gap-1.5 rounded-2xl border-0 px-1 pb-2 pt-2.5"
+                  style={{ background: on ? `${accent}18` : '#f6f6f8', boxShadow: on ? `inset 0 0 0 2px ${accent}` : 'none' }}
+                >
+                  <div className="grid h-[48px] w-full place-items-center">
+                    <div style={{ width: w, height: h }}>
+                      <BubbleBody bubble={{ ...value, shape: s.id, text: '', tail: s.tail ? (value.tail === 'none' ? 'left' : value.tail) : 'none' }} width={w} height={h} />
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-bold leading-tight text-neutral-500">{s.label}</span>
+                </motion.button>
+              )
+            })}
+          </div>
+        </section>
 
-      <div className="no-scrollbar flex gap-2 overflow-x-auto px-5" style={{ touchAction: 'pan-x' }} role="radiogroup" aria-label="Font">
-        {BUBBLE_FONTS.map((f) => {
-          const on = value.font === f.css
-          return (
-            <motion.button
-              key={f.css} type="button" role="radio" aria-checked={on} whileTap={{ scale: 0.94 }} onClick={() => onChange({ font: f.css })}
-              className="h-11 shrink-0 rounded-full border-0 px-4 text-[16px]"
-              style={{ fontFamily: f.css, ...(on ? { background: '#17171a', color: '#fff' } : { background: '#f1f1f3', color: '#333' }) }}
-            >
-              {f.label}
-            </motion.button>
-          )
-        })}
-      </div>
+        {tailOk && (
+          <section>
+            <span className={label}>Tail</span>
+            <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Tail">
+              {tails.map((t) => (
+                <motion.button
+                  key={t.id} type="button" role="radio" aria-checked={value.tail === t.id} whileTap={{ scale: 0.95 }}
+                  onClick={() => onChange({ tail: t.id })}
+                  className="h-12 rounded-2xl border-0 text-[14px] font-bold"
+                  style={value.tail === t.id ? { background: '#17171a', color: '#fff' } : { background: '#f1f1f3', color: '#55555f' }}
+                >
+                  {t.label}
+                </motion.button>
+              ))}
+            </div>
+          </section>
+        )}
 
-      <div className="flex items-center gap-3 px-5">
-        <span className="w-14 text-[12px] font-bold uppercase tracking-wider text-neutral-400">Outline</span>
-        <input
-          type="range" min={0} max={10} step={0.5} value={value.stroke ?? 2.2} aria-label="Outline thickness"
-          onChange={(e) => onChange({ stroke: +e.target.value })} className="h-11 flex-1" style={{ accentColor: accent }}
-        />
-      </div>
+        <section>
+          <span className={label}>Letters</span>
+          <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5" style={{ touchAction: 'pan-x' }} role="radiogroup" aria-label="Font">
+            {BUBBLE_FONTS.map((f) => {
+              const on = value.font === f.css
+              return (
+                <motion.button
+                  key={f.css} type="button" role="radio" aria-checked={on} whileTap={{ scale: 0.94 }} onClick={() => onChange({ font: f.css })}
+                  className="h-12 shrink-0 rounded-full border-0 px-5 text-[17px]"
+                  style={{ fontFamily: f.css, ...(on ? { background: '#17171a', color: '#fff' } : { background: '#f1f1f3', color: '#333' }) }}
+                >
+                  {f.label}
+                </motion.button>
+              )
+            })}
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <span className="w-16 text-[13px] font-bold text-neutral-500">Size</span>
+            <input
+              type="range" min={5} max={18} step={0.5} value={value.size} aria-label="Text size"
+              onChange={(e) => onChange({ size: +e.target.value })} className="h-11 flex-1" style={{ accentColor: accent }}
+            />
+          </div>
+        </section>
 
-      <div className="no-scrollbar flex gap-1 overflow-x-auto px-4" style={{ touchAction: 'pan-x' }} role="radiogroup" aria-label="Outline colour">
-        {BUBBLE_STROKE_COLORS.map((c) => {
-          const on = (value.strokeColor ?? INK).toLowerCase() === c.toLowerCase()
-          return (
-            <motion.button
-              key={c} type="button" role="radio" aria-checked={on} aria-label={`Outline ${c}`} whileTap={{ scale: 0.88 }}
-              onClick={() => onChange({ strokeColor: c })}
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-0 bg-transparent"
-            >
-              <span className="h-8 w-8 rounded-full" style={{ background: c, boxShadow: on ? `0 0 0 2px #fff, 0 0 0 4px ${accent}` : 'inset 0 0 0 1px rgba(0,0,0,.18)' }} />
-            </motion.button>
-          )
-        })}
+        <section>
+          <span className={label}>Outline</span>
+          <div className="flex items-center gap-3">
+            <span className="w-16 text-[13px] font-bold text-neutral-500">Thickness</span>
+            <input
+              type="range" min={0} max={10} step={0.5} value={value.stroke ?? 2.2} aria-label="Outline thickness"
+              onChange={(e) => onChange({ stroke: +e.target.value })} className="h-11 flex-1" style={{ accentColor: accent }}
+            />
+          </div>
+          <div className="no-scrollbar -mx-4 mt-1 flex gap-1 overflow-x-auto px-4" style={{ touchAction: 'pan-x' }} role="radiogroup" aria-label="Outline colour">
+            {BUBBLE_STROKE_COLORS.map((c) => {
+              const on = (value.strokeColor ?? INK).toLowerCase() === c.toLowerCase()
+              return (
+                <motion.button
+                  key={c} type="button" role="radio" aria-checked={on} aria-label={`Outline ${c}`} whileTap={{ scale: 0.88 }}
+                  onClick={() => onChange({ strokeColor: c })}
+                  className="grid h-12 w-12 shrink-0 place-items-center rounded-full border-0 bg-transparent"
+                >
+                  <span className="h-8 w-8 rounded-full" style={{ background: c, boxShadow: on ? `0 0 0 2px #fff, 0 0 0 4px ${accent}` : 'inset 0 0 0 1px rgba(0,0,0,.18)' }} />
+                </motion.button>
+              )
+            })}
+          </div>
+        </section>
       </div>
-
-      <label className="flex items-center gap-3 px-5">
-        <span className="text-[12px] font-bold uppercase tracking-wider text-neutral-400">Size</span>
-        <input
-          type="range" min={5} max={18} step={0.5} value={value.size} aria-label="Text size"
-          onChange={(e) => onChange({ size: +e.target.value })} className="h-11 flex-1" style={{ accentColor: accent }}
-        />
-      </label>
     </div>
   )
 }

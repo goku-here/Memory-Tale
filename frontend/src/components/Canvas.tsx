@@ -1523,11 +1523,11 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       </ToolSheet>
 
       <ToolSheet
-        open={sheet === 'bubble' && !!bubbleItem} onClose={closeSheet} title="Chat bubble" snaps={[0.58, 0.88]} dim={0.18} z={55}
+        open={sheet === 'bubble' && !!bubbleItem} onClose={closeSheet} title="Chat bubble" snaps={[0.94]} dim={0.32} z={55}
         onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, bubble: h }))}
       >
         {bubbleItem && (
-          <BubbleEditor value={bubbleItem.props as BubbleProps} accent={accent} onChange={(p) => patch(bubbleItem.id, { props: p, ...(p.shape ? { height: Math.round(bubbleItem.width * (BUBBLE_SHAPES.find((s) => s.id === p.shape)?.ratio ?? 0.72)) } : {}) })} />
+          <BubbleEditor value={bubbleItem.props as BubbleProps} accent={accent} box={{ width: bubbleItem.width, height: bubbleItem.height }} onChange={(p) => patch(bubbleItem.id, { props: p, ...(p.shape ? { height: Math.round(bubbleItem.width * (BUBBLE_SHAPES.find((s) => s.id === p.shape)?.ratio ?? 0.72)) } : {}) })} />
         )}
       </ToolSheet>
 
