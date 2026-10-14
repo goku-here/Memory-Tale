@@ -134,7 +134,7 @@ export const CanvasItemView = memo(function CanvasItemView({ item, canvasW, sele
         x: (item.x / 100) * canvasW, y: item.y, rotate: item.rotation, zIndex: item.zIndex,
         touchAction: selected ? 'none' : 'pan-x pan-y', cursor: dragging ? 'grabbing' : 'grab', willChange: far ? undefined : 'transform',
         // a background does not catch taps until it is chosen (from its "Background" tab)
-        pointerEvents: item.type === 'photo' && item.props.background && !selected ? 'none' : undefined,
+        pointerEvents: (item.type === 'photo' || item.type === 'collage') && item.props.background && !selected ? 'none' : undefined,
       }}
       initial={{ scale: 0.5, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}

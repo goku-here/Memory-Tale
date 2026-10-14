@@ -24,7 +24,7 @@ export interface Slot {
 export interface CollageDef {
   label: string
   /** frames are offered in the tray; pieces are what page templates are built from */
-  group: 'frames' | 'pieces'
+  group: 'frames' | 'pieces' | 'grids'
   /** artwork images (png/svg in /public) drawn under / over the pictures: the way to use designer-made frames */
   underImg?: string
   overImg?: string
@@ -397,12 +397,59 @@ const creamSheetDef: CollageDef = {
 
 const cameraDecoDef: CollageDef = { label: 'Instant camera', group: 'pieces', w: 100, h: 63, slots: [], over: <Camera x={0} y={0} w={100} /> }
 
+/* ---------- grids: 2, 3, 4, 5 or 6 pictures laid out in different ways ---------- */
+
+/** a layout: a leaf is one picture; a split cuts its box into weighted parts, side by side ('h') or one under the other ('v') */
+type Layout = 1 | { dir: 'h' | 'v'; parts: [number, Layout][] }
+const row = (...p: [number, Layout][]): Layout => ({ dir: 'h', parts: p })
+const col = (...p: [number, Layout][]): Layout => ({ dir: 'v', parts: p })
+
+function gridDef(label: string, H: number, layout: Layout, board: string, edge: string): CollageDef {
+  const m = 3.2, gap = 2.2, W = 100
+  const slots: Slot[] = []
+  const lay = (n: Layout, x: number, y: number, w: number, h: number) => {
+    if (n === 1) { slots.push({ x: +x.toFixed(2), y: +y.toFixed(2), w: +w.toFixed(2), h: +h.toFixed(2), shape: 'plain' }); return }
+    const total = n.parts.reduce((s, [k]) => s + k, 0)
+    const span = (n.dir === 'h' ? w : h) - gap * (n.parts.length - 1)
+    let at = n.dir === 'h' ? x : y
+    for (const [k, child] of n.parts) {
+      const len = (span * k) / total
+      if (n.dir === 'h') lay(child, at, y, len, h); else lay(child, x, at, w, len)
+      at += len + gap
+    }
+  }
+  lay(layout, m, m, W - m * 2, H - m * 2)
+  return {
+    label, group: 'grids', w: W, h: H, slots,
+    under: <rect x=".4" y=".4" width={W - .8} height={H - .8} rx="3" fill={board} stroke={edge} strokeWidth=".5" style={{ filter: 'drop-shadow(0 1px 1.4px rgba(40,30,30,.3)) drop-shadow(0 3px 5px rgba(40,30,30,.18))' }} />,
+  }
+}
+
+const WHITE = '#fffefb', CREAM = '#f6efe0', INK = '#1d1d22', ROSE = '#f7d9d6', SKY = '#d9e8f7', SAGE = '#dbe8d6'
+const GRID_LIST = {
+  grid2side: gridDef('2 photos, side by side', 62, row([1, 1], [1, 1]), WHITE, '#e8e4da'),
+  grid2stack: gridDef('2 photos, stacked', 124, col([1, 1], [1, 1]), CREAM, '#e0d6bf'),
+  grid2big: gridDef('2 photos, big and small', 66, row([2.1, 1], [1, 1]), ROSE, '#ebc3be'),
+  grid2tall: gridDef('2 photos, tall and wide', 112, col([1.7, 1], [1, 1]), INK, '#000'),
+  grid3left: gridDef('3 photos, one big', 70, row([1.6, 1], [1, col([1, 1], [1, 1])]), WHITE, '#e8e4da'),
+  grid3top: gridDef('3 photos, big on top', 104, col([1.5, 1], [1, row([1, 1], [1, 1])]), SKY, '#bcd2ea'),
+  grid3cols: gridDef('3 photos, three columns', 58, row([1, 1], [1, 1], [1, 1]), CREAM, '#e0d6bf'),
+  grid3rows: gridDef('3 photos, three rows', 132, col([1, 1], [1, 1], [1, 1]), WHITE, '#e8e4da'),
+  grid3right: gridDef('3 photos, one big on the right', 70, row([1, col([1, 1], [1, 1])], [1.6, 1]), SAGE, '#bfd3b8'),
+  grid4: gridDef('4 photos, square', 100, col([1, row([1, 1], [1, 1])], [1, row([1, 1], [1, 1])]), WHITE, '#e8e4da'),
+  grid4strip: gridDef('4 photos, big with a strip', 100, col([2.2, 1], [1, row([1, 1], [1, 1], [1, 1])]), INK, '#000'),
+  grid4side: gridDef('4 photos, long and short', 90, row([1.3, col([1, 1], [1, 1])], [1, col([1.4, 1], [1, 1])]), ROSE, '#ebc3be'),
+  grid5: gridDef('5 photos, mosaic', 84, col([1.2, row([1, 1], [1, 1])], [1, row([1, 1], [1, 1], [1, 1])]), CREAM, '#e0d6bf'),
+  grid6: gridDef('6 photos, three by two', 72, col([1, row([1, 1], [1, 1], [1, 1])], [1, row([1, 1], [1, 1], [1, 1])]), SKY, '#bcd2ea'),
+}
+
 /* ---------- the list ---------- */
 
 export type CollageKind =
   | 'camera3' | 'camera1' | 'polaroid' | 'stamp' | 'stampWide' | 'film4' | 'film3v' | 'disc'
   | 'ticketCream' | 'ticketPink' | 'ticketTeal' | 'ticketMustard' | 'ticketLilac'
   | 'paperLetter' | 'corkBoard' | 'creamSheet' | 'cameraDeco'
+  | keyof typeof GRID_LIST
 
 export const COLLAGES: Record<CollageKind, CollageDef> = {
   camera3: cameraDef(3),
@@ -422,8 +469,11 @@ export const COLLAGES: Record<CollageKind, CollageDef> = {
   corkBoard: corkBoardDef,
   creamSheet: creamSheetDef,
   cameraDeco: cameraDecoDef,
+  ...GRID_LIST,
 }
 
 export const FRAME_KINDS = (Object.keys(COLLAGES) as CollageKind[]).filter((k) => COLLAGES[k].group === 'frames')
+
+export const GRID_KINDS = (Object.keys(COLLAGES) as CollageKind[]).filter((k) => COLLAGES[k].group === 'grids')
 
 export { FrameArt }

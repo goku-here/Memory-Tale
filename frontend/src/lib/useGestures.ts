@@ -117,7 +117,7 @@ export function useGestures(opts: GestureOptions) {
     if (!pts.length) return
 
     const mine = o.current.itemsRef.current.find((i) => i.id === st.id)
-    const locked = mine?.type === 'photo' && !!mine.props.background // a background only slides up and down
+    const locked = (mine?.type === 'photo' || mine?.type === 'collage') && !!mine.props.background // a background only slides up and down
     if (locked && st.mode !== 'drag') return
 
     if (st.mode === 'drag') {

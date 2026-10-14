@@ -637,6 +637,21 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     }
   }
 
+  /** a grid collage <-> full-width background behind everything */
+  const setCollageBackground = (on: boolean) => {
+    const t = itemsRef.current.find((i) => i.id === selectedId)
+    if (t?.type !== 'collage') return
+    const d = COLLAGES[t.props.kind]
+    const others = itemsRef.current.filter((i) => i.id !== t.id)
+    if (on) {
+      const low = others.reduce((m, i) => Math.min(m, i.zIndex), 1) - 1
+      patch(t.id, { x: 50, rotation: 0, width: canvasW, height: Math.round((canvasW * d.h) / d.w), zIndex: low, props: { background: true } })
+    } else {
+      const w = Math.round(clamp(canvasW * 0.86, 150, 420))
+      patch(t.id, { x: 50, width: w, height: Math.round((w * d.h) / d.w), zIndex: nextZ(others), props: { background: false } })
+    }
+  }
+
   /** several stickers from the tray's long-press selection: laid out in a loose row around the middle */
   const addStickers = (list: StickerProps[]) => {
     list.forEach((s, i) => addSticker(s, false, (i - (list.length - 1) / 2) * 34, (i % 2 ? 26 : -26)))
@@ -754,7 +769,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   /** a photo frame from the Frames tab: lands in the middle of the screen with empty slots to fill */
   const addCollage = (kind: CollageKind, close = true) => {
     const def = COLLAGES[kind]
-    const w = Math.round(clamp(canvasW * (def.w < def.h * 0.5 ? 0.3 : def.w >= 100 && def.h > 200 ? 0.5 : def.w / def.h > 3 ? 0.9 : kind.startsWith('ticket') ? 0.7 : 0.62), 150, 420))
+    const w = Math.round(clamp(canvasW * (def.group === 'grids' ? 0.86 : def.w < def.h * 0.5 ? 0.3 : def.w >= 100 && def.h > 200 ? 0.5 : def.w / def.h > 3 ? 0.9 : kind.startsWith('ticket') ? 0.7 : 0.62), 150, 420))
     const id = addItem((z, c) => ({
       id: '', type: 'collage', zIndex: z, x: c.x, y: c.y, width: w, height: Math.round((w * def.h) / def.w), rotation: 0,
       props: { kind, photos: def.slots.map(() => '') },
@@ -1363,7 +1378,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
             {/* a background does not catch taps; its tab is how to pick it up */}
             {!drawing && !readOnly && vItems.filter((i) => isBg(i) && i.id !== selectedId).map((i) => (
               <button
-                key={`bgtab${i.id}`} type="button" data-ui aria-label="Select the background photo" onClick={() => setSelectedId(i.id)}
+                key={`bgtab${i.id}`} type="button" data-ui aria-label="Select the background" onClick={() => setSelectedId(i.id)}
                 className="absolute flex h-8 items-center gap-1.5 rounded-full border-0 bg-white/90 px-3 text-[12px] font-bold text-[#17171a] shadow-[0_2px_8px_rgba(20,24,40,.25)]"
                 style={{ left: 8, top: i.y - i.height / 2 + 8, zIndex: 8700, transform: `scale(${1 / zoom})`, transformOrigin: 'top left' }}
               >
@@ -1518,6 +1533,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
             value={collageItem.props} accent={accent}
             onChange={(p) => patch(collageItem.id, { props: p })}
             onPick={(i) => { slotTarget.current = { id: collageItem.id, index: i }; slotInput.current?.click() }}
+            onBackground={COLLAGES[collageItem.props.kind]?.group === 'grids' ? setCollageBackground : undefined}
           />
         )}
       </ToolSheet>

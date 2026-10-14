@@ -5,13 +5,28 @@ import type { CollageProps } from '../types'
 
 /** Change what is in a photo frame: the pictures and the writing under them. */
 export function CollageEditor({
-  value, accent, onChange, onPick,
-}: { value: CollageProps; accent: string; onChange: (p: Partial<CollageProps>) => void; onPick: (slot: number) => void }) {
+  value, accent, onChange, onPick, onBackground,
+}: { value: CollageProps; accent: string; onChange: (p: Partial<CollageProps>) => void; onPick: (slot: number) => void; onBackground?: (on: boolean) => void }) {
   const def = COLLAGES[value.kind]
   if (!def || def.slots.length === 0) return <p className="m-0 px-6 py-6 text-center text-[14px] text-neutral-500">This one is just decoration. Move, turn or resize it, or delete it.</p>
   const texts = value.texts ?? []
   return (
     <div className="space-y-3 px-5 pb-6">
+      {onBackground && (
+        <button
+          type="button" role="switch" aria-checked={!!value.background} onClick={() => onBackground(!value.background)}
+          className="flex min-h-14 w-full items-center justify-between gap-3 rounded-2xl border-0 bg-[#f6f6f8] px-4 text-left"
+          style={{ boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.05)' }}
+        >
+          <span>
+            <span className="block text-[14.5px] font-extrabold text-[#17171a]">Use as background</span>
+            <span className="block text-[12.5px] font-medium text-neutral-500">Fills the page width, behind everything else</span>
+          </span>
+          <span className="relative h-7 w-12 shrink-0 rounded-full transition-colors" style={{ background: value.background ? accent : '#d4d4da' }}>
+            <span className="absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-[left]" style={{ left: value.background ? 22 : 2 }} />
+          </span>
+        </button>
+      )}
       {def.slots.map((s, i) => {
         const src = value.photos[i]
         return (

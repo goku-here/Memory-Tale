@@ -1,5 +1,6 @@
 import type { CanvasItem, FrameId } from '../types'
 import { uid } from './id'
+import { COLLAGES } from './collages'
 
 export const MIN_HEIGHT = 2400
 
@@ -19,16 +20,23 @@ export function cloneItem(item: CanvasItem, z: number): CanvasItem {
 }
 
 /** a photo that was turned into a background */
-export const isBg = (i: CanvasItem) => i.type === 'photo' && !!i.props.background
+export const isBg = (i: CanvasItem) => (i.type === 'photo' || i.type === 'collage') && !!i.props.background
 
 /**
  * Backgrounds always span the canvas, whatever its width is on this device, so their size is worked out
  * when drawing (never stored): that way phones with different widths cannot fight over it.
  */
 export function withBackground(items: CanvasItem[], canvasW: number): CanvasItem[] {
-  return items.map((i) => (i.type === 'photo' && i.props.background
-    ? { ...i, x: 50, rotation: 0, width: canvasW, height: canvasW / (i.props.aspect || 1), props: { ...i.props, frame: 'none' as const, radius: 0, caption: '' } }
-    : i))
+  return items.map((i) => {
+    if (i.type === 'photo' && i.props.background) {
+      return { ...i, x: 50, rotation: 0, width: canvasW, height: canvasW / (i.props.aspect || 1), props: { ...i.props, frame: 'none' as const, radius: 0, caption: '' } }
+    }
+    if (i.type === 'collage' && i.props.background) {
+      const d = COLLAGES[i.props.kind]
+      return d ? { ...i, x: 50, rotation: 0, width: canvasW, height: (canvasW * d.h) / d.w } : i
+    }
+    return i
+  })
 }
 
 export const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))

@@ -9,7 +9,7 @@ import { uid } from '../lib/id'
 import { StickerMaker } from './StickerMaker'
 import { STICKER_GROUPS, STICKERS, StickerArt, stickerRatio, type StickerCategory, type StickerDef } from './stickers'
 import { CollageBody } from './CollageBody'
-import { COLLAGES, FRAME_KINDS, type CollageKind } from '../lib/collages'
+import { COLLAGES, FRAME_KINDS, GRID_KINDS, type CollageKind } from '../lib/collages'
 
 interface Props {
   accent: string
@@ -20,10 +20,10 @@ interface Props {
   onFrame?: (kind: CollageKind) => void
 }
 
-type GroupId = (typeof STICKER_GROUPS)[number]['id'] | 'frames' | 'mine'
+type GroupId = (typeof STICKER_GROUPS)[number]['id'] | 'collages' | 'frames' | 'mine'
 const TABS: { id: GroupId; label: string }[] = [
   ...STICKER_GROUPS.map((g) => ({ id: g.id as GroupId, label: g.label })),
-  { id: 'frames', label: 'Frames' }, { id: 'mine', label: 'Mine' },
+  { id: 'collages', label: 'Collages' }, { id: 'frames', label: 'Frames' }, { id: 'mine', label: 'Mine' },
 ]
 
 const isWide = (s: StickerProps) => s.kind === 'svg' && (s.value.startsWith('w-') || s.value.startsWith('c-') || s.value.startsWith('tape') || s.value === 'ticket' || s.value === 'p-postmark' || s.value === 'd-wave')
@@ -87,7 +87,7 @@ export function StickerTray({ accent, onPick, onPickMany, onFrame }: Props) {
     }
     return out
   })()
-  const foundFrames = q ? FRAME_KINDS.filter((k) => COLLAGES[k].label.toLowerCase().includes(q) || 'frame photo'.includes(q)) : []
+  const foundFrames = q ? [...GRID_KINDS, ...FRAME_KINDS].filter((k) => COLLAGES[k].label.toLowerCase().includes(q) || (COLLAGES[k].group === 'grids' ? 'collage grid photo' : 'frame photo').includes(q)) : []
 
   const sections = useRef<Partial<Record<StickerCategory, HTMLElement | null>>>({})
   const chipBar = useRef<HTMLDivElement>(null)
@@ -222,6 +222,15 @@ export function StickerTray({ accent, onPick, onPickMany, onFrame }: Props) {
             </div>
           )}
           {!foundFrames.length && !found?.length && <p className="m-0 px-2 pb-4 pt-8 text-center text-[14px] text-neutral-500">Nothing called “{query}”. Try a word like heart, tape, food or camera.</p>}
+        </div>
+      ) : group === 'collages' ? (
+        <div className="px-4 pt-3">
+          <p className="m-0 px-1 pb-3 text-[13px] leading-snug text-neutral-500">
+            Photos in a neat grid. Tap one to put it on your page, then tap each plus to add a photo. Open it later and switch on Use as background to fill the page with it.
+          </p>
+          <div className="grid grid-cols-2 gap-2.5">
+            {GRID_KINDS.map((k) => <CollageCard key={k} kind={k} accent={accent} onPick={() => onFrame?.(k)} />)}
+          </div>
         </div>
       ) : group === 'frames' ? (
         <div className="px-4 pt-3">
