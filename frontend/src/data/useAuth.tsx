@@ -1,4 +1,4 @@
-import { onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut, updateProfile, type User } from 'firebase/auth'
+import { getRedirectResult, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut, updateProfile, type User } from 'firebase/auth'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { adoptAccount, wipeLocalAccount } from './account'
 import { firebaseConfigured, getFirebaseAuth, googleProvider } from '../lib/firebase'
@@ -36,6 +36,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const auth = getFirebaseAuth()
     if (!auth) return
+    // coming back from a Google redirect: finish the sign-in (and say so if it failed)
+    void getRedirectResult(auth).catch((e) => console.warn('[auth] redirect sign-in failed', (e as { code?: string }).code, e))
     return onAuthStateChanged(auth, (u) => {
       // switching accounts: clear the other account's books before this one is shown
       void (u ? adoptAccount(u.uid).catch(() => {}) : Promise.resolve()).then(() => {
@@ -54,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       const code = (e as { code?: string }).code
       // popups are unreliable in installed PWAs / mobile browsers: fall back to a full-page redirect
-      if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
+      if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment' || code === 'auth/web-storage-unsupported' || code === 'auth/internal-error' || code === 'auth/network-request-failed') {
         await signInWithRedirect(auth, googleProvider())
         return null
       }

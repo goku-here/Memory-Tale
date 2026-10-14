@@ -6,6 +6,7 @@ import { importKey } from '../lib/crypto'
 import { useAuth, type Profile } from '../data/useAuth'
 import { getTheme } from './ThemeEngine'
 import { saveBookKey } from '../data/keys'
+import { inAppBrowser } from '../lib/inAppBrowser'
 import { dropInviteKey, takeInviteKey } from '../data/privacy'
 import { rise, ShareLayout } from './ShareLayout'
 import { toast } from './ui'
@@ -83,6 +84,14 @@ export function InviteScreen({ token, knownIds, onJoined, onDismiss }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, invite])
 
+  /** the invite link again (for a private book it carries the key after the #) */
+  const copyLink = async () => {
+    const k = takeInviteKey(token)
+    const [raw, epoch] = (k ?? '').split('.')
+    const url = `${window.location.origin}/join/${token}${raw ? `#k=${raw}${epoch ? `&e=${epoch}` : ''}` : ''}`
+    try { await navigator.clipboard.writeText(url); toast('Link copied. Paste it in Chrome or Safari') } catch { toast(url) }
+  }
+
   const start = async () => {
     setSigning(true)
     sessionStorage.setItem(FLAG, token)
@@ -148,6 +157,18 @@ export function InviteScreen({ token, knownIds, onJoined, onDismiss }: Props) {
         </motion.button>
       ) : (
         <>
+          {inAppBrowser() && (
+            <div className="rounded-2xl bg-white/15 p-3.5 text-left backdrop-blur" role="note">
+              <div className="text-[14px] font-extrabold text-white">Open this in Chrome or Safari</div>
+              <p className="m-0 mt-1 text-[12.5px] leading-snug text-white/80">
+                Google doesn&apos;t allow sign-in inside chat apps like WhatsApp or Instagram. Tap the menu (⋮ or ⋯) and choose <b>Open in browser</b>, or copy the link and paste it into your browser.
+              </p>
+              <button
+                type="button" onClick={() => void copyLink()}
+                className="mt-2.5 h-10 rounded-full border-0 bg-white px-4 text-[13.5px] font-bold text-[#17171a]"
+              >Copy the link</button>
+            </div>
+          )}
           <motion.button
             type="button" whileTap={{ scale: 0.96 }} onClick={() => void start()} disabled={busy || authLoading || !configured}
             className="flex h-14 items-center justify-center gap-3 rounded-2xl border-0 bg-[#17171a] text-[16px] font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,.35)] disabled:opacity-70"
