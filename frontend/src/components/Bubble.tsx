@@ -11,11 +11,12 @@ export const BUBBLE_FONTS: { label: string; css: string }[] = [
 ]
 
 /** every kind of bubble: its name, whether it can have a tail, and how tall it is compared with its width */
-export const BUBBLE_SHAPES: { id: BubbleShape; label: string; tail: boolean; ratio: number }[] = [
+export const BUBBLE_SHAPES: { id: BubbleShape; label: string; tail: boolean; ratio: number; hidden?: boolean }[] = [
   { id: 'speech', label: 'Speech', tail: true, ratio: 0.72 },
   { id: 'tall', label: 'Tall', tail: true, ratio: 1.35 },
-  { id: 'squircle', label: 'Rounded', tail: true, ratio: 0.66 },
-  { id: 'two', label: 'Two parts', tail: false, ratio: 0.72 },
+  // no longer offered, but bubbles that were already made with them still draw
+  { id: 'squircle', label: 'Rounded', tail: true, ratio: 0.66, hidden: true },
+  { id: 'two', label: 'Two parts', tail: false, ratio: 0.72, hidden: true },
   { id: 'offscreen', label: 'Off panel', tail: false, ratio: 0.95 },
   { id: 'shout', label: 'Shout', tail: false, ratio: 0.82 },
   { id: 'announce', label: 'Announce', tail: false, ratio: 0.9 },
@@ -167,12 +168,20 @@ export function BubbleBody({
       </g>
     )
   } else if (shape === 'whisper') {
-    art = (
-      <g transform={flip} strokeLinejoin="round" strokeDasharray={dash}>
-        {hasTail && swoosh({ fill: '#fff', stroke: ink, strokeWidth: sw, vectorEffect: 'non-scaling-stroke' })}
-        {body({ fill: '#fff', stroke: ink, strokeWidth: sw, vectorEffect: 'non-scaling-stroke' })}
-      </g>
-    )
+    if (hasTail) {
+      // one open outline: the dashes run all the way round and out along the tail, so the ring is not closed where the tail grows
+      const [x1, y1] = P(105)
+      const [x2, y2] = P(121)
+      const tx = 19, ty = H - 0.8
+      art = (
+        <path
+          transform={flip} strokeLinejoin="round" strokeLinecap="round" strokeDasharray={dash} fill="#fff" stroke={ink} strokeWidth={sw} vectorEffect="non-scaling-stroke"
+          d={`M${x2.toFixed(2)} ${y2.toFixed(2)}A${rx} ${ry} 0 1 1 ${x1.toFixed(2)} ${y1.toFixed(2)}C${(x1 - 1.5).toFixed(2)} ${(y1 + tailH * 0.5).toFixed(2)} ${(tx + 9).toFixed(2)} ${(ty - tailH * 0.18).toFixed(2)} ${tx} ${ty.toFixed(2)}C${(tx + 6).toFixed(2)} ${(ty - tailH * 0.1).toFixed(2)} ${(x2 + 1).toFixed(2)} ${(y2 + tailH * 0.25).toFixed(2)} ${x2.toFixed(2)} ${y2.toFixed(2)}Z`}
+        />
+      )
+    } else {
+      art = body({ fill: '#fff', stroke: ink, strokeWidth: sw, vectorEffect: 'non-scaling-stroke', strokeDasharray: dash })
+    }
   } else if (shape === 'think' || shape === 'dark') {
     art = body({ fill, stroke: ink, strokeWidth: sw, vectorEffect: 'non-scaling-stroke' })
   } else {
@@ -238,7 +247,7 @@ export function BubbleEditor({ value, accent, onChange }: EditorProps) {
       </div>
 
       <div className="no-scrollbar flex gap-2.5 overflow-x-auto px-5" style={{ touchAction: 'pan-x' }} role="radiogroup" aria-label="Bubble shape">
-        {BUBBLE_SHAPES.map((s) => {
+        {BUBBLE_SHAPES.filter((s) => !s.hidden || s.id === value.shape).map((s) => {
           const on = value.shape === s.id
           const w = s.ratio > 1 ? 44 : 68
           return (
