@@ -14,7 +14,10 @@ const same = (a: CanvasItem[], b: CanvasItem[]) => a === b || (a.length === b.le
  *  - commit(): a discrete change that is recorded in history
  *  - begin()/live()/end(): a continuous gesture (drag, pinch) → one history entry
  */
-export function useCanvas(memoryId: string, uid?: string, readOnly = false) {
+export function useCanvas(memoryId: string, uid?: string, readOnly = false, defer = false) {
+  // the book-opening animation runs first: reading a big canvas from storage in the middle of it would make it stutter
+  const [go, setGo] = useState(!defer)
+  useEffect(() => { if (!defer) setGo(true) }, [defer])
   const ro = useRef(readOnly)
   ro.current = readOnly
   const [items, setItems] = useState<CanvasItem[]>([])
@@ -57,6 +60,7 @@ export function useCanvas(memoryId: string, uid?: string, readOnly = false) {
   }, [flush])
 
   useEffect(() => {
+    if (!go) return
     let alive = true
     void repo.loadCanvas(memoryId).then((doc) => {
       if (!alive) return
@@ -71,7 +75,7 @@ export function useCanvas(memoryId: string, uid?: string, readOnly = false) {
       alive = false
       void flush() // never lose the last edit when leaving the canvas
     }
-  }, [memoryId, flush])
+  }, [memoryId, flush, go])
 
   useEffect(() => { if (loaded && dirty.current) schedule() }, [items, height, loaded, schedule])
 

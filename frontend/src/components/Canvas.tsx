@@ -115,7 +115,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   const { user } = useAuth()
   /** view-only members can look around but not change anything */
   const readOnly = !!user && !canEdit(memory, user.uid)
-  const cv = useCanvas(memory.id, user?.uid, readOnly)
+  const cv = useCanvas(memory.id, user?.uid, readOnly, !!reveal)
   const here = usePresence(memory.id, theme.palette[0])
   const { items, itemsRef, height, commit, live, begin, end, setHeight } = cv
   const heightRef = useRef(height)
