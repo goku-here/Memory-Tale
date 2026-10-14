@@ -229,14 +229,16 @@ export function Home({ memories, loading, hiddenId, onAdd, onSettings, onReorder
         <motion.button
           type="button" data-tour="add"
           onClick={onAdd}
-          className="no-select pointer-events-auto relative flex h-14 items-center gap-2.5 overflow-hidden rounded-full border-0 bg-[#2f6bff] pl-5 pr-6 text-[16px] font-semibold text-white outline-none"
-          style={{ boxShadow: '0 12px 32px rgba(47,107,255,.35), 0 2px 6px rgba(10,12,24,.2)', textShadow: '0 1px 2px rgba(10,20,60,.35)' }}
+          className="no-select pointer-events-auto relative flex h-14 items-center gap-2.5 rounded-full border-0 bg-transparent pl-5 pr-6 text-[16px] font-semibold text-white outline-none"
+          style={{ boxShadow: '0 12px 32px rgba(10,12,24,.32)' }}
           initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 300, damping: 24, delay: 0.25 }}
           whileTap={{ scale: 0.96 }}
         >
-          {/* colours slowly turning inside the button: blue, light blue, violet, pink */}
-          <span aria-hidden className="mt-aurora" />
+          {/* the colours turn only around the edge: a soft glow just outside, a thin ring, then the black button */}
+          <span aria-hidden className="mt-ring-glow"><span className="mt-aurora" /></span>
+          <span aria-hidden className="mt-ring"><span className="mt-aurora" /></span>
+          <span aria-hidden className="absolute inset-0 rounded-full bg-[#17171a]" />
           <span className="relative z-10 flex items-center gap-2.5"><Plus size={20} strokeWidth={2.6} aria-hidden /> Add memory</span>
         </motion.button>
       </div>
