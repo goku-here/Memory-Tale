@@ -1,34 +1,45 @@
 import { cubicBezier } from 'framer-motion'
 
 export const bookEase = cubicBezier(0.5, 0, 0.12, 1)
+const flyEase = cubicBezier(0.3, 0.1, 0.2, 1)
 export const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 
-/** Geometry of the book growing from its grid slot to fill the screen. */
-export function bookGeom(rect: DOMRect) {
+/** the first part of the timeline: the book flies to the middle of the screen; the rest: it opens from there */
+const FLY = 0.4
+
+/**
+ * Where the book is at progress `v` (0 = on the shelf, 1 = open and filling the screen):
+ *  - 0 .. FLY   it lifts off its slot and flies to the middle of the screen, growing to a comfortable size
+ *  - FLY .. 1   it opens from the middle: the cover swings away on its spine while the page grows to fill the screen
+ * Going back (v from 1 to 0) plays the same thing in reverse.
+ */
+export function bookPose(rect: DOMRect, v: number) {
   const vw = window.innerWidth
   const vh = window.innerHeight
-  return {
-    vw, vh,
-    S: Math.max(vh / rect.height, vw / rect.width) * 1.06,
-    dx: vw / 2 - (rect.left + rect.width / 2),
-    dy: vh / 2 - (rect.top + rect.height / 2),
-  }
+  const full = Math.max(vh / rect.height, vw / rect.width) * 1.06
+  const rest = Math.min((vw * 0.64) / rect.width, (vh * 0.6) / rect.height)
+  const dx = vw / 2 - (rect.left + rect.width / 2)
+  const dy = vh / 2 - (rect.top + rect.height / 2)
+  const fly = flyEase(clamp01(v / FLY))
+  const open = bookEase(clamp01((v - FLY) / (1 - FLY)))
+  const scale = v < FLY ? 1 + (rest - 1) * fly : rest + (full - rest) * open
+  // the cover starts swinging a little after the page begins to grow
+  const swing = -172 * bookEase(clamp01((open - 0.04) / 0.86))
+  return { x: dx * fly, y: dy * fly, scale, swing, vw, vh }
 }
 
 /**
- * clip-path that makes the real canvas visible exactly through the (growing) book,
+ * clip-path that makes the real canvas visible exactly through the (moving) book,
  * so the inside is already on the page while the cover swings open.
- * `e` is the eased progress 0..1.
  */
-export function clipAt(rect: DOMRect, e: number) {
-  const { vw, vh, S, dx, dy } = bookGeom(rect)
-  const s = 1 + (S - 1) * e
-  const cx = rect.left + rect.width / 2 + dx * e
-  const cy = rect.top + rect.height / 2 + dy * e
-  const w = rect.width * s
-  const h = rect.height * s
+export function clipAt(rect: DOMRect, v: number) {
+  const { x, y, scale, vw, vh } = bookPose(rect, v)
+  const cx = rect.left + rect.width / 2 + x
+  const cy = rect.top + rect.height / 2 + y
+  const w = rect.width * scale
+  const h = rect.height * scale
   const f = (n: number) => `${Math.max(0, n).toFixed(1)}px`
-  const rs = rect.width * 0.05 * s
-  const rl = rect.width * 0.022 * s
+  const rs = rect.width * 0.05 * scale
+  const rl = rect.width * 0.022 * scale
   return `inset(${f(cy - h / 2)} ${f(vw - (cx + w / 2))} ${f(vh - (cy + h / 2))} ${f(cx - w / 2)} round ${rl}px ${rs}px ${rs}px ${rl}px)`
 }

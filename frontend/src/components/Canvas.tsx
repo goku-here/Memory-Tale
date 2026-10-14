@@ -15,7 +15,7 @@ import { discardOriginal, loadOriginalBlob, markForDiscard, missingCopies, prefs
 import { reportError } from '../data/sync'
 import { downloadBookZip } from '../lib/zipBook'
 import { AssetCtx } from '../lib/assets'
-import { bookEase, clipAt } from '../lib/bookTransition'
+import { clipAt } from '../lib/bookTransition'
 import { clamp, cloneItem, frameHeight, isBg, nextZ, rnd, withBackground } from '../lib/items'
 import { placeInOrder } from '../lib/layout'
 import { useGestures } from '../lib/useGestures'
@@ -331,7 +331,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   }, [liveZoom])
 
   const idle = useMotionValue(1)
-  const clip = useTransform(reveal?.p ?? idle, (v) => (reveal ? clipAt(reveal.rect, bookEase(v)) : 'none'))
+  const clip = useTransform(reveal?.p ?? idle, (v) => (reveal ? clipAt(reveal.rect, v) : 'none'))
   const titleScale = useTransform(scrollY, [0, 120], [1, 0.82])
   const titleY = useTransform(scrollY, [0, 120], [0, -4])
   const subOpacity = useTransform(scrollY, [0, 80], [1, 0])

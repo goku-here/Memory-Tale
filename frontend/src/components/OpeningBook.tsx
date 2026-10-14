@@ -1,26 +1,24 @@
 import { animate, motion, useTransform, type MotionValue } from 'framer-motion'
 import { useEffect } from 'react'
 import type { Memory } from '../types'
-import { bookEase, bookGeom, clamp01 } from '../lib/bookTransition'
+import { bookPose } from '../lib/bookTransition'
 import { BookCover } from './BookCard'
 
 /**
- * Book ⇄ canvas transition. The cover grows out of (or shrinks back into) its grid slot while
- * swinging on the spine (3D rotateY). The canvas itself is revealed through a matching clip-path
- * (see Canvas `reveal`), so the real content is visible as the cover opens.
+ * Book ⇄ canvas transition. The book lifts off its shelf slot and flies to the middle of the screen, then opens from
+ * there: the cover swings away on its spine (3D rotateY) while the page grows to fill the screen. Closing plays it
+ * backwards. The canvas itself is revealed through a matching clip-path (see Canvas `reveal`).
  */
 export function OpeningBook({
   memory, rect, mode, progress, onDone,
 }: { memory: Memory; rect: DOMRect; mode: 'open' | 'close'; progress: MotionValue<number>; onDone: () => void }) {
-  const { S, dx, dy } = bookGeom(rect)
-  const e = useTransform(progress, (v) => bookEase(v))
-  const x = useTransform(e, (v) => dx * v)
-  const y = useTransform(e, (v) => dy * v)
-  const scale = useTransform(e, (v) => 1 + (S - 1) * v)
-  const rotateY = useTransform(progress, (v) => -172 * bookEase(clamp01((v - 0.08) / 0.82)))
+  const x = useTransform(progress, (v) => bookPose(rect, v).x)
+  const y = useTransform(progress, (v) => bookPose(rect, v).y)
+  const scale = useTransform(progress, (v) => bookPose(rect, v).scale)
+  const rotateY = useTransform(progress, (v) => bookPose(rect, v).swing)
 
   useEffect(() => {
-    const c = animate(progress, mode === 'open' ? 1 : 0, { duration: 1.0, ease: 'linear' })
+    const c = animate(progress, mode === 'open' ? 1 : 0, { duration: 1.3, ease: 'linear' })
     c.then(onDone)
     return () => c.stop()
     // eslint-disable-next-line react-hooks/exhaustive-deps
