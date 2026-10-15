@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion'
-import { AlignCenter, AlignLeft, AlignRight, Check, Palette, Type, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { AlignCenter, AlignLeft, AlignRight, Check, X } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ResolvedCanvas } from '../lib/canvasStyle'
 import type { TextProps } from '../types'
 import { TEXT_FONTS } from './TextEditor'
+import { IcAlignTool, IcColorTool, IcFontTool, IcSizeTool } from './ToolIcons'
 
 const EXTRA = ['#17171A', '#FFFFFF', '#E5486F', '#F28C38', '#FFC93C', '#2F8FD0', '#5F8650', '#8F5BD0']
 type Tool = 'font' | 'size' | 'align' | 'color'
@@ -48,11 +49,11 @@ export function TextStudio({ seed, palette, accent, look, onDone, onCancel }: Pr
     return () => { vv.removeEventListener('resize', on); vv.removeEventListener('scroll', on) }
   }, [])
 
-  const tools: { id: Tool; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
-    { id: 'font', label: 'Font', icon: Type },
-    { id: 'size', label: 'Size', icon: () => <span className="text-[15px] font-extrabold leading-none">A<span className="text-[11px]">A</span></span> },
-    { id: 'align', label: 'Align', icon: v.align === 'left' ? AlignLeft : v.align === 'right' ? AlignRight : AlignCenter },
-    { id: 'color', label: 'Colour', icon: Palette },
+  const tools: { id: Tool; label: string; icon: ReactNode }[] = [
+    { id: 'font', label: 'Font', icon: <IcFontTool /> },
+    { id: 'size', label: 'Size', icon: <IcSizeTool /> },
+    { id: 'align', label: 'Align', icon: <IcAlignTool align={v.align} /> },
+    { id: 'color', label: 'Colour', icon: <IcColorTool /> },
   ]
   // tapping a tool puts the keyboard away; tapping the page brings it back
   const hideKeyboard = () => ta.current?.blur()
@@ -139,14 +140,13 @@ export function TextStudio({ seed, palette, accent, look, onDone, onCancel }: Pr
           <div className="flex border-t border-black/5" role="tablist" aria-label="Text tools">
             {tools.map((t) => {
               const on = tool === t.id
-              const Icon = t.icon
               return (
                 <button
                   key={t.id} type="button" role="tab" aria-selected={on} onClick={() => setTool(t.id)}
                   className="flex h-14 flex-1 flex-col items-center justify-center gap-0.5 border-0 bg-transparent"
                   style={{ color: on ? accent : '#6b6b76' }}
                 >
-                  <Icon size={19} />
+                  <span className="transition-transform" style={{ transform: on ? 'scale(1.08)' : 'scale(.92)', opacity: on ? 1 : 0.8 }}>{t.icon}</span>
                   <span className="text-[11px] font-bold">{t.label}</span>
                 </button>
               )

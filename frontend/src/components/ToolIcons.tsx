@@ -398,3 +398,41 @@ export const IcUnlock = () => (
     <circle cx="12" cy="15" r="1.6" fill="#0C5A37" /><rect x="11.3" y="15.2" width="1.4" height="3" rx=".7" fill="#0C5A37" />
   </S>
 )
+
+/* ---------- the text page's tabs ---------- */
+
+export const IcFontTool = () => (
+  <S size={28}>
+    <defs><G id="tf-a" a="#B79CFF" b="#6B4DF0" /></defs>
+    <rect x="2.5" y="2.5" width="19" height="19" rx="6" fill="url(#tf-a)" />
+    <path d="M6.6 17.4 11 6.6h2l4.4 10.8M8.2 13.6h7.6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </S>
+)
+export const IcSizeTool = () => (
+  <S size={28}>
+    <defs><G id="ts-a" a="#8FE0C2" b="#27B38A" /></defs>
+    <rect x="2.5" y="2.5" width="19" height="19" rx="6" fill="url(#ts-a)" />
+    <path d="M5.4 17.6 8.6 9.2h.8l3.2 8.4M6.6 14.6h4.8" stroke="#fff" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M13.2 17.6l2.7-6.2h.7l2.7 6.2M14.2 15.4h3.8" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity=".85" />
+  </S>
+)
+export const IcAlignTool = ({ align = 'left' }: { align?: 'left' | 'center' | 'right' }) => {
+  const at = (w: number) => (align === 'left' ? 6 : align === 'right' ? 18 - w : 12 - w / 2)
+  return (
+    <S size={28}>
+      <defs><G id="ta-a" a="#FFC38A" b="#F2873A" /></defs>
+      <rect x="2.5" y="2.5" width="19" height="19" rx="6" fill="url(#ta-a)" />
+      {[[6.5, 12], [10.2, 7.6], [13.9, 10], [17.6, 6]].map(([y, w]) => (
+        <path key={y} d={`M${at(w)} ${y}h${w}`} stroke="#fff" strokeWidth="1.9" strokeLinecap="round" />
+      ))}
+    </S>
+  )
+}
+export const IcColorTool = () => (
+  <S size={28}>
+    <defs><G id="tc-a" a="#FFE7A8" b="#FFC24D" /></defs>
+    <circle cx="12" cy="12" r="9.6" fill="url(#tc-a)" />
+    <circle cx="8" cy="10.2" r="2" fill="#EF5B7B" /><circle cx="12.4" cy="6.8" r="2" fill="#5B8CFF" /><circle cx="16.4" cy="10.6" r="2" fill="#3FBF8A" />
+    <circle cx="12" cy="16.2" r="2.6" fill="#fff" opacity=".92" />
+  </S>
+)
