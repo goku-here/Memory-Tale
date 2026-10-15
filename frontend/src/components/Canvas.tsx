@@ -486,7 +486,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   }
   const openText = () => {
     const it = itemsRef.current.find((i) => i.id === selectedId)
-    if (it?.type === 'text') setTextStudio({ id: it.id, seed: it.props, boxW: it.width })
+    if (it?.type === 'text') setTextStudio({ id: it.id, seed: it.props, boxW: Math.round(clamp(canvasW - 40, 160, 520)) })
   }
   /** the writing page is done: the whole block lands on the canvas (or replaces the one that was being changed) */
   const finishText = (props: TextProps, width: number) => {
