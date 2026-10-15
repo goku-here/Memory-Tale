@@ -62,3 +62,6 @@ body {
 
 /* the writing page: a hint while it is empty */
 .mt-editor:empty::before { content: attr(data-ph); opacity: .38; pointer-events: none; }
+
+/* chosen words: a light wash, so a new colour or size can be seen while they are still chosen */
+.mt-editor::selection, .mt-editor *::selection { background: rgba(70, 110, 255, .2); color: inherit; }
