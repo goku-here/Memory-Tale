@@ -59,3 +59,6 @@ body {
 }
 @keyframes mt-aurora-turn { to { transform: translate(-50%, -50%) rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .mt-aurora { animation: none; } }
+
+/* the writing page: a hint while it is empty */
+.mt-editor:empty::before { content: attr(data-ph); opacity: .38; pointer-events: none; }

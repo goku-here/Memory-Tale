@@ -35,7 +35,7 @@ function TextBody({ item, onMeasure }: { item: Extract<CanvasItem, { type: 'text
   useLayoutEffect(() => {
     const h = ref.current?.offsetHeight
     if (h && Math.abs(h - item.height) > 1) onMeasure(item.id, h)
-  }, [p.text, p.font, p.size, item.width, item.height, item.id, onMeasure])
+  }, [p.text, p.runs, p.font, p.size, item.width, item.height, item.id, onMeasure])
   return (
     <div
       ref={ref}
@@ -45,7 +45,11 @@ function TextBody({ item, onMeasure }: { item: Extract<CanvasItem, { type: 'text
         textShadow: '0 1px 0 rgba(255,255,255,.5)',
       }}
     >
-      {p.text || ' '}
+      {p.runs?.length
+        ? p.runs.map((r, i) => (r.font || r.k || r.color
+          ? <span key={i} style={{ fontFamily: r.font, fontSize: r.k ? `${r.k}em` : undefined, color: r.color }}>{r.t}</span>
+          : r.t))
+        : p.text || ' '}
     </div>
   )
 }

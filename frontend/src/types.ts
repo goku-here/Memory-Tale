@@ -92,8 +92,17 @@ export interface StickerProps {
   /** width / height of an image sticker */
   ratio?: number
 }
+/** a piece of a text block that has its own look: font, size (a multiple of the block's size) and colour */
+export interface TextRun {
+  t: string
+  font?: string
+  k?: number
+  color?: string
+}
 export interface TextProps {
   text: string
+  /** the text cut into pieces that may each look different; when missing the whole block has one look */
+  runs?: TextRun[]
   font: string
   size: number
   color: string

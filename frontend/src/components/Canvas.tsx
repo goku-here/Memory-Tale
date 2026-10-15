@@ -166,7 +166,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   /** the writing page: a new text block (no id) or an existing one being changed */
-  const [textStudio, setTextStudio] = useState<{ id?: string; seed: TextProps } | null>(null)
+  const [textStudio, setTextStudio] = useState<{ id?: string; seed: TextProps; boxW: number } | null>(null)
   const [sheet, setSheet] = useState<Sheet>(null)
   const [sheetHs, setSheetHs] = useState<Record<string, number>>({})
   const [canvasW, setCanvasW] = useState(() => Math.min(window.innerWidth, 520))
@@ -486,15 +486,17 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   }
   const openText = () => {
     const it = itemsRef.current.find((i) => i.id === selectedId)
-    if (it?.type === 'text') setTextStudio({ id: it.id, seed: it.props })
+    if (it?.type === 'text') setTextStudio({ id: it.id, seed: it.props, boxW: it.width })
   }
   /** the writing page is done: the whole block lands on the canvas (or replaces the one that was being changed) */
-  const finishText = (props: TextProps) => {
+  const finishText = (props: TextProps, width: number) => {
     const id = textStudio?.id
     setTextStudio(null)
     if (!props.text.trim()) return
-    if (id) { patch(id, { props: { ...props } }, true); setSelectedId(id) } else {
-      addItem((z, c) => ({ id: '', type: 'text', zIndex: z, x: c.x, y: c.y, width: Math.round(canvasW * 0.8), height: Math.round(props.size * 1.2), rotation: 0, props }), { ignoreSheet: true })
+    if (id) {
+      patch(id, { props: { ...props, runs: props.runs }, width }, true); setSelectedId(id)
+    } else {
+      addItem((z, c) => ({ id: '', type: 'text', zIndex: z, x: c.x, y: c.y, width, height: Math.round(props.size * 1.2), rotation: 0, props }), { ignoreSheet: true })
     }
   }
   const openBubble = () => { begin(); setSheet('bubble') }
@@ -685,7 +687,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     tour.emit('sticker-added')
   }
 
-  const addText = () => setTextStudio({ seed: { text: '', font: theme.font, size: 38, color: theme.palette[0], align: 'center' } })
+  const addText = () => setTextStudio({ seed: { text: '', font: theme.font, size: 38, color: theme.palette[0], align: 'center' }, boxW: Math.round(clamp(canvasW - 40, 160, 520)) })
 
   const addNote = () => {
     begin()
@@ -1406,7 +1408,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       </div>
 
       <AnimatePresence>
-        {textStudio && <TextStudio key="text" seed={textStudio.seed} palette={theme.palette} accent={accent} look={rc} onDone={finishText} onCancel={() => setTextStudio(null)} />}
+        {textStudio && <TextStudio key="text" seed={textStudio.seed} boxW={textStudio.boxW} palette={theme.palette} accent={accent} look={rc} onDone={finishText} onCancel={() => setTextStudio(null)} />}
       </AnimatePresence>
 
       <AnimatePresence>
