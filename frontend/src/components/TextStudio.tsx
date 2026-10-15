@@ -54,7 +54,8 @@ export function TextStudio({ seed, palette, accent, look, onDone, onCancel }: Pr
     { id: 'align', label: 'Align', icon: v.align === 'left' ? AlignLeft : v.align === 'right' ? AlignRight : AlignCenter },
     { id: 'color', label: 'Colour', icon: Palette },
   ]
-  const keep = (e: React.PointerEvent) => e.preventDefault() // tapping a tool must not close the keyboard
+  // tapping a tool puts the keyboard away; tapping the page brings it back
+  const hideKeyboard = () => ta.current?.blur()
   const ink = v.color
 
   return (
@@ -80,8 +81,8 @@ export function TextStudio({ seed, palette, accent, look, onDone, onCancel }: Pr
         style={{ fontFamily: v.font, fontSize: v.size, color: ink, textAlign: v.align, lineHeight: 1.15, caretColor: accent, textShadow: '0 1px 0 rgba(255,255,255,.5)' }}
       />
 
-      {/* tools, riding above the keyboard */}
-      <div className="shrink-0" style={{ paddingBottom: kb > 0 ? kb : 'var(--safe-bottom)' }} onPointerDown={keep}>
+      {/* tools: above the keyboard while typing, at the bottom once it is put away */}
+      <div className="shrink-0" style={{ paddingBottom: kb > 0 ? kb : 'var(--safe-bottom)' }} onPointerDown={hideKeyboard}>
         <div className="mx-3 mb-2 overflow-hidden rounded-[22px] bg-white shadow-[0_10px_34px_rgba(20,24,40,.2),0_0_0_1px_rgba(20,24,40,.05)]">
           <div className="min-h-[84px] py-3">
             {tool === 'font' && (
