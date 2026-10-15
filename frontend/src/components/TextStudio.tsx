@@ -262,7 +262,13 @@ export function TextStudio({ seed, boxW, palette, accent, look, onDone, onCancel
     const text = runsText(runs)
     const rich = runs.some((r) => r.font || r.k || r.color)
     const { runs: _drop, ...rest } = v
-    onDone({ ...rest, text, ...(rich ? { runs } : {}) }, Math.round(root.clientWidth))
+    // the block hugs its words: as wide as the longest line, so there is no empty space either side
+    const range = document.createRange()
+    range.selectNodeContents(root)
+    let lo = Infinity, hi = -Infinity
+    for (const r of Array.from(range.getClientRects())) { if (r.width > 0) { lo = Math.min(lo, r.left); hi = Math.max(hi, r.right) } }
+    const hug = Number.isFinite(lo) ? Math.ceil(hi - lo) + 6 : root.clientWidth
+    onDone({ ...rest, text, ...(rich ? { runs } : {}) }, Math.min(Math.round(root.clientWidth), Math.max(24, hug)))
   }
 
   // tools do not take the keyboard's focus (that would lose the selection); with nothing selected the keyboard goes away
