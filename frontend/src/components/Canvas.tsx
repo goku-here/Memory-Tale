@@ -38,7 +38,7 @@ import { COLLAGES, type CollageKind } from '../lib/collages'
 import type { TemplateDef } from '../lib/templates'
 import { SVG_STICKERS } from './stickers'
 import { stickerRatio } from './stickers'
-import { TextEditor } from './TextEditor'
+import { TextStudio } from './TextStudio'
 import { FloatingShapes, getTheme, themeVars } from './ThemeEngine'
 import { ToolSheet } from './ToolSheet'
 import { BUBBLE_SHAPES, BubbleEditor } from './Bubble'
@@ -165,6 +165,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   const selectedIdRef = useRef<string | null>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
+  /** the writing page: a new text block (no id) or an existing one being changed */
+  const [textStudio, setTextStudio] = useState<{ id?: string; seed: TextProps } | null>(null)
   const [sheet, setSheet] = useState<Sheet>(null)
   const [sheetHs, setSheetHs] = useState<Record<string, number>>({})
   const [canvasW, setCanvasW] = useState(() => Math.min(window.innerWidth, 520))
@@ -482,7 +484,19 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     setCaptionFocus(focusCaption)
     setSheet('frame')
   }
-  const openText = () => { begin(); setSheet('text') }
+  const openText = () => {
+    const it = itemsRef.current.find((i) => i.id === selectedId)
+    if (it?.type === 'text') setTextStudio({ id: it.id, seed: it.props })
+  }
+  /** the writing page is done: the whole block lands on the canvas (or replaces the one that was being changed) */
+  const finishText = (props: TextProps) => {
+    const id = textStudio?.id
+    setTextStudio(null)
+    if (!props.text.trim()) return
+    if (id) { patch(id, { props: { ...props } }, true); setSelectedId(id) } else {
+      addItem((z, c) => ({ id: '', type: 'text', zIndex: z, x: c.x, y: c.y, width: Math.round(canvasW * 0.8), height: Math.round(props.size * 1.2), rotation: 0, props }), { ignoreSheet: true })
+    }
+  }
   const openBubble = () => { begin(); setSheet('bubble') }
 
   /** the drawing from the drawing page becomes one item, placed in the middle of what is on screen */
@@ -671,14 +685,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     tour.emit('sticker-added')
   }
 
-  const addText = () => {
-    begin()
-    addItem((z, c) => ({
-      id: '', type: 'text', zIndex: z, x: c.x, y: c.y, width: Math.round(canvasW * 0.7), height: 48, rotation: 0,
-      props: { text: 'Your words', font: theme.font, size: 38, color: theme.palette[0], align: 'center' },
-    }), { record: false })
-    setSheet('text')
-  }
+  const addText = () => setTextStudio({ seed: { text: '', font: theme.font, size: 38, color: theme.palette[0], align: 'center' } })
 
   const addNote = () => {
     begin()
@@ -1156,7 +1163,6 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     return { l: Math.min(...bb.map((b) => b.l)), r: Math.max(...bb.map((b) => b.r)), t: Math.min(...bb.map((b) => b.t)), b: Math.max(...bb.map((b) => b.b)) }
   })()
   const collageItem = selected?.type === 'collage' ? selected : undefined
-  const textItem = selected?.type === 'text' ? selected : undefined
   const photoItem = selected?.type === 'photo' ? selected : undefined
 
   return (
@@ -1400,6 +1406,10 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       </div>
 
       <AnimatePresence>
+        {textStudio && <TextStudio key="text" seed={textStudio.seed} palette={theme.palette} accent={accent} look={rc} onDone={finishText} onCancel={() => setTextStudio(null)} />}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {drawing && <DrawStudio key="draw" seed={editDrawId ? (() => { const it = items.find((x) => x.id === editDrawId); return it && it.type === 'draw' ? { draw: it.props, scale: it.width / it.props.w } : undefined })() : undefined} palette={theme.palette} accent={accent} look={rc} onDone={(strokes, w) => addDrawing(strokes, w)} />}
       </AnimatePresence>
 
@@ -1552,18 +1562,6 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
         onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, sticker: h }))}
       >
         <StickerTray accent={accent} onPick={(s) => addSticker(s)} onPickMany={addStickers} onFrame={(k) => addCollage(k)} />
-      </ToolSheet>
-
-      <ToolSheet
-        open={sheet === 'text' && !!textItem} onClose={closeSheet} title="Text" snaps={[0.56, 0.88]} dim={0.18} z={55}
-        onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, text: h }))}
-      >
-        {textItem && (
-          <TextEditor
-            value={textItem.props as TextProps} colors={theme.palette} accent={accent}
-            onChange={(p) => patch(textItem.id, { props: p })}
-          />
-        )}
       </ToolSheet>
 
       <ToolSheet
