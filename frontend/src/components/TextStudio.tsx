@@ -156,6 +156,8 @@ export function TextStudio({ seed, boxW, palette, accent, look, onDone, onCancel
   const [sel, setSel] = useState<{ font: string; size: number; color: string } | null>(null)
   const ed = useRef<HTMLDivElement>(null)
   const saved = useRef<{ s: number; e: number } | null>(null)
+  /** rebuilding the text moves the selection by itself: ignore those moves */
+  const quietUntil = useRef(0)
   const swatches = [...new Set([...palette.filter((c) => c !== '#FFFFFF'), ...EXTRA])]
 
   // start with what is already written, and the cursor at its end
@@ -204,7 +206,7 @@ export function TextStudio({ seed, boxW, palette, accent, look, onDone, onCancel
     const read = () => {
       const root = ed.current
       const s = window.getSelection()
-      if (!root || !s || !s.rangeCount || !root.contains(s.anchorNode)) return
+      if (!root || !s || !s.rangeCount || !root.contains(s.anchorNode) || performance.now() < quietUntil.current) return
       const r = s.getRangeAt(0)
       const a = offsetOf(root, r.startContainer, r.startOffset), b = offsetOf(root, r.endContainer, r.endOffset)
       if (b > a) {
@@ -236,8 +238,11 @@ export function TextStudio({ seed, boxW, palette, accent, look, onDone, onCancel
         else chars[i].k = (value as number) / vRef.current.size
       }
       const next = toRuns(chars)
+      quietUntil.current = performance.now() + 120
       build(root, next)
-      if (document.activeElement === root) setOffsets(root, s.s, s.e)
+      // the chosen words stay chosen, so the next change (or the next step of the size slider) still reaches them
+      root.focus({ preventScroll: true })
+      setOffsets(root, s.s, s.e)
       setV((x) => ({ ...x, text: runsText(next), runs: next }))
       setSel(styleAt(next, s.s, vRef.current))
     } else {
@@ -261,7 +266,7 @@ export function TextStudio({ seed, boxW, palette, accent, look, onDone, onCancel
   }
 
   // tools do not take the keyboard's focus (that would lose the selection); with nothing selected the keyboard goes away
-  const holdFocus = (e: React.PointerEvent) => e.preventDefault()
+  const holdFocus = (e: React.PointerEvent) => { if ((e.target as HTMLElement).tagName !== 'INPUT') e.preventDefault() } // the size slider must be free to drag
   const afterTool = () => { if (!saved.current) window.setTimeout(() => ed.current?.blur(), 150) }
 
   const curFont = sel?.font ?? v.font
