@@ -6,7 +6,7 @@ import { BubbleBody } from './Bubble'
 import { ClotheslineBody } from './Clothesline'
 import { DrawItem } from './DrawLayer'
 import { MapCard } from './MapCard'
-import { IcCopy, IcDown, IcEdit, IcExpand, IcFrame, IcLock, IcPalette, IcThread, IcThreadOn, IcTrash, IcUnlock, IcUp } from './ToolIcons'
+import { IcCopy, IcDown, IcEdit, IcExpand, IcFrame, IcGroup, IcLock, IcUngroup, IcPalette, IcThread, IcThreadOn, IcTrash, IcUnlock, IcUp } from './ToolIcons'
 import { PhotoFrame } from './PhotoFrame'
 import { StickerArt } from './stickers'
 import { NOTE_COLORS, StickyNote } from './StickyNote'
@@ -174,7 +174,9 @@ export interface SelectionActions {
   onView?: () => void
   onColor?: (color: string) => void
   /** lock the pieces of a template together, or unlock them to edit */
-  onGroup?: { locked: boolean; run: () => void }
+  onGroup?: { locked: boolean; run: () => void; /** made by the person: Ungroup instead of Unlock */ made?: boolean }
+  /** start grouping: the next item tapped joins this one */
+  onGather?: () => void
 }
 
 function TB({ label, onClick, children, danger, caption, w = 42, active }: { label: string; onClick: () => void; children: React.ReactNode; danger?: boolean; caption: string; w?: number; active?: boolean }) {
@@ -193,13 +195,13 @@ function TB({ label, onClick, children, danger, caption, w = 42, active }: { lab
 }
 
 export function SelectionOverlay({
-  item, canvasW, topLimit, accent, actions, hideToolbar, zoom = 1, locked = false, connecting = false,
-}: { item: CanvasItem; canvasW: number; topLimit: number; accent: string; actions: SelectionActions; hideToolbar?: boolean; zoom?: number; locked?: boolean; connecting?: boolean }) {
+  item, canvasW, topLimit, accent, actions, hideToolbar, zoom = 1, locked = false, connecting = false, grouping = false,
+}: { item: CanvasItem; canvasW: number; topLimit: number; accent: string; actions: SelectionActions; hideToolbar?: boolean; zoom?: number; locked?: boolean; connecting?: boolean; grouping?: boolean }) {
   const cx = (item.x / 100) * canvasW
   const rad = (item.rotation * Math.PI) / 180
   const hh = (Math.abs(item.width * Math.sin(rad)) + Math.abs(item.height * Math.cos(rad))) / 2
   const [colorsOpen, setColorsOpen] = useState(false)
-  const nButtons = locked ? 2 : 2 + (actions.onForward ? 1 : 0) + (actions.onBackward ? 1 : 0) + (actions.onEdit ? 1 : 0) + (actions.onFrame ? 1 : 0) + (actions.onConnect ? 1 : 0) + (actions.onView ? 1 : 0) + (actions.onColor ? 1 : 0) + (actions.onGroup ? 1 : 0)
+  const nButtons = locked ? 2 : 2 + (actions.onForward ? 1 : 0) + (actions.onBackward ? 1 : 0) + (actions.onEdit ? 1 : 0) + (actions.onFrame ? 1 : 0) + (actions.onConnect ? 1 : 0) + (actions.onView ? 1 : 0) + (actions.onColor ? 1 : 0) + (actions.onGroup ? 1 : 0) + (actions.onGather ? 1 : 0)
   // the toolbar and handles keep their on-screen size however far the canvas is zoomed out
   const k = 1 / zoom
   // a little more room between the buttons on wider screens; phones need the tighter fit
@@ -272,7 +274,10 @@ export function SelectionOverlay({
           {!locked && actions.onView && <TB w={bw} label="View full size" caption="View" onClick={actions.onView}><IcExpand /></TB>}
           {actions.onFrame && <TB w={bw} label="Frame" caption="Frame" onClick={actions.onFrame}><IcFrame /></TB>}
           {!locked && actions.onColor && <TB w={bw} label="Note colour" caption="Colour" onClick={() => setColorsOpen((v) => !v)}><IcPalette /></TB>}
-          {actions.onGroup && <TB w={bw} label={actions.onGroup.locked ? 'Unlock to edit the pieces' : 'Lock the pieces together'} caption={actions.onGroup.locked ? 'Unlock' : 'Lock'} onClick={actions.onGroup.run}>{actions.onGroup.locked ? <IcLock /> : <IcUnlock />}</TB>}
+          {actions.onGroup && (actions.onGroup.made
+            ? <TB w={bw} label="Ungroup" caption="Ungroup" onClick={actions.onGroup.run}><IcUngroup /></TB>
+            : <TB w={bw} label={actions.onGroup.locked ? 'Unlock to edit the pieces' : 'Lock the pieces together'} caption={actions.onGroup.locked ? 'Unlock' : 'Lock'} onClick={actions.onGroup.run}>{actions.onGroup.locked ? <IcLock /> : <IcUnlock />}</TB>)}
+          {!locked && actions.onGather && <TB w={bw} label={grouping ? 'Cancel grouping' : 'Group with another item'} caption={grouping ? 'Pick 2nd' : item.type === 'group' ? 'Add' : 'Group'} active={grouping} onClick={actions.onGather}><IcGroup /></TB>}
           {!locked && actions.onEdit && <TB w={bw} label="Edit" caption="Edit" onClick={actions.onEdit}><IcEdit /></TB>}
           {!locked && actions.onConnect && <TB w={bw} label={connecting ? 'Cancel the thread' : 'Tie with thread'} caption={connecting ? 'Pick 2nd' : 'Thread'} onClick={actions.onConnect}>{connecting ? <IcThreadOn /> : <IcThread />}</TB>}
           {!locked && <TB w={bw} label="Duplicate" caption="Copy" onClick={actions.onDuplicate}><IcCopy /></TB>}

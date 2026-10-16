@@ -197,6 +197,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   const [busy, setBusy] = useState<{ done: number; total: number; label?: string } | null>(null)
   const [drivePrompt, setDrivePrompt] = useState<{ count: number; bytes: number } | null>(null)
   const [connectFrom, setConnectFrom] = useState<string | null>(null)
+  /** grouping: the item that was chosen first, waiting for the one to join it */
+  const [groupFrom, setGroupFrom] = useState<string | null>(null)
   const slotInput = useRef<HTMLInputElement>(null)
   const slotTarget = useRef<{ id: string; index: number } | null>(null)
   const sheetH = Math.max(0, ...Object.values(sheetHs))
@@ -418,6 +420,18 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   })
 
   const startItem = (e: React.PointerEvent, id: string) => {
+    if (groupFrom) {
+      e.preventDefault()
+      e.stopPropagation()
+      suppressClick.current = true // the tap that picks the second item must not also open it
+      const from = groupFrom
+      setGroupFrom(null)
+      const other = itemsRef.current.find((i) => i.id === id)
+      if (id === from || !other || isBg(other) || other.type === 'thread') return
+      makeGroup([from, id])
+      toast('Grouped. They move together now; tap Ungroup to separate them.')
+      return
+    }
     if (connectFrom) {
       e.preventDefault()
       e.stopPropagation()
@@ -852,7 +866,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   }
 
   /** unlock: the pieces become ordinary items (tagged with the group) at the places they had */
-  const unlockGroup = (id: string) => {
+  const unlockGroup = (id: string, loose = false) => {
     commit((list) => {
       const g = list.find((i) => i.id === id)
       if (!g || g.type !== 'group') return list
@@ -863,7 +877,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       const kids = [...g.props.children].sort((a, b) => a.zIndex - b.zIndex).map((c, i) => {
         const ox = c.x * s, oy = c.y * s
         const x = gx + ox * cs - oy * sn, y = g.y + ox * sn + oy * cs
-        const out: CanvasItem = { ...c, x: (x / canvasW) * 100, y, width: c.width * s, height: c.height * s, rotation: c.rotation + g.rotation, zIndex: g.zIndex + i, groupId: id }
+        const out: CanvasItem = { ...c, x: (x / canvasW) * 100, y, width: c.width * s, height: c.height * s, rotation: c.rotation + g.rotation, zIndex: g.zIndex + i, groupId: loose ? undefined : id }
         if (out.type === 'text') out.props = { ...out.props, size: Math.round(out.props.size * s * 10) / 10 }
         return out
       })
@@ -872,6 +886,39 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       return [...list.filter((i) => i.id !== id).map((i) => (i.zIndex > g.zIndex ? { ...i, zIndex: i.zIndex + room } : i)), ...kids]
     })
     setSelectedId(null)
+  }
+
+  /** the pieces of a locked group as ordinary items at the places they have on the page */
+  const groupPieces = (g: Extract<CanvasItem, { type: 'group' }>): CanvasItem[] => {
+    const s = g.width / g.props.w
+    const th = (g.rotation * Math.PI) / 180
+    const cs = Math.cos(th), sn = Math.sin(th)
+    const gx = (g.x / 100) * canvasW
+    return [...g.props.children].sort((a, b) => a.zIndex - b.zIndex).map((c, i) => {
+      const ox = c.x * s, oy = c.y * s
+      const out: CanvasItem = { ...c, x: ((gx + ox * cs - oy * sn) / canvasW) * 100, y: g.y + ox * sn + oy * cs, width: c.width * s, height: c.height * s, rotation: c.rotation + g.rotation, zIndex: g.zIndex + i * 0.001, groupId: undefined }
+      if (out.type === 'text') out.props = { ...out.props, size: Math.round(out.props.size * s * 10) / 10 }
+      return out
+    })
+  }
+  /** group: the chosen items (a group among them is opened up) become one piece that moves, turns and resizes together */
+  const makeGroup = (ids: string[]) => {
+    let made = ''
+    commit((list) => {
+      const chosen = ids.map((id) => list.find((i) => i.id === id)).filter((i): i is CanvasItem => !!i)
+      if (chosen.length < 2) return list
+      const flat = chosen.flatMap((c) => (c.type === 'group' ? groupPieces(c) : [c])).sort((a, b) => a.zIndex - b.zIndex)
+      const bb = flat.map(boundsOf)
+      const L = Math.min(...bb.map((b) => b.l)), R = Math.max(...bb.map((b) => b.r)), T = Math.min(...bb.map((b) => b.t)), B = Math.max(...bb.map((b) => b.b))
+      const cx = (L + R) / 2, cy = (T + B) / 2
+      const kids: CanvasItem[] = flat.map((c, i) => ({ ...c, groupId: undefined, x: (c.x / 100) * canvasW - cx, y: c.y - cy, zIndex: i + 1 }))
+      const gone = new Set([...chosen.map((c) => c.id), ...flat.map((c) => c.id)])
+      const rest = list.filter((i) => !gone.has(i.id) && !(i.type === 'thread' && (gone.has(i.props.a) || gone.has(i.props.b))))
+      const W = Math.max(1, Math.round(R - L)), H = Math.max(1, Math.round(B - T))
+      made = uid()
+      return [...rest, { id: made, type: 'group', x: (cx / canvasW) * 100, y: cy, width: W, height: H, rotation: 0, zIndex: Math.max(...chosen.map((c) => c.zIndex)), props: { made: true, w: W, h: H, children: kids } } as CanvasItem]
+    })
+    if (made) setSelectedId(made)
   }
 
   /** lock: the pieces of the group, and anything dropped inside its area, join into one piece again */
@@ -1080,7 +1127,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     },
     onDelete: () => { commit((l) => l.filter((x) => x.id !== selected.id && !(x.type === 'thread' && (x.props.a === selected.id || x.props.b === selected.id)))); setSelectedId(null) },
     onConnect: () => { if (connectFrom) setConnectFrom(null); else setConnectFrom(selected.id) },
-    onGroup: selected.type === 'group' ? { locked: true, run: () => unlockGroup(selected.id) } : undefined,
+    onGroup: selected.type === 'group' ? { locked: true, made: !!selected.props.made, run: () => unlockGroup(selected.id, !!selected.props.made) } : undefined,
+    onGather: selected.type !== 'thread' ? () => { setConnectFrom(null); setGroupFrom((g) => (g ? null : selected.id)) } : undefined,
     onForward: overlap.up ? () => reorder(1) : undefined,
     onBackward: overlap.down ? () => reorder(-1) : undefined,
     onView: selected.type === 'photo' && hasMouse() ? () => viewItem(selected.id) : undefined,
@@ -1479,7 +1527,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
               </div>
             )}
             {selected && actions && !drawing && editingId !== selected.id && draggingId !== selected.id && (
-              <SelectionOverlay item={selected} canvasW={canvasW} topLimit={((scroller.current?.scrollTop ?? 0) + 8) / zoom} accent={accent} actions={actions} hideToolbar={!!sheet} zoom={zoom} locked={isBg(selected)} connecting={!!connectFrom} />
+              <SelectionOverlay item={selected} canvasW={canvasW} topLimit={((scroller.current?.scrollTop ?? 0) + 8) / zoom} accent={accent} actions={actions} hideToolbar={!!sheet} zoom={zoom} locked={isBg(selected)} connecting={!!connectFrom} grouping={!!groupFrom} />
             )}
             {selected && actions && draggingId === selected.id && (
               <SelectionOverlay item={selected} canvasW={canvasW} topLimit={-9999} accent={accent} actions={{ ...actions, onFrame: undefined, onEdit: undefined }} hideToolbar zoom={zoom} locked={isBg(selected)} />
@@ -1592,6 +1640,20 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
             <button type="button" aria-label="Fit to width" onClick={() => applyZoom(1)} className="flex h-10 items-center gap-2 rounded-full border-0 bg-transparent px-4 text-[13px] font-extrabold text-[#17171a]">
               {Math.round(zoom * 100)}% <span className="font-semibold text-neutral-400">Fit to width</span>
             </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {groupFrom && (
+          <motion.div
+            key="group-hint" data-ui className="fixed left-1/2 z-40 flex w-max max-w-[94vw] items-center gap-3 whitespace-nowrap rounded-full bg-white py-1.5 pl-4 pr-1.5 text-[13.5px] font-bold text-[#17171a] shadow-[0_10px_28px_rgba(20,24,40,.25),0_0_0_1px_rgba(20,24,40,.06)]"
+            style={{ top: 'calc(var(--safe-top) + 138px)', x: '-50%' }}
+            initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+          >
+            <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-[#4F7BFF]" />
+            Tap another item to group it
+            <button type="button" onClick={() => setGroupFrom(null)} className="h-9 rounded-full border-0 bg-neutral-100 px-3.5 text-[13px] font-bold text-[#17171a]">Cancel</button>
           </motion.div>
         )}
       </AnimatePresence>

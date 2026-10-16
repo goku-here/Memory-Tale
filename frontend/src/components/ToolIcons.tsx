@@ -445,3 +445,20 @@ export const IcPages = () => (
     <path d="M7 8.5h7M7 11.5h7M7 14.5h4.5" stroke="#4F7BFF" strokeWidth="1.5" strokeLinecap="round" />
   </S>
 )
+
+export const IcGroup = () => (
+  <S>
+    <defs><G id="ic-gr1" a="#9DB7FF" b="#4F7BFF" /><G id="ic-gr2" a="#FFB1C8" b="#F0568A" /></defs>
+    <rect x="2.6" y="2.6" width="18.8" height="18.8" rx="4" fill="none" stroke="#5B6477" strokeWidth="1.6" strokeDasharray="3 2.4" />
+    <rect x="5.4" y="5.4" width="8" height="8" rx="2" fill="url(#ic-gr1)" />
+    <rect x="10.6" y="10.6" width="8" height="8" rx="2" fill="url(#ic-gr2)" stroke="#fff" strokeWidth="1.2" />
+  </S>
+)
+export const IcUngroup = () => (
+  <S>
+    <defs><G id="ic-ug1" a="#9DB7FF" b="#4F7BFF" /><G id="ic-ug2" a="#FFB1C8" b="#F0568A" /></defs>
+    <rect x="2.8" y="2.8" width="9.4" height="9.4" rx="2.4" fill="url(#ic-ug1)" />
+    <rect x="11.8" y="11.8" width="9.4" height="9.4" rx="2.4" fill="url(#ic-ug2)" />
+    <path d="M13.2 7.4h3.2M16.8 4.6v3.2M7.4 13.2v3.2" stroke="#5B6477" strokeWidth="1.5" strokeLinecap="round" />
+  </S>
+)

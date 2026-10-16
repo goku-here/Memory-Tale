@@ -190,6 +190,8 @@ export interface CollageProps {
 }
 /** a locked template (like a frame in a design tool): its pieces, positioned from its centre, in a box w x h that scales as one */
 export interface GroupProps {
+  /** made by the person with Group (not a template): its button says Ungroup */
+  made?: boolean
   w: number
   h: number
   children: CanvasItem[]
