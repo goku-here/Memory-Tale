@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { Check, ChevronDown, ChevronUp, Hand, Image as ImageIcon, Move, Redo2, Trash2, Undo2, X } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { shade } from '../lib/color'
 import type { ResolvedCanvas } from '../lib/canvasStyle'
 import type { BrushId, DrawProps, Stroke } from '../types'
@@ -63,6 +63,12 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
   /** hand on: a finger scrolls the page and nothing is drawn */
   const [hand, setHand] = useState(false)
   const [pop, setPop] = useState<null | 'tune' | 'color' | 'trace'>(null)
+  /** the page can be pinched bigger with the hand on (to draw small details); strokes are kept in page units, so zoom never changes them */
+  const [zoom, setZoom] = useState(1)
+  const zoomRef = useRef(1)
+  zoomRef.current = zoom
+  const [baseH, setBaseH] = useState(600)
+  const anchor = useRef<{ px: number; py: number; cx: number; cy: number } | null>(null)
   /** a picture to trace over: shown faintly under the strokes, never part of the drawing */
   const [trace, setTrace] = useState<{ url: string; x: number; y: number; w: number; own?: boolean } | null>(null)
   const [traceOp, setTraceOp] = useState(0.4)
@@ -138,11 +144,60 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
     if (!h.on) { if (dir > 0) grow(el); setTimeout(() => el.scrollBy({ top: dir * el.clientHeight * 0.5, behavior: 'smooth' }), 40) }
   }
 
+  /** zoom around a point of the screen: the spot under it stays where it is */
+  const zoomTo = (next: number, cx: number, cy: number) => {
+    const el = scroller.current
+    if (!el) return
+    const z = Math.min(4, Math.max(1, next))
+    if (Math.abs(z - zoomRef.current) < 0.001) return
+    const r = el.getBoundingClientRect()
+    const x = cx - r.left, y = cy - r.top
+    anchor.current = { px: (el.scrollLeft + x) / zoomRef.current, py: (el.scrollTop + y) / zoomRef.current, cx: x, cy: y }
+    setZoom(z)
+  }
+  useLayoutEffect(() => {
+    const a = anchor.current, el = scroller.current
+    if (!a || !el) return
+    anchor.current = null
+    el.scrollLeft = a.px * zoom - a.cx
+    el.scrollTop = a.py * zoom - a.cy
+  }, [zoom])
+  useEffect(() => {
+    const el = scroller.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setBaseH(el.clientHeight))
+    ro.observe(el)
+    setBaseH(el.clientHeight)
+    return () => ro.disconnect()
+  }, [])
+  // pinch with two fingers while the hand is on; on a computer, ctrl + wheel
+  useEffect(() => {
+    const el = scroller.current
+    if (!el) return
+    let start: { d: number; z: number } | null = null
+    const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
+    const down = (e: TouchEvent) => { if (hand && e.touches.length === 2) start = { d: dist(e.touches), z: zoomRef.current } }
+    const move = (e: TouchEvent) => {
+      if (!hand || !start || e.touches.length !== 2) return
+      e.preventDefault()
+      zoomTo(start.z * (dist(e.touches) / start.d), (e.touches[0].clientX + e.touches[1].clientX) / 2, (e.touches[0].clientY + e.touches[1].clientY) / 2)
+    }
+    const up = (e: TouchEvent) => { if (e.touches.length < 2) start = null }
+    const wheel = (e: WheelEvent) => { if (!e.ctrlKey) return; e.preventDefault(); zoomTo(zoomRef.current * Math.exp(-e.deltaY * 0.01), e.clientX, e.clientY) }
+    el.addEventListener('touchstart', down, { passive: true })
+    el.addEventListener('touchmove', move, { passive: false })
+    el.addEventListener('touchend', up)
+    el.addEventListener('touchcancel', up)
+    el.addEventListener('wheel', wheel, { passive: false })
+    return () => { el.removeEventListener('touchstart', down); el.removeEventListener('touchmove', move); el.removeEventListener('touchend', up); el.removeEventListener('touchcancel', up); el.removeEventListener('wheel', wheel) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hand])
+
   /** put a picture on the page, in the middle of what is on screen */
   const putTrace = (url: string, isOwn = false) => {
-    const pw = page.current?.getBoundingClientRect().width ?? 360
+    const pw = (page.current?.getBoundingClientRect().width ?? 360) / zoomRef.current
     const w = Math.round(Math.min(pw * 0.8, 360))
-    setTrace({ url, x: Math.round((pw - w) / 2), y: Math.round((scroller.current?.scrollTop ?? 0) + 110), w, own: isOwn })
+    setTrace({ url, x: Math.round(((scroller.current?.scrollLeft ?? 0) / zoomRef.current) + (pw - w) / 2), y: Math.round(((scroller.current?.scrollTop ?? 0) + 110) / zoomRef.current), w, own: isOwn })
     setPickOpen(false)
     setPop('trace')
     setMoveTrace(false)
@@ -159,7 +214,7 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
   const undo = () => { const prev = past[past.length - 1]; if (!prev) return; setFuture((f) => [...f, strokesRef.current]); setPast((p) => p.slice(0, -1)); setStrokes(prev) }
   const redo = () => { const next = future[future.length - 1]; if (!next) return; setPast((p) => [...p, strokesRef.current]); setFuture((f) => f.slice(0, -1)); setStrokes(next) }
   const clear = () => { if (!strokes.length) return; setPast((p) => [...p.slice(-40), strokes]); setFuture([]); setStrokes([]) }
-  const done = () => { const r = page.current?.getBoundingClientRect(); onDone(strokes, r?.width ?? 360, r?.height ?? 640) }
+  const done = () => { const r = page.current?.getBoundingClientRect(); onDone(strokes, (r?.width ?? 360) / zoom, (r?.height ?? 640) / zoom) }
 
   const pickTool = (id: ToolId) => {
     if (id === tool) setPop((p) => (p === 'tune' ? null : 'tune'))
@@ -189,24 +244,34 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
         initial={{ y: 60 }} animate={{ y: 0 }} transition={{ type: 'spring', stiffness: 320, damping: 32 }}
       >
         {/* the page: your canvas look, strokes on top */}
-        <div ref={scroller} onScroll={(e) => grow(e.currentTarget)} className="no-scrollbar absolute inset-0 overflow-y-auto" style={{ touchAction: hand ? 'pan-y' : 'none', overscrollBehavior: 'contain' }}>
-          <div ref={page} className="relative" style={{ ...look.css, minHeight: `calc(100% + ${extra}px)` }}>
+        <div ref={scroller} onScroll={(e) => grow(e.currentTarget)} className="no-scrollbar absolute inset-0 overflow-auto" style={{ touchAction: hand ? 'pan-x pan-y' : 'none', overscrollBehavior: 'contain' }}>
+          <div style={{ width: `${zoom * 100}%`, height: (baseH + extra) * zoom }}>
+          <div ref={page} className="relative" style={{ ...look.css, width: `${100 / zoom}%`, height: baseH + extra, transform: `scale(${zoom})`, transformOrigin: '0 0' }}>
             {trace && (
               <img
                 src={trace.url} alt="" draggable={false}
                 onPointerDown={(e) => { if (!moveTrace) return; e.currentTarget.setPointerCapture(e.pointerId); drag.current = { x: e.clientX, y: e.clientY, ox: trace.x, oy: trace.y } }}
-                onPointerMove={(e) => { const d = drag.current; if (d) setTrace((t) => t && { ...t, x: Math.round(d.ox + e.clientX - d.x), y: Math.round(d.oy + e.clientY - d.y) }) }}
+                onPointerMove={(e) => { const d = drag.current; if (d) setTrace((t) => t && { ...t, x: Math.round(d.ox + (e.clientX - d.x) / zoom), y: Math.round(d.oy + (e.clientY - d.y) / zoom) }) }}
                 onPointerUp={() => { drag.current = null }} onPointerCancel={() => { drag.current = null }}
                 style={{ position: 'absolute', left: trace.x, top: trace.y, width: trace.w, height: 'auto', opacity: traceOp, pointerEvents: moveTrace ? 'auto' : 'none', touchAction: 'none', cursor: moveTrace ? 'grab' : undefined, outline: moveTrace ? `2px dashed ${accent}` : undefined, outlineOffset: 4 }}
               />
             )}
             <DrawStrokes strokes={strokes} />
           </div>
+          </div>
         </div>
         <DrawLayer
           surfaceRef={page} strokes={strokes} color={color} size={size} brush={eraser ? 'pen' : tool} opacity={opacity} erase={eraser}
-          onChange={setStrokes} onBegin={begin} bottomInset={shelfH} off={hand || (moveTrace && pop === 'trace')}
+          onChange={setStrokes} onBegin={begin} bottomInset={shelfH} zoom={zoom} off={hand || (moveTrace && pop === 'trace')}
         />
+
+        {zoom > 1.01 && (
+          <button
+            type="button" aria-label="Back to normal size" onClick={() => { const r = scroller.current?.getBoundingClientRect(); zoomTo(1, (r?.left ?? 0) + (r?.width ?? 0) / 2, (r?.top ?? 0) + (r?.height ?? 0) / 2) }}
+            className="absolute left-1/2 z-[51] -translate-x-1/2 rounded-full border-0 bg-[#17171a]/85 px-3.5 py-1.5 text-[12.5px] font-bold text-white backdrop-blur"
+            style={{ top: 66 }}
+          >{Math.round(zoom * 100)}% · tap to reset</button>
+        )}
 
         {/* top bar */}
         <div className="absolute inset-x-0 top-0 z-[50] flex items-center gap-1 px-3 pt-3">
