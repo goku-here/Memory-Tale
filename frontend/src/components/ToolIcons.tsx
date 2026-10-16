@@ -449,16 +449,19 @@ export const IcPages = () => (
 export const IcGroup = () => (
   <S>
     <defs><G id="ic-gr1" a="#9DB7FF" b="#4F7BFF" /><G id="ic-gr2" a="#FFB1C8" b="#F0568A" /></defs>
-    <rect x="2.6" y="2.6" width="18.8" height="18.8" rx="4" fill="none" stroke="#5B6477" strokeWidth="1.6" strokeDasharray="3 2.4" />
-    <rect x="5.4" y="5.4" width="8" height="8" rx="2" fill="url(#ic-gr1)" />
-    <rect x="10.6" y="10.6" width="8" height="8" rx="2" fill="url(#ic-gr2)" stroke="#fff" strokeWidth="1.2" />
+    {/* one frame round both pieces */}
+    <path d="M3 8V5.6A2.6 2.6 0 0 1 5.6 3H8M16 3h2.4A2.6 2.6 0 0 1 21 5.6V8M21 16v2.4a2.6 2.6 0 0 1-2.6 2.6H16M8 21H5.6A2.6 2.6 0 0 1 3 18.4V16" stroke="#5B6477" strokeWidth="2" strokeLinecap="round" />
+    <rect x="6.4" y="6.4" width="7.6" height="7.6" rx="2" fill="url(#ic-gr1)" />
+    <rect x="10" y="10" width="7.6" height="7.6" rx="2" fill="url(#ic-gr2)" stroke="#fff" strokeWidth="1.3" />
   </S>
 )
 export const IcUngroup = () => (
   <S>
     <defs><G id="ic-ug1" a="#9DB7FF" b="#4F7BFF" /><G id="ic-ug2" a="#FFB1C8" b="#F0568A" /></defs>
-    <rect x="2.8" y="2.8" width="9.4" height="9.4" rx="2.4" fill="url(#ic-ug1)" />
-    <rect x="11.8" y="11.8" width="9.4" height="9.4" rx="2.4" fill="url(#ic-ug2)" />
-    <path d="M13.2 7.4h3.2M16.8 4.6v3.2M7.4 13.2v3.2" stroke="#5B6477" strokeWidth="1.5" strokeLinecap="round" />
+    {/* each piece gets its own frame again */}
+    <rect x="2" y="2" width="10.4" height="10.4" rx="3" stroke="#5B6477" strokeWidth="1.7" strokeDasharray="2.6 2.2" />
+    <rect x="11.6" y="11.6" width="10.4" height="10.4" rx="3" stroke="#5B6477" strokeWidth="1.7" strokeDasharray="2.6 2.2" />
+    <rect x="4.4" y="4.4" width="5.6" height="5.6" rx="1.6" fill="url(#ic-ug1)" />
+    <rect x="14" y="14" width="5.6" height="5.6" rx="1.6" fill="url(#ic-ug2)" />
   </S>
 )

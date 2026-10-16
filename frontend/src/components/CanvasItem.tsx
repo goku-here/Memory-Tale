@@ -277,7 +277,7 @@ export function SelectionOverlay({
           {actions.onGroup && (actions.onGroup.made
             ? <TB w={bw} label="Ungroup" caption="Ungroup" onClick={actions.onGroup.run}><IcUngroup /></TB>
             : <TB w={bw} label={actions.onGroup.locked ? 'Unlock to edit the pieces' : 'Lock the pieces together'} caption={actions.onGroup.locked ? 'Unlock' : 'Lock'} onClick={actions.onGroup.run}>{actions.onGroup.locked ? <IcLock /> : <IcUnlock />}</TB>)}
-          {!locked && actions.onGather && <TB w={bw} label={grouping ? 'Cancel grouping' : 'Group with another item'} caption={grouping ? 'Pick 2nd' : item.type === 'group' ? 'Add' : 'Group'} active={grouping} onClick={actions.onGather}><IcGroup /></TB>}
+          {!locked && actions.onGather && <TB w={bw} label={grouping ? 'Cancel grouping' : 'Group with another item'} caption={grouping ? 'Pick 2nd' : item.type === 'group' ? 'Add' : 'Group'} onClick={actions.onGather}><IcGroup /></TB>}
           {!locked && actions.onEdit && <TB w={bw} label="Edit" caption="Edit" onClick={actions.onEdit}><IcEdit /></TB>}
           {!locked && actions.onConnect && <TB w={bw} label={connecting ? 'Cancel the thread' : 'Tie with thread'} caption={connecting ? 'Pick 2nd' : 'Thread'} onClick={actions.onConnect}>{connecting ? <IcThreadOn /> : <IcThread />}</TB>}
           {!locked && <TB w={bw} label="Duplicate" caption="Copy" onClick={actions.onDuplicate}><IcCopy /></TB>}
