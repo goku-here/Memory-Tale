@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useMotionValue, useTransform, type MotionValue } from 'framer-motion'
-import { ArrowLeft, Check, ChevronDown, Eye, Image as ImageIcon, Loader2, MoreHorizontal, Redo2, Undo2, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, Eye, Image as ImageIcon, Loader2, Maximize2, MoreHorizontal, Redo2, Undo2, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../data/useAuth'
 import { canEdit } from '../data/people'
@@ -1349,10 +1349,13 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
                   </button>
                 </div>
               ) : printMode ? (
-                <div className="flex items-center justify-end gap-1.5 pr-1">
-                  <button type="button" aria-label="Move every item inside its page" onClick={fitToPages} className="flex h-9 items-center rounded-full border-0 bg-white px-3 text-[12.5px] font-extrabold text-[#17171a] shadow-[0_2px_8px_rgba(20,24,40,.15)]">Fit</button>
+                <div className="relative flex justify-end pr-1">
                   <button type="button" aria-label="Change page size" onClick={() => setPrintSizeOpen(true)} className="flex h-9 items-center gap-1 rounded-full border-0 bg-white px-3 text-[12.5px] font-extrabold text-[#17171a] shadow-[0_2px_8px_rgba(20,24,40,.15)]">
                     {printSize.name.replace('Scrapbook ', '').replace('Photo ', '')} <ChevronDown size={14} />
+                  </button>
+                  {/* below the size chip, so the top bar stays uncrowded */}
+                  <button type="button" aria-label="Move every item inside its page" onClick={fitToPages} className="absolute right-1 top-full mt-1.5 flex h-9 items-center gap-1.5 rounded-full border-0 bg-white px-3.5 text-[12.5px] font-extrabold text-[#17171a] shadow-[0_2px_8px_rgba(20,24,40,.15)]">
+                    <Maximize2 size={13} strokeWidth={2.6} /> Fit
                   </button>
                 </div>
               ) : (
