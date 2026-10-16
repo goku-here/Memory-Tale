@@ -1290,6 +1290,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
                         initial={{ opacity: 0, scale: 0.85, y: -6 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }}
                         transition={{ type: 'spring', stiffness: 460, damping: 30 }}
                       >
+                        <MenuItem icon={<IcPages />} label="Print pages" onClick={run(() => { if (!story && !printMode) enterPrint() })} />
                         {!readOnly && <MenuItem icon={<IcEdit />} label="Edit book" onClick={run(onEdit)} />}
                         {!readOnly && <MenuItem icon={<IcPalette />} label="Change theme" onClick={run(onTheme)} />}
                         <MenuItem icon={<IcShare />} label="Share" onClick={run(onShare)} />
