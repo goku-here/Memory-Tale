@@ -1,10 +1,11 @@
 import { motion } from 'framer-motion'
-import { Check, ChevronDown, ChevronUp, Hand, Redo2, Trash2, Undo2 } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp, Hand, Image as ImageIcon, Move, Redo2, Trash2, Undo2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { shade } from '../lib/color'
 import type { ResolvedCanvas } from '../lib/canvasStyle'
 import type { BrushId, DrawProps, Stroke } from '../types'
 import { DrawLayer, DrawStrokes } from './DrawLayer'
+import { TRACE_ART, traceUrl } from '../lib/traceArt'
 import { IcCalligraphyTool, IcCrayonTool, IcEraserTool, IcHighlighterTool, IcMarkerTool, IcPenTool, IcPencilTool } from './ToolIcons'
 
 type ToolId = BrushId | 'eraser'
@@ -60,7 +61,14 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
   const shelfRef = useRef(150)
   /** hand on: a finger scrolls the page and nothing is drawn */
   const [hand, setHand] = useState(false)
-  const [pop, setPop] = useState<null | 'tune' | 'color'>(null)
+  const [pop, setPop] = useState<null | 'tune' | 'color' | 'trace'>(null)
+  /** a picture to trace over: shown faintly under the strokes, never part of the drawing */
+  const [trace, setTrace] = useState<{ url: string; x: number; y: number; w: number; own?: boolean } | null>(null)
+  const [traceOp, setTraceOp] = useState(0.4)
+  const [pickOpen, setPickOpen] = useState(false)
+  const [moveTrace, setMoveTrace] = useState(false)
+  const own = useRef<HTMLInputElement>(null)
+  const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null)
 
   const color = shade(base, SHADES[shadeAt])
   const eraser = tool === 'eraser'
@@ -129,6 +137,23 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
     if (!h.on) { if (dir > 0) grow(el); setTimeout(() => el.scrollBy({ top: dir * el.clientHeight * 0.5, behavior: 'smooth' }), 40) }
   }
 
+  /** put a picture on the page, in the middle of what is on screen */
+  const putTrace = (url: string, isOwn = false) => {
+    const pw = page.current?.getBoundingClientRect().width ?? 360
+    const w = Math.round(Math.min(pw * 0.8, 360))
+    setTrace({ url, x: Math.round((pw - w) / 2), y: Math.round((scroller.current?.scrollTop ?? 0) + 110), w, own: isOwn })
+    setPickOpen(false)
+    setPop('trace')
+    setMoveTrace(false)
+  }
+  const dropTrace = () => { if (trace?.own) URL.revokeObjectURL(trace.url); setTrace(null); setPop(null); setMoveTrace(false) }
+  const onOwn = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (f) { if (trace?.own) URL.revokeObjectURL(trace.url); putTrace(URL.createObjectURL(f), true) }
+  }
+  const imageButton = () => { if (!trace) setPickOpen(true); else setPop((p) => (p === 'trace' ? null : 'trace')) }
+
   const begin = () => { setPop(null); setPast((p) => [...p.slice(-40), strokesRef.current]); setFuture([]) }
   const undo = () => { const prev = past[past.length - 1]; if (!prev) return; setFuture((f) => [...f, strokesRef.current]); setPast((p) => p.slice(0, -1)); setStrokes(prev) }
   const redo = () => { const next = future[future.length - 1]; if (!next) return; setPast((p) => [...p, strokesRef.current]); setFuture((f) => f.slice(0, -1)); setStrokes(next) }
@@ -165,12 +190,21 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
         {/* the page: your canvas look, strokes on top */}
         <div ref={scroller} onScroll={(e) => grow(e.currentTarget)} className="no-scrollbar absolute inset-0 overflow-y-auto" style={{ touchAction: hand ? 'pan-y' : 'none', overscrollBehavior: 'contain' }}>
           <div ref={page} className="relative" style={{ ...look.css, minHeight: `calc(100% + ${extra}px)` }}>
+            {trace && (
+              <img
+                src={trace.url} alt="" draggable={false}
+                onPointerDown={(e) => { if (!moveTrace) return; e.currentTarget.setPointerCapture(e.pointerId); drag.current = { x: e.clientX, y: e.clientY, ox: trace.x, oy: trace.y } }}
+                onPointerMove={(e) => { const d = drag.current; if (d) setTrace((t) => t && { ...t, x: Math.round(d.ox + e.clientX - d.x), y: Math.round(d.oy + e.clientY - d.y) }) }}
+                onPointerUp={() => { drag.current = null }} onPointerCancel={() => { drag.current = null }}
+                style={{ position: 'absolute', left: trace.x, top: trace.y, width: trace.w, height: 'auto', opacity: traceOp, pointerEvents: moveTrace ? 'auto' : 'none', touchAction: 'none', cursor: moveTrace ? 'grab' : undefined, outline: moveTrace ? `2px dashed ${accent}` : undefined, outlineOffset: 4 }}
+              />
+            )}
             <DrawStrokes strokes={strokes} />
           </div>
         </div>
         <DrawLayer
           surfaceRef={page} strokes={strokes} color={color} size={size} brush={eraser ? 'pen' : tool} opacity={opacity} erase={eraser}
-          onChange={setStrokes} onBegin={begin} bottomInset={shelfH} off={hand}
+          onChange={setStrokes} onBegin={begin} bottomInset={shelfH} off={hand || (moveTrace && pop === 'trace')}
         />
 
         {/* top bar */}
@@ -182,6 +216,11 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
             className="ml-1 grid h-11 w-11 place-items-center rounded-full border-0 backdrop-blur"
             style={hand ? { background: '#17171a', color: '#fff' } : { background: 'rgba(255,255,255,.8)', color: '#17171a' }}
           ><Hand size={20} /></button>
+          <button
+            type="button" aria-label="Trace a picture" aria-pressed={!!trace} onClick={imageButton}
+            className="ml-1 flex h-11 items-center gap-1.5 rounded-full border-0 px-3.5 text-[14px] font-bold backdrop-blur"
+            style={trace ? { background: '#17171a', color: '#fff' } : { background: 'rgba(255,255,255,.8)', color: '#17171a' }}
+          ><ImageIcon size={18} /> Image</button>
           <span className="flex-1" />
           <button type="button" aria-label="Clear the drawing" onClick={clear} disabled={!strokes.length} className="grid h-11 w-11 place-items-center rounded-full border-0 bg-white/80 text-[#17171a] backdrop-blur disabled:opacity-30"><Trash2 size={19} /></button>
           <motion.button type="button" whileTap={{ scale: 0.95 }} onClick={done} className="ml-1 flex h-11 items-center gap-1.5 rounded-full border-0 bg-[#17171a] px-5 text-[15px] font-semibold text-white">
@@ -197,6 +236,63 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
             type="button" aria-label="Scroll down" onPointerDown={(e) => { e.stopPropagation(); arrowDown(1) }} onPointerUp={() => arrowUp(1)} onPointerLeave={() => arrowUp(1)} onPointerCancel={() => arrowUp(1)}
             className="absolute right-3 z-[52] grid h-11 w-11 touch-none place-items-center rounded-full border-0 bg-white/90 text-[#17171a] shadow-[0_4px_14px_rgba(20,24,40,.22)] backdrop-blur" style={{ bottom: shelfH + 14 }}
           ><ChevronDown size={22} strokeWidth={2.6} /></button>
+
+        {/* the picture being traced: how faint, how big, where, or take it away */}
+        {pop === 'trace' && trace && (
+          <motion.div
+            className="absolute inset-x-3 z-[55] mx-auto max-w-[400px]" style={{ bottom: shelfH + 10 }}
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} onPointerDown={(e) => e.stopPropagation()}
+          >
+            <div className={`${card} space-y-1 px-4 pb-3 pt-3`}>
+              <label className="flex items-center gap-3">
+                <span className="w-14 text-[12px] font-extrabold uppercase tracking-wider text-neutral-400">Faint</span>
+                <input type="range" min={10} max={90} value={Math.round(traceOp * 100)} aria-label="How faint the picture is" onChange={(e) => setTraceOp(+e.target.value / 100)} className="h-10 flex-1" style={{ accentColor: accent }} />
+              </label>
+              <label className="flex items-center gap-3">
+                <span className="w-14 text-[12px] font-extrabold uppercase tracking-wider text-neutral-400">Size</span>
+                <input
+                  type="range" min={60} max={900} value={trace.w} aria-label="Picture size"
+                  onChange={(e) => { const w = +e.target.value; setTrace((t) => t && { ...t, w, x: Math.round(t.x + (t.w - w) / 2), y: Math.round(t.y + (t.w - w) / 2) }) }}
+                  className="h-10 flex-1" style={{ accentColor: accent }}
+                />
+              </label>
+              <div className="flex gap-2 pt-1">
+                <button type="button" aria-pressed={moveTrace} onClick={() => setMoveTrace((v) => !v)} className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full border-0 text-[13.5px] font-bold" style={moveTrace ? { background: '#17171a', color: '#fff' } : { background: '#f1f1f3', color: '#17171a' }}><Move size={16} /> {moveTrace ? 'Drag it, then tap here' : 'Move'}</button>
+                <button type="button" onClick={() => { setPop(null); setMoveTrace(false); setPickOpen(true) }} className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full border-0 bg-[#f1f1f3] text-[13.5px] font-bold text-[#17171a]"><ImageIcon size={16} /> Change</button>
+                <button type="button" aria-label="Remove the picture" onClick={dropTrace} className="grid h-11 w-11 place-items-center rounded-full border-0 bg-[#fdecef] text-[#d6455d]"><Trash2 size={17} /></button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* choose a picture to trace */}
+        {pickOpen && (
+          <motion.div className="absolute inset-0 z-[70]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} onPointerDown={(e) => e.stopPropagation()}>
+            <div className="absolute inset-0 bg-black/30" onClick={() => setPickOpen(false)} aria-hidden />
+            <motion.div
+              className="absolute inset-x-0 bottom-0 max-h-[78%] overflow-y-auto rounded-t-[28px] bg-white pb-6" role="dialog" aria-label="Pick a picture to trace"
+              initial={{ y: 80 }} animate={{ y: 0 }} transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+            >
+              <div className="sticky top-0 z-10 flex items-center justify-between bg-white px-5 pb-2 pt-4">
+                <h3 className="m-0 text-[17px] font-extrabold text-[#17171a]">Trace a picture</h3>
+                <button type="button" aria-label="Close" onClick={() => setPickOpen(false)} className="grid h-9 w-9 place-items-center rounded-full border-0 bg-neutral-100 text-neutral-600"><X size={17} /></button>
+              </div>
+              <p className="m-0 px-5 pb-3 text-[13px] leading-snug text-neutral-500">It shows faintly on your page so you can draw over it. It is never added to your drawing.</p>
+              <div className="px-5 pb-3">
+                <button type="button" onClick={() => own.current?.click()} className="flex h-12 w-full items-center justify-center gap-2 rounded-full border-0 text-[14.5px] font-bold text-white" style={{ background: accent }}><ImageIcon size={18} /> Use one of my photos</button>
+                <input ref={own} type="file" accept="image/*" className="hidden" onChange={onOwn} />
+              </div>
+              <div className="grid grid-cols-4 gap-2 px-4">
+                {TRACE_ART.map((a) => (
+                  <button key={a.id} type="button" aria-label={a.label} onClick={() => putTrace(traceUrl(a))} className="flex flex-col items-center gap-1 rounded-2xl border-0 bg-[#f6f6f8] px-1 pb-2 pt-2.5">
+                    <img src={traceUrl(a)} alt="" className="h-14 w-14" draggable={false} />
+                    <span className="text-[11px] font-bold text-neutral-500">{a.label}</span>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
 
         {/* thickness and opacity */}
         {pop === 'tune' && (
