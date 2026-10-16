@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useState, type ReactNode } from 'react'
-import { IcBubble, IcCamera, IcGallery, IcDraw, IcFlag, IcGrid, IcLine, IcMore, IcNote, IcPhoto, IcPhone, IcPin, IcSticker, IcTemplates, IcText } from './ToolIcons'
+import { IcBubble, IcCamera, IcGallery, IcDraw, IcFlag, IcGrid, IcLine, IcMore, IcNote, IcPhoto, IcPhone, IcPin, IcSticker, IcTemplates, IcText, IcPages } from './ToolIcons'
 
-export type ToolId = 'templates' | 'sticker' | 'draw' | 'text' | 'photo' | 'camera' | 'note' | 'location' | 'divider' | 'bubble' | 'line' | 'story' | 'canvas'
+export type ToolId = 'templates' | 'sticker' | 'draw' | 'text' | 'photo' | 'camera' | 'note' | 'location' | 'divider' | 'bubble' | 'line' | 'story' | 'print' | 'canvas'
 
 interface Props {
   visible: boolean
@@ -84,7 +84,8 @@ export function BottomToolbar({ visible, onTool, inStory }: Props) {
                     ['canvas', 'Canvas style', <IcGrid key="g" />],
                     ['templates', 'Templates', <IcTemplates key="t" />],
                     ['story', 'Story mode', <IcPhone key="s" />],
-                  ] as [ToolId, string, ReactNode][]).filter(([id]) => !(inStory && id === 'story')).map(([id, label, icon]) => (
+                    ['print', 'Print pages', <IcPages key="pp" />],
+                  ] as [ToolId, string, ReactNode][]).filter(([id]) => !(inStory && (id === 'story' || id === 'print'))).map(([id, label, icon]) => (
                     <motion.button
                       key={id} data-tour={id === 'story' ? 'story-item' : undefined} type="button" role="menuitem" whileTap={{ scale: 0.96 }} onClick={() => pick(id)}
                       className="flex min-h-12 w-full items-center gap-3 rounded-2xl border-0 bg-transparent px-3 text-left text-[15px] font-semibold text-[#17171a]"

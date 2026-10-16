@@ -42,7 +42,7 @@ function StoryView({ memory: m, items: raw, canvasW, frameY, dots, mark, size }:
         ['--t-pin' as string]: theme.palette[0], ['--t-pin2' as string]: theme.palette[1],
       }}
     >
-      {[...items].filter((i) => i.type !== 'thread').sort((a, b) => a.zIndex - b.zIndex).map((it, rank) => (
+      {[...items].filter((i) => i.type !== 'thread' && !(i.y + Math.max(i.width, i.height) * 0.75 < frameY || i.y - Math.max(i.width, i.height) * 0.75 > frameY + h)).sort((a, b) => a.zIndex - b.zIndex).map((it, rank) => (
         <div
           key={it.id}
           style={{
@@ -134,14 +134,14 @@ async function normalise(blob: Blob, size: StorySize): Promise<Blob> {
   } finally { URL.revokeObjectURL(url) }
 }
 
-export interface StoryOptions { frameY: number; canvasW: number; dots: boolean; mark: boolean; size: StorySize }
+export interface StoryOptions { frameY: number; canvasW: number; dots: boolean; mark: boolean; size: StorySize; /** the items already have their pictures resolved (many pages from one book) */ resolved?: boolean }
 
 /**
  * Renders just what is inside the story frame, off-screen, as a PNG of the chosen size (1080 x 1920 for a story).
  * Only the items are drawn: no dim mask, safe-zone guides, handles or selection UI.
  */
 export async function exportStoryPng(memory: Memory, current: CanvasItem[], o: StoryOptions): Promise<Blob> {
-  const items = await Promise.all(current.map((i) => resolveItemAssets(memory.id, i)))
+  const items = o.resolved ? current : await Promise.all(current.map((i) => resolveItemAssets(memory.id, i)))
   const host = document.createElement('div')
   host.style.cssText = `position:fixed;left:0;top:0;width:${o.canvasW}px;opacity:0;pointer-events:none;z-index:-1;`
   document.body.appendChild(host)

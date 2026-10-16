@@ -49,9 +49,11 @@ import { LocationTool } from './LocationTool'
 import { PeopleSheet } from './PeopleSheet'
 import { mapAspect } from '../lib/geo'
 import { CanvasStyleSheet } from './CanvasStyleSheet'
-import { IcClapper, IcDownload, IcEdit, IcLock, IcPalette, IcPeople, IcShare, IcTrash } from './ToolIcons'
+import { IcClapper, IcDownload, IcEdit, IcLock, IcPages, IcPalette, IcPeople, IcShare, IcTrash } from './ToolIcons'
 import { resolveCanvas } from '../lib/canvasStyle'
 import { SizeSheet, StoryOverlay, StoryPreview } from './StoryMode'
+import { PrintExportSheet, PrintOverlay, PrintSizeSheet, pagesNeeded } from './PrintMode'
+import { getPrintSize, pageDims, type PrintSize } from '../lib/printSizes'
 import { THREAD_COLORS, ThreadsSvg, threadMid } from './Threads'
 import { IconButton, toast } from './ui'
 import type { Memory } from '../types'
@@ -141,6 +143,18 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
 
   const [menu, setMenu] = useState(false)
   const [story, setStory] = useState(false)
+  /** print mode: the book laid out as pages (one image per page), for a scrapbook or a frame */
+  const [printMode, setPrintMode] = useState(false)
+  const [printY, setPrintYState] = useState(0)
+  const printYRef = useRef(0)
+  const setPrintY = useCallback((y: number) => { printYRef.current = y; setPrintYState(y) }, [])
+  const [printSizeOpen, setPrintSizeOpen] = useState(false)
+  const [printExportOpen, setPrintExportOpen] = useState(false)
+  const [printPick, setPrintPick] = useState<{ id: string; landscape: boolean }>(() => {
+    try { const v = localStorage.getItem(`mt-print-size:${memory.id}`); if (v) { const [id, o] = v.split(':'); return { id, landscape: o === 'l' } } } catch { /* ignore */ }
+    return { id: 'a4', landscape: false }
+  })
+  const printSize: PrintSize = getPrintSize(printPick.id)
   const [zoom, setZoomState] = useState(1)
   const zoomRef = useRef(1)
   const zoomAnchor = useRef<{ y: number; screenY: number; x?: number; screenX?: number } | null>(null)
@@ -904,6 +918,68 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     sc.scrollTo({ top: Math.max(0, (wrap.current?.offsetTop ?? 0) + y * zoomRef.current - HEADER_H - 10), behavior: 'smooth' })
     try { if (!localStorage.getItem('mt-story-hint')) { localStorage.setItem('mt-story-hint', '1'); toast('Keep titles and faces out of the shaded zones.') } } catch { /* ignore */ }
   }
+  /* ---------- print mode: the book as pages ---------- */
+  const printDims = pageDims(printSize, printPick.landscape)
+  const printPageH = (canvasW * printDims.h) / printDims.w
+  const printMargin = Math.round(canvasW * 0.04)
+  const printUsed = useMemo(() => (printMode ? pagesNeeded(vItems, canvasW, printY, printPageH) : 1), [printMode, vItems, canvasW, printY, printPageH])
+  const fitPrintFrame = (y: number, ph: number) => {
+    const z = clamp((window.innerHeight - HEADER_H - 150) / ph, ZMIN, 1)
+    applyZoom(Math.min(zoomRef.current, z), { y, screenY: HEADER_H + 10 })
+  }
+  const enterPrint = () => {
+    const sc = scroller.current
+    const sf = surface.current
+    if (!sc || !sf) return
+    let y = 0
+    try { const v = localStorage.getItem(`mt-print-y:${memory.id}`); if (v) y = Math.max(0, +v || 0) } catch { /* ignore */ }
+    if (!y) {
+      const tops = itemsRef.current.filter((i) => i.type !== 'thread' && !isBg(i)).map((i) => boundsOf(i).t)
+      y = tops.length ? Math.max(0, Math.floor(Math.min(...tops) - printMargin)) : 0
+    }
+    setPrintY(y)
+    setSelectedId(null)
+    setPrintMode(true)
+    preStoryZoom.current = zoomRef.current
+    fitPrintFrame(y, printPageH)
+    sc.scrollTo({ top: Math.max(0, (wrap.current?.offsetTop ?? 0) + y * zoomRef.current - HEADER_H - 10), behavior: 'smooth' })
+    try { if (!localStorage.getItem('mt-print-hint')) { localStorage.setItem('mt-print-hint', '1'); toast('Each framed page is one picture. Keep things inside the dashed margin.') } } catch { /* ignore */ }
+  }
+  const leavePrint = () => { setPrintMode(false); setPrintExportOpen(false); applyZoom(preStoryZoom.current) }
+  const pickPrint = (s: PrintSize, landscape: boolean) => {
+    setPrintPick({ id: s.id, landscape })
+    try { localStorage.setItem(`mt-print-size:${memory.id}`, `${s.id}:${landscape ? 'l' : 'p'}`) } catch { /* ignore */ }
+    const d = pageDims(s, landscape)
+    fitPrintFrame(printYRef.current, (canvasW * d.h) / d.w)
+  }
+  useEffect(() => { if (printMode) try { localStorage.setItem(`mt-print-y:${memory.id}`, String(Math.round(printY))) } catch { /* ignore */ } }, [printMode, printY, memory.id])
+  useEffect(() => {
+    if (!printMode) return
+    const need = Math.ceil((printY + (printUsed + 1) * printPageH + 300) / 100) * 100
+    if (need > heightRef.current) setHeight(need)
+  }, [printMode, printY, printUsed, printPageH, setHeight])
+  /** nudge every item that a page edge cuts (or that sticks out of the margin) so it sits inside its page */
+  const fitToPages = () => {
+    const m = printMargin
+    let moved = 0
+    const next = itemsRef.current.map((it) => {
+      if (it.type === 'thread' || isBg(it)) return it
+      const b = boundsOf(it)
+      const h = b.b - b.t, w = b.r - b.l
+      const p = Math.max(0, Math.floor((it.y - printY) / printPageH))
+      const top = printY + p * printPageH + m, bot = printY + (p + 1) * printPageH - m
+      let dy = 0, dx = 0
+      if (h <= bot - top) { if (b.t < top) dy = top - b.t; else if (b.b > bot) dy = bot - b.b }
+      if (w <= canvasW - 2 * m) { if (b.l < m) dx = m - b.l; else if (b.r > canvasW - m) dx = canvasW - m - b.r }
+      if (!dx && !dy) return it
+      moved++
+      return { ...it, y: it.y + dy, x: it.x + (dx / canvasW) * 100 }
+    })
+    if (!moved) { toast('Everything already sits inside its page'); return }
+    commit(() => next)
+    toast(`Moved ${moved} item${moved > 1 ? 's' : ''} inside their pages`)
+  }
+
   const leaveStory = () => { setStory(false); setStoryPreview(false); applyZoom(preStoryZoom.current); tour.emit('story-close') }
   /** zoom out just enough that the whole frame fits on screen */
   function fitFrame(y: number, sz: StorySize) {
@@ -938,6 +1014,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       case 'bubble': addBubble(); break
       case 'line': addLine(); break
       case 'story': if (!story) enterStory(); break
+      case 'print': if (!printMode) enterPrint(); break
       case 'canvas': setStyleOpen(true); break
     }
   }
@@ -1249,6 +1326,17 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
                     className="grid h-10 w-10 place-items-center rounded-full border-0 bg-white text-[#17171a] shadow-[0_2px_8px_rgba(20,24,40,.15)]"
                   ><X size={18} /></motion.button>
                 </div>
+              ) : printMode ? (
+                <div className="flex items-center gap-1.5">
+                  <motion.button
+                    type="button" onClick={() => setPrintExportOpen(true)} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 460, damping: 28 }}
+                    className="flex h-10 items-center gap-1.5 rounded-full border-0 bg-[#17171a] px-4 text-[14px] font-bold text-white"
+                  ><IcPages /> Export</motion.button>
+                  <motion.button
+                    type="button" aria-label="Close print mode" onClick={leavePrint} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 460, damping: 28 }}
+                    className="grid h-10 w-10 place-items-center rounded-full border-0 bg-white text-[#17171a] shadow-[0_2px_8px_rgba(20,24,40,.15)]"
+                  ><X size={18} /></motion.button>
+                </div>
               ) : (
                 <motion.p className="m-0 text-center text-[14px] font-semibold text-neutral-400" style={{ opacity: subOpacity }}>
                   {photoCount} {photoCount === 1 ? 'Photo' : 'Photos'} <span className="mx-1">•</span> {formatDate(memory.date)}
@@ -1258,6 +1346,13 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
                 <div className="flex justify-end pr-1">
                   <button type="button" aria-label="Change frame size" onClick={() => setSizeOpen(true)} className="flex h-9 items-center gap-1 rounded-full border-0 bg-white px-3 text-[12.5px] font-extrabold text-[#17171a] shadow-[0_2px_8px_rgba(20,24,40,.15)]">
                     {ratioLabel(size)} <ChevronDown size={14} />
+                  </button>
+                </div>
+              ) : printMode ? (
+                <div className="flex items-center justify-end gap-1.5 pr-1">
+                  <button type="button" aria-label="Move every item inside its page" onClick={fitToPages} className="flex h-9 items-center rounded-full border-0 bg-white px-3 text-[12.5px] font-extrabold text-[#17171a] shadow-[0_2px_8px_rgba(20,24,40,.15)]">Fit</button>
+                  <button type="button" aria-label="Change page size" onClick={() => setPrintSizeOpen(true)} className="flex h-9 items-center gap-1 rounded-full border-0 bg-white px-3 text-[12.5px] font-extrabold text-[#17171a] shadow-[0_2px_8px_rgba(20,24,40,.15)]">
+                    {printSize.name.replace('Scrapbook ', '').replace('Photo ', '')} <ChevronDown size={14} />
                   </button>
                 </div>
               ) : (
@@ -1334,6 +1429,9 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
                 {guides.v.map((l) => <line key={`v${l.x}`} x1={l.x} x2={l.x} y1={l.y1} y2={l.y2} stroke="#ff3d81" strokeWidth={1.25} strokeDasharray="5 4" />)}
                 {guides.h.map((l) => <line key={`h${l.y}`} x1={l.x1} x2={l.x2} y1={l.y} y2={l.y} stroke="#ff3d81" strokeWidth={1.25} strokeDasharray="5 4" />)}
               </svg>
+            )}
+            {printMode && (
+              <PrintOverlay surfaceRef={surface} scrollerRef={scroller} canvasW={canvasW} surfaceH={height} y0={printY} onY0={setPrintY} pageH={printPageH} used={printUsed} items={vItems} accent={accent} headerH={HEADER_H} zoom={zoom} margin={printMargin} />
             )}
             {story && (
               <StoryOverlay surfaceRef={surface} scrollerRef={scroller} canvasW={canvasW} surfaceH={height} y={storyY} onY={setStoryY} items={vItems} accent={accent} headerH={HEADER_H} size={size} zoom={zoom} />
@@ -1508,10 +1606,12 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
         )}
       </AnimatePresence>
 
-      <BottomToolbar visible={!sheet && !editingId && !readOnly} inStory={story} accent={accent} onTool={onTool} />
+      <BottomToolbar visible={!sheet && !editingId && !readOnly} inStory={story || printMode} accent={accent} onTool={onTool} />
       <CanvasStyleSheet open={styleOpen} onClose={() => setStyleOpen(false)} memory={memory} value={cstyle} onChange={changeStyle} onHeight={(h) => setSheetHs((s) => ({ ...s, style: h }))} />
       {user && <PeopleSheet open={peopleOpen} onClose={() => setPeopleOpen(false)} memory={memory} />}
       <StoryPreview open={storyPreview} onClose={() => setStoryPreview(false)} memory={memory} accent={accent} getItems={() => itemsRef.current} frameY={storyY} canvasW={canvasW} size={size} />
+      <PrintSizeSheet open={printSizeOpen} onClose={() => setPrintSizeOpen(false)} size={printSize} landscape={printPick.landscape} onPick={pickPrint} accent={accent} />
+      <PrintExportSheet open={printExportOpen} onClose={() => setPrintExportOpen(false)} memory={memory} accent={accent} getItems={() => withBackground(itemsRef.current, canvasW)} y0={printY} pageCount={printUsed} canvasW={canvasW} size={printSize} landscape={printPick.landscape} />
       <SizeSheet open={sizeOpen} onClose={() => setSizeOpen(false)} value={size} onPick={pickSize} accent={accent} />
 
       {/* ---- tool sheets ---- */}

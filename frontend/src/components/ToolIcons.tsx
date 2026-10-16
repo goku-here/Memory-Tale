@@ -436,3 +436,12 @@ export const IcColorTool = () => (
     <circle cx="12" cy="16.2" r="2.6" fill="#fff" opacity=".92" />
   </S>
 )
+
+export const IcPages = () => (
+  <S>
+    <defs><G id="pg-a" a="#FFFFFF" b="#E6E9F2" /><G id="pg-b" a="#8FB3FF" b="#4F7BFF" /></defs>
+    <rect x="6.5" y="2.6" width="13" height="17" rx="2" fill="url(#pg-b)" opacity=".55" transform="rotate(8 13 11)" />
+    <rect x="4" y="4" width="13" height="17" rx="2" fill="url(#pg-a)" stroke="#9AA6C4" strokeWidth="1.2" />
+    <path d="M7 8.5h7M7 11.5h7M7 14.5h4.5" stroke="#4F7BFF" strokeWidth="1.5" strokeLinecap="round" />
+  </S>
+)
