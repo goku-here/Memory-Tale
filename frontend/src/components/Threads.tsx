@@ -30,7 +30,7 @@ export function ThreadsSvg({ items, canvasW, offsetY = 0, selectedId, onSelect }
   return (
     <svg className="pointer-events-none absolute inset-0 h-full w-full" style={{ zIndex: 8000, overflow: 'visible' }}>
       <defs>
-        {THREAD_COLORS.map((c) => (
+        {[...new Set([...THREAD_COLORS, ...threads.map((t) => t.props.color)])].map((c) => (
           <radialGradient key={c} id={`${gid}${c.slice(1)}`} cx="35%" cy="30%" r="75%">
             <stop offset="0" stopColor="#fff" stopOpacity=".85" />
             <stop offset=".35" stopColor={c} />
@@ -45,7 +45,7 @@ export function ThreadsSvg({ items, canvasW, offsetY = 0, selectedId, onSelect }
         const a = anchorOf(A, canvasW, offsetY)
         const b = anchorOf(B, canvasW, offsetY)
         const sel = selectedId === t.id
-        const fill = `url(#${gid}${(THREAD_COLORS.includes(t.props.color) ? t.props.color : THREAD_COLORS[0]).slice(1)})`
+        const fill = `url(#${gid}${t.props.color.slice(1)})`
         return (
           <g key={t.id}>
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="rgba(0,0,0,.18)" strokeWidth="4" strokeLinecap="round" transform="translate(0 2)" />

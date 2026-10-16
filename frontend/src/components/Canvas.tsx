@@ -54,6 +54,7 @@ import { resolveCanvas } from '../lib/canvasStyle'
 import { SizeSheet, StoryOverlay, StoryPreview } from './StoryMode'
 import { PrintExportSheet, PrintOverlay, PrintSizeSheet, pagesNeeded } from './PrintMode'
 import { getPrintSize, pageDims, type PrintSize } from '../lib/printSizes'
+import { CustomColor } from './ColorPicker'
 import { THREAD_COLORS, ThreadsSvg, threadMid } from './Threads'
 import { IconButton, toast } from './ui'
 import type { Memory } from '../types'
@@ -1507,6 +1508,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
                       <span className="h-6 w-6 rounded-full" style={{ background: c, boxShadow: selectedThread.props.color === c ? `0 0 0 2px #fff, 0 0 0 3.5px ${c}` : 'none' }} />
                     </button>
                   ))}
+                  <CustomColor value={selectedThread.props.color} listed={THREAD_COLORS.includes(selectedThread.props.color)} accent="#17171a" onPick={(c) => patch(selectedThread.id, { props: { color: c } }, true)} cell="h-11 w-9" dot={24} />
                   <button
                     type="button" aria-label="Remove thread" onClick={() => { commit((l) => l.filter((x) => x.id !== selectedThread.id)); setSelectedId(null) }}
                     className="grid h-11 w-11 place-items-center border-0 bg-transparent text-[#d6455d]"

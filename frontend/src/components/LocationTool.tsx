@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { CustomColor } from './ColorPicker'
 import { Bike, Car, Check, Footprints, Motorbike, Plus, Loader2, LocateFixed, MapPin, Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { MapProps, MapStyle, Place, TravelMode } from '../types'
@@ -265,6 +266,7 @@ export function LocationTool({ pins, accent, onAdd, initial }: Props) {
                 <span className="h-7 w-7 rounded-full" style={{ background: c, boxShadow: color === c ? '0 0 0 2px #fff, 0 0 0 4px #17171a' : 'inset 0 0 0 1px rgba(0,0,0,.18)' }} />
               </button>
             ))}
+            <CustomColor value={color} listed={COLORS.some((c) => c.toLowerCase() === color.toLowerCase())} accent="#17171a" onPick={setColor} cell="h-9 w-9" dot={28} />
           </div>
         )}
       </div>

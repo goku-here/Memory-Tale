@@ -1,4 +1,5 @@
-import { motion } from 'framer-motion'
+import { motion } from 'framer-motion'
+import { CustomColor } from './ColorPicker'
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { BubbleProps, BubbleShape } from '../types'
 
@@ -360,6 +361,7 @@ export function BubbleEditor({ value, accent, box, onChange }: EditorProps) {
                 </motion.button>
               )
             })}
+            <CustomColor value={value.strokeColor ?? INK} listed={BUBBLE_STROKE_COLORS.some((c) => c.toLowerCase() === (value.strokeColor ?? INK).toLowerCase())} accent={accent} onPick={(c) => onChange({ strokeColor: c })} />
           </div>
         </section>
       </div>

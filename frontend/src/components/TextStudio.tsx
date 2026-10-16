@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ResolvedCanvas } from '../lib/canvasStyle'
 import type { TextProps, TextRun } from '../types'
 import { TEXT_FONTS } from './TextEditor'
+import { CustomColor } from './ColorPicker'
 import { IcAlignTool, IcColorTool, IcFontTool, IcSizeTool } from './ToolIcons'
 
 const EXTRA = ['#17171A', '#FFFFFF', '#E5486F', '#F28C38', '#FFC93C', '#2F8FD0', '#5F8650', '#8F5BD0']
@@ -374,6 +375,7 @@ export function TextStudio({ seed, boxW, palette, accent, look, onDone, onCancel
                     </button>
                   )
                 })}
+                <CustomColor value={curColor} listed={swatches.some((c) => c.toLowerCase() === curColor.toLowerCase())} accent={accent} onPick={(c) => style('color', c)} cell="h-14 w-12" dot={36} />
               </div>
             )}
           </div>

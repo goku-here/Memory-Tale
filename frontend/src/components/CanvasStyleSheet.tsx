@@ -1,4 +1,5 @@
-import { motion } from 'framer-motion'
+import { motion } from 'framer-motion'
+import { CustomColor } from './ColorPicker'
 import { Check, RotateCcw } from 'lucide-react'
 import { inkChoices, isTexture, PATTERNS, resolveCanvas, swatchesFor } from '../lib/canvasStyle'
 import type { CanvasStyle } from '../types'
@@ -54,6 +55,7 @@ export function CanvasStyleSheet({ open, onClose, memory, value, onChange, onHei
               </motion.button>
             )
           })}
+          <CustomColor value={bgNow} listed={swatches.some((s) => s.value.toLowerCase() === bgNow.toLowerCase())} accent={theme.palette[0]} onPick={(c) => pick({ bg: c })} cell="h-12 w-12" dot={44} />
         </div>
         {active && (
           <p className="m-0 px-5 pt-2.5 text-[13.5px] leading-snug text-neutral-500"><b className="text-[#17171a]">{active.name}.</b> {active.why}</p>

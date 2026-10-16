@@ -1,4 +1,5 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
+import { CustomColor } from './ColorPicker'
 import { Check, ChevronLeft, ImagePlus, Loader2, Lock } from 'lucide-react'
 import { useRef, useState } from 'react'
 import type { CategoryId, Cover, Memory } from '../types'
@@ -225,6 +226,7 @@ function Form({ state, memory, onSubmit }: { state: SheetState } & Omit<Props, '
                     </motion.button>
                   )
                 })}
+                <CustomColor value={cover.type === 'color' ? cover.value : '#8E2B3D'} listed={cover.type !== 'color' || COVER_COLORS.some((c) => c.value === cover.value)} accent="#17171a" onPick={pickColor} cell="h-11 w-11" dot={34} />
                 <motion.button
                   type="button" aria-label="Upload cover image" whileTap={{ scale: 0.92 }}
                   onClick={() => fileRef.current?.click()}

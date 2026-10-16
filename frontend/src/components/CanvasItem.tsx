@@ -10,6 +10,7 @@ import { IcCopy, IcDown, IcEdit, IcExpand, IcFrame, IcGroup, IcLock, IcUngroup, 
 import { PhotoFrame } from './PhotoFrame'
 import { StickerArt } from './stickers'
 import { NOTE_COLORS, StickyNote } from './StickyNote'
+import { CustomColor } from './ColorPicker'
 import { CollageBody } from './CollageBody'
 
 interface ItemProps {
@@ -304,6 +305,7 @@ export function SelectionOverlay({
                 </span>
               </motion.button>
             ))}
+            {item.type === 'note' && <CustomColor value={item.props.color} listed={NOTE_COLORS.includes(item.props.color)} accent="#17171a" onPick={(c) => actions.onColor?.(c)} cell="h-11 w-11" dot={32} />}
           </motion.div></div>
         )}
       </AnimatePresence>

@@ -6,6 +6,7 @@ import type { ResolvedCanvas } from '../lib/canvasStyle'
 import type { BrushId, DrawProps, Stroke } from '../types'
 import { DrawLayer, DrawStrokes } from './DrawLayer'
 import { TRACE_ART, traceUrl } from '../lib/traceArt'
+import { CustomColor } from './ColorPicker'
 import { IcCalligraphyTool, IcCrayonTool, IcEraserTool, IcHighlighterTool, IcMarkerTool, IcPenTool, IcPencilTool } from './ToolIcons'
 
 type ToolId = BrushId | 'eraser'
@@ -357,6 +358,7 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
                     </button>
                   )
                 })}
+                <CustomColor value={base} listed={hues.includes(base.toUpperCase())} accent={accent} onPick={(c) => { setBase(c); setShadeAt(3) }} cell="h-10 w-10" dot={32} />
               </div>
             </div>
           </motion.div>
