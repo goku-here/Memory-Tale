@@ -23,7 +23,7 @@ interface Props {
 type GroupId = (typeof STICKER_GROUPS)[number]['id'] | 'collages' | 'frames' | 'mine'
 const TABS: { id: GroupId; label: string }[] = [
   ...STICKER_GROUPS.map((g) => ({ id: g.id as GroupId, label: g.label })),
-  { id: 'collages', label: 'Collages' }, { id: 'frames', label: 'Frames' }, { id: 'mine', label: 'Mine' },
+  { id: 'mine', label: 'Mine' },
 ]
 
 const isWide = (s: StickerProps) => s.kind === 'svg' && (s.value.startsWith('w-') || s.value.startsWith('c-') || s.value.startsWith('tape') || s.value === 'ticket' || s.value === 'p-postmark' || s.value === 'd-wave')
@@ -87,7 +87,7 @@ export function StickerTray({ accent, onPick, onPickMany, onFrame }: Props) {
     }
     return out
   })()
-  const foundFrames = q ? [...GRID_KINDS, ...FRAME_KINDS].filter((k) => COLLAGES[k].label.toLowerCase().includes(q) || (COLLAGES[k].group === 'grids' ? 'collage grid photo' : 'frame photo').includes(q)) : []
+  const foundFrames: CollageKind[] = q && false ? [...GRID_KINDS, ...FRAME_KINDS].filter((k) => COLLAGES[k].label.toLowerCase().includes(q) || (COLLAGES[k].group === 'grids' ? 'collage grid photo' : 'frame photo').includes(q)) : []
 
   const sections = useRef<Partial<Record<StickerCategory, HTMLElement | null>>>({})
   const chipBar = useRef<HTMLDivElement>(null)
@@ -343,7 +343,7 @@ export function StickerTray({ accent, onPick, onPickMany, onFrame }: Props) {
 }
 
 /** a frame or template as a card in the tray (drawn live, empty) */
-function CollageCard({ kind, accent, onPick }: { kind: CollageKind; accent: string; onPick: () => void }) {
+export function CollageCard({ kind, accent, onPick }: { kind: CollageKind; accent: string; onPick: () => void }) {
   const d = COLLAGES[kind]
   const tall = d.h / d.w
   return (

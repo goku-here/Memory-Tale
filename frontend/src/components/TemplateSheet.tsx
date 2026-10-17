@@ -1,9 +1,11 @@
 import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
-import { COLLAGES } from '../lib/collages'
+import { COLLAGES, FRAME_KINDS, GRID_KINDS, type CollageKind } from '../lib/collages'
 import { TEMPLATE_CATEGORIES, TEMPLATES, THEME_CATEGORY, type TemplateCategory, type TemplateDef } from '../lib/templates'
 import { CollageBody } from './CollageBody'
 import { StickerArt, SVG_STICKERS } from './stickers'
+import { CollageCard } from './StickerTray'
+import { IcLine } from './ToolIcons'
 import { ToolSheet } from './ToolSheet'
 
 /** a page template drawn small, from its real pieces */
@@ -40,7 +42,11 @@ function TemplateCard({ def, accent, onPick }: { def: TemplateDef; accent: strin
 }
 
 /** Page templates, grouped by the kind of memory they suit. Picking one puts it on the page, locked as one piece. */
-export function TemplateSheet({ open, onClose, accent, themeId, onPick }: { open: boolean; onClose: () => void; accent: string; themeId: string; onPick: (t: TemplateDef) => void }) {
+export function TemplateSheet({
+  open, onClose, accent, themeId, onPick, onFrame, onLine,
+}: { open: boolean; onClose: () => void; accent: string; themeId: string; onPick: (t: TemplateDef) => void; onFrame: (kind: CollageKind) => void; onLine: () => void }) {
+  const [view, setView] = useState<'templates' | 'collages' | 'frames'>('templates')
+  useEffect(() => { if (open) setView('templates') }, [open])
   const [cat, setCat] = useState<TemplateCategory | 'All'>(THEME_CATEGORY[themeId] ?? 'All')
   useEffect(() => { if (open) setCat(THEME_CATEGORY[themeId] ?? 'All') }, [open, themeId])
   const list = TEMPLATES.filter((t) => cat === 'All' || t.categories.includes(cat))
@@ -48,6 +54,44 @@ export function TemplateSheet({ open, onClose, accent, themeId, onPick }: { open
   return (
     <ToolSheet open={open} onClose={onClose} title="Templates" snaps={[0.94]} dim={0.18} z={55}>
       <div className="px-4 pb-8">
+        <div className="mb-3 flex rounded-full bg-neutral-100 p-1" role="tablist" aria-label="What to add">
+          {([['templates', 'Templates'], ['collages', 'Collages'], ['frames', 'Frames']] as const).map(([id, label]) => (
+            <button
+              key={id} type="button" role="tab" aria-selected={view === id} onClick={() => setView(id)}
+              className="h-10 flex-1 rounded-full border-0 text-[13.5px] font-bold"
+              style={view === id ? { background: '#fff', color: '#17171a', boxShadow: '0 1px 4px rgba(0,0,0,.15)' } : { background: 'transparent', color: '#7a7a85' }}
+            >{label}</button>
+          ))}
+        </div>
+        {view === 'collages' && (
+          <>
+            <p className="m-0 px-1 pb-3 text-[13px] leading-snug text-neutral-500">
+              Photos in a neat grid. Tap one to put it on your page, then tap each plus to add a photo. Open it later and switch on Use as background to fill the page with it.
+            </p>
+            <div className="grid grid-cols-2 gap-2.5">
+              {GRID_KINDS.map((k) => <CollageCard key={k} kind={k} accent={accent} onPick={() => onFrame(k)} />)}
+            </div>
+          </>
+        )}
+        {view === 'frames' && (
+          <>
+            <p className="m-0 px-1 pb-3 text-[13px] leading-snug text-neutral-500">
+              Tap one to put it on your page, then tap the plus to add your photo. Double-tap it later to change the photo or write a caption.
+            </p>
+            <div className="grid grid-cols-2 gap-2.5">
+              <motion.button
+                type="button" aria-label="Polaroid line" whileTap={{ scale: 0.96 }} onClick={onLine}
+                className="flex flex-col items-center gap-2 rounded-2xl border-0 bg-[#f6f6f8] p-3 text-center" style={{ boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.05)' }}
+              >
+                <span className="grid h-[148px] w-full place-items-center [&_svg]:h-[84px] [&_svg]:w-[84px]"><IcLine /></span>
+                <span className="text-[13px] font-bold text-[#17171a]">Polaroid line</span>
+                <span className="text-[11.5px] font-semibold" style={{ color: accent }}>3 photos</span>
+              </motion.button>
+              {FRAME_KINDS.map((k) => <CollageCard key={k} kind={k} accent={accent} onPick={() => onFrame(k)} />)}
+            </div>
+          </>
+        )}
+        {view === 'templates' && <>
         <div className="no-scrollbar -mx-4 mb-3 flex gap-2 overflow-x-auto px-4" role="tablist" aria-label="Template categories" style={{ touchAction: 'pan-x' }}>
           {chips.map((c) => (
             <motion.button
@@ -67,6 +111,7 @@ export function TemplateSheet({ open, onClose, accent, themeId, onPick }: { open
             {list.map((t) => <TemplateCard key={t.id} def={t} accent={accent} onPick={() => onPick(t)} />)}
           </div>
         )}
+        </>}
       </div>
     </ToolSheet>
   )

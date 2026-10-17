@@ -7,6 +7,7 @@ import type { BrushId, DrawProps, Stroke } from '../types'
 import { DrawLayer, DrawStrokes } from './DrawLayer'
 import { TRACE_ART, traceUrl } from '../lib/traceArt'
 import { CustomColor } from './ColorPicker'
+import { createPortal } from 'react-dom'
 import { useDesktop } from '../lib/useDesktop'
 import { IcCalligraphyTool, IcCrayonTool, IcEraserTool, IcHighlighterTool, IcMarkerTool, IcPenTool, IcPencilTool } from './ToolIcons'
 
@@ -75,6 +76,13 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
   const [trace, setTrace] = useState<{ url: string; x: number; y: number; w: number; own?: boolean } | null>(null)
   const [traceOp, setTraceOp] = useState(0.4)
   const [pickOpen, setPickOpen] = useState(false)
+  // a laptop: the picker is a panel on the left, and the drawing page makes way for it
+  useEffect(() => {
+    if (!(desk && pickOpen)) return
+    const root = document.documentElement
+    root.style.setProperty('--dock-w', '360px')
+    return () => root.style.setProperty('--dock-w', '0px')
+  }, [desk, pickOpen])
   const [moveTrace, setMoveTrace] = useState(false)
   const own = useRef<HTMLInputElement>(null)
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null)
@@ -336,7 +344,7 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
         )}
 
         {/* choose a picture to trace */}
-        {pickOpen && (
+        {pickOpen && !desk && (
           <motion.div className="absolute inset-0 z-[70]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} onPointerDown={(e) => e.stopPropagation()}>
             <div className="absolute inset-0 bg-black/30" onClick={() => setPickOpen(false)} aria-hidden />
             <motion.div
@@ -362,6 +370,32 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
               </div>
             </motion.div>
           </motion.div>
+        )}
+
+        {pickOpen && desk && createPortal(
+          <div
+            className="fixed z-[70] flex flex-col overflow-y-auto bg-white" role="dialog" aria-label="Pick a picture to trace" data-ui
+            style={{ left: 84, top: 56, bottom: 0, width: 360, boxShadow: '1px 0 0 rgba(20,24,40,.08), 10px 0 30px rgba(20,24,40,.08)' }}
+          >
+            <div className="flex items-center justify-between px-5 pb-2 pt-4">
+              <h3 className="m-0 text-[16px] font-extrabold text-[#17171a]">Trace a picture</h3>
+              <button type="button" aria-label="Close" onClick={() => setPickOpen(false)} className="grid h-9 w-9 place-items-center rounded-full border-0 bg-neutral-100 text-neutral-600 hover:bg-neutral-200"><X size={17} /></button>
+            </div>
+            <p className="m-0 px-5 pb-3 text-[13px] leading-snug text-neutral-500">It shows faintly on your page so you can draw over it. It is never added to your drawing.</p>
+            <div className="px-5 pb-3">
+              <button type="button" onClick={() => own.current?.click()} className="flex h-12 w-full items-center justify-center gap-2 rounded-full border-0 text-[14.5px] font-bold text-white" style={{ background: accent }}><ImageIcon size={18} /> Use one of my photos</button>
+              <input ref={own} type="file" accept="image/*" className="hidden" onChange={onOwn} />
+            </div>
+            <div className="grid grid-cols-3 gap-2 px-4 pb-6">
+              {TRACE_ART.map((a) => (
+                <button key={a.id} type="button" aria-label={a.label} onClick={() => putTrace(traceUrl(a))} className="flex flex-col items-center gap-1 rounded-2xl border-0 bg-[#f6f6f8] px-1 pb-2 pt-2.5 hover:bg-[#eeeef2]">
+                  <img src={traceUrl(a)} alt="" className="h-14 w-14" draggable={false} />
+                  <span className="text-[11px] font-bold text-neutral-500">{a.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>,
+          document.body,
         )}
 
         {/* thickness and opacity */}

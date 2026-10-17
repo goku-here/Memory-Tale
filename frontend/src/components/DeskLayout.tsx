@@ -1,7 +1,7 @@
 import { ArrowLeft, Check, ChevronDown, Loader2, Minus, Plus, Redo2, Undo2, X } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import type { ToolId } from './BottomToolbar'
-import { IcBubble, IcCamera, IcDraw, IcFlag, IcGrid, IcLine, IcMore, IcPages, IcPhone, IcPhoto, IcPin, IcNote, IcSticker, IcTemplates, IcText } from './ToolIcons'
+import { IcBubble, IcCamera, IcDraw, IcFlag, IcGrid, IcMore, IcPages, IcPhone, IcPhoto, IcPin, IcNote, IcSticker, IcTemplates, IcText } from './ToolIcons'
 
 /** the laptop layout: a bar along the top, a tool rail down the left (its panel opens beside it), the page in the middle, a strip along the bottom */
 export const BAR_H = 56
@@ -127,7 +127,6 @@ const TOOLS: { id: ToolId; label: string; icon: ReactNode }[] = [
   { id: 'draw', label: 'Draw', icon: <IcDraw /> },
   { id: 'photo', label: 'Photos', icon: <IcPhoto /> },
   { id: 'bubble', label: 'Bubbles', icon: <IcBubble /> },
-  { id: 'line', label: 'Polaroids', icon: <IcLine /> },
   { id: 'location', label: 'Places', icon: <IcPin /> },
   { id: 'canvas', label: 'Canvas', icon: <IcGrid /> },
 ]

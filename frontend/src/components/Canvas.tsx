@@ -1791,7 +1791,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
 
       <PrivacySheet open={privacyOpen} onClose={() => setPrivacyOpen(false)} memory={memory} accent={accent} />
 
-      <TemplateSheet open={sheet === 'templates'} onClose={closeSheet} accent={accent} themeId={memory.themeId} onPick={addTemplate} />
+      <TemplateSheet open={sheet === 'templates'} onClose={closeSheet} accent={accent} themeId={memory.themeId} onPick={addTemplate} onFrame={(k) => addCollage(k)} onLine={() => { closeSheet(); addLine() }} />
 
       <ToolSheet
         open={sheet === 'collage' && !!collageItem} onClose={closeSheet} title="Photo frame" snaps={[0.56, 0.88]} dim={0.18} z={55}

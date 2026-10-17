@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useState, type ReactNode } from 'react'
 import { useDesktop } from '../lib/useDesktop'
-import { IcBubble, IcCamera, IcGallery, IcDraw, IcFlag, IcGrid, IcLine, IcMore, IcNote, IcPhoto, IcPhone, IcPin, IcSticker, IcTemplates, IcText, IcPages } from './ToolIcons'
+import { IcBubble, IcCamera, IcGallery, IcDraw, IcFlag, IcGrid, IcMore, IcNote, IcPhoto, IcPhone, IcPin, IcSticker, IcTemplates, IcText, IcPages } from './ToolIcons'
 
 export type ToolId = 'templates' | 'sticker' | 'draw' | 'text' | 'photo' | 'camera' | 'note' | 'location' | 'divider' | 'bubble' | 'line' | 'story' | 'print' | 'canvas'
 
@@ -80,7 +80,6 @@ export function BottomToolbar({ visible, onTool, inStory }: Props) {
                   {([
                     ['note', 'Sticky note', <IcNote key="n" />],
                     ['bubble', 'Chat bubble', <IcBubble key="b" />],
-                    ['line', 'Polaroid line', <IcLine key="p" />],
                     ['location', 'Location', <IcPin key="l" />],
                     ['divider', 'Stop divider', <IcFlag key="d" />],
                     ['canvas', 'Canvas style', <IcGrid key="g" />],
