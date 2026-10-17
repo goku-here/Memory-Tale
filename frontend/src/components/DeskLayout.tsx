@@ -139,6 +139,7 @@ const MORE: { id: ToolId; label: string; icon: ReactNode }[] = [
 
 export function DeskRail({ active, onTool }: { active: ToolId | null; onTool: (t: ToolId) => void }) {
   const [more, setMore] = useState(false)
+  const [moreAt, setMoreAt] = useState(16)
   return (
     <nav
       aria-label="Tools" data-ui
@@ -162,7 +163,7 @@ export function DeskRail({ active, onTool }: { active: ToolId | null; onTool: (t
       })}
       <div className="relative">
         <button
-          type="button" aria-label="More" aria-haspopup="menu" aria-expanded={more} onClick={() => setMore((v) => !v)}
+          type="button" aria-label="More" aria-haspopup="menu" aria-expanded={more} onClick={(e) => { setMoreAt(window.innerHeight - e.currentTarget.getBoundingClientRect().top + 8); setMore((v) => !v) }}
           className="grid h-[66px] w-[70px] shrink-0 place-items-center rounded-2xl border-0 bg-transparent text-[#17171a] transition-colors hover:bg-neutral-100"
           style={more ? { background: 'rgba(23,23,26,.09)' } : undefined}
         >
@@ -174,7 +175,7 @@ export function DeskRail({ active, onTool }: { active: ToolId | null; onTool: (t
         {more && (
           <>
             <div className="fixed inset-0 z-40" onPointerDown={() => setMore(false)} />
-            <div role="menu" className="fixed z-50 w-56 rounded-2xl bg-white p-1.5 shadow-[0_14px_40px_rgba(20,24,40,.25),0_0_0_1px_rgba(20,24,40,.05)]" style={{ left: RAIL_W + 8, bottom: 16 }}>
+            <div role="menu" className="fixed z-50 w-56 rounded-2xl bg-white p-1.5 shadow-[0_14px_40px_rgba(20,24,40,.25),0_0_0_1px_rgba(20,24,40,.05)]" style={{ left: RAIL_W + 8, bottom: moreAt }}>
               {MORE.map((m) => (
                 <button
                   key={m.id} type="button" role="menuitem" onClick={() => { setMore(false); onTool(m.id) }}

@@ -142,6 +142,8 @@ interface Props {
   look: ResolvedCanvas
   onDone: (p: TextProps, width: number) => void
   onCancel: () => void
+  /** lets the page finish this text when another tool is picked */
+  doneRef?: { current: (() => void) | null }
 }
 
 /**
@@ -149,7 +151,7 @@ interface Props {
  * sit above the keyboard. With nothing selected they change the whole block; select words (long press) and they
  * change just those. Done puts the block on the canvas exactly as written.
  */
-export function TextStudio({ seed, boxW, palette, accent, look, onDone, onCancel }: Props) {
+export function TextStudio({ seed, boxW, palette, accent, look, onDone, onCancel, doneRef }: Props) {
   const desk = useDesktop()
   // the tools take the left panel, and the page makes way for it
   useEffect(() => {
@@ -280,6 +282,9 @@ export function TextStudio({ seed, boxW, palette, accent, look, onDone, onCancel
     const hug = Number.isFinite(lo) ? Math.ceil(hi - lo) + 6 : root.clientWidth
     onDone({ ...rest, text, ...(rich ? { runs } : {}) }, Math.min(Math.round(root.clientWidth), Math.max(24, hug)))
   }
+
+  if (doneRef) doneRef.current = finish
+  useEffect(() => () => { if (doneRef) doneRef.current = null }, [doneRef])
 
   // tools do not take the keyboard's focus (that would lose the selection); with nothing selected the keyboard goes away
   const holdFocus = (e: React.PointerEvent) => { if ((e.target as HTMLElement).tagName !== 'INPUT') e.preventDefault() } // the size slider must be free to drag

@@ -147,6 +147,9 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   const [menu, setMenu] = useState(false)
   const desk = useDesktop()
   const deskRef = useRef(desk)
+  /** finishes the open drawing / text page, so picking another tool does not leave it stuck on screen */
+  const studioDone = useRef<(() => void) | null>(null)
+  const [drawHist, setDrawHist] = useState<{ canUndo: boolean; canRedo: boolean; undo: () => void; redo: () => void } | null>(null)
   deskRef.current = desk
   /** on a laptop the whole page (its frame) grows and shrinks with the zoom, not just what is drawn inside it */
   const col = useRef<HTMLDivElement>(null)
@@ -1490,7 +1493,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
           <div ref={inner} style={{ position: 'relative', width: canvasW * (desk ? zoom : Math.max(1, zoom)), height: height * zoom }}>
           <div
             ref={surface}
-            className="isolate"
+            className={zoom !== 1 ? 'isolate mt-zoomed' : 'isolate'}
             style={{
               position: 'absolute', top: 0, left: !desk && zoom < 1 ? (canvasW * (1 - zoom)) / 2 : 0, width: canvasW, height,
               transform: zoom !== 1 ? `scale(${zoom})` : undefined, transformOrigin: 'top left',
@@ -1615,11 +1618,11 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       </div>
 
       <AnimatePresence>
-        {textStudio && <TextStudio key="text" seed={textStudio.seed} boxW={textStudio.boxW} palette={theme.palette} accent={accent} look={rc} onDone={finishText} onCancel={() => setTextStudio(null)} />}
+        {textStudio && <TextStudio key="text" seed={textStudio.seed} boxW={textStudio.boxW} palette={theme.palette} accent={accent} look={rc} onDone={finishText} onCancel={() => setTextStudio(null)} doneRef={studioDone} />}
       </AnimatePresence>
 
       <AnimatePresence>
-        {drawing && <DrawStudio key="draw" seed={editDrawId ? (() => { const it = items.find((x) => x.id === editDrawId); return it && it.type === 'draw' ? { draw: it.props, scale: it.width / it.props.w } : undefined })() : undefined} palette={theme.palette} accent={accent} look={rc} onDone={(strokes, w) => addDrawing(strokes, w)} />}
+        {drawing && <DrawStudio key="draw" seed={editDrawId ? (() => { const it = items.find((x) => x.id === editDrawId); return it && it.type === 'draw' ? { draw: it.props, scale: it.width / it.props.w } : undefined })() : undefined} palette={theme.palette} accent={accent} look={rc} onDone={(strokes, w) => addDrawing(strokes, w)} onHistory={setDrawHist} doneRef={studioDone} />}
       </AnimatePresence>
 
       <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => { void addPhotos(e.target.files); e.target.value = '' }} />
@@ -1735,7 +1738,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
         <>
           <DeskBar
             title={memory.title} from={theme.palette[0]} to={theme.palette[1] ?? theme.palette[0]} readOnly={readOnly}
-            canUndo={cv.canUndo} canRedo={cv.canRedo} onUndo={cv.undo} onRedo={cv.redo} saving={cv.status === 'saving'} here={here}
+            canUndo={drawing && drawHist ? drawHist.canUndo : cv.canUndo} canRedo={drawing && drawHist ? drawHist.canRedo : cv.canRedo} onUndo={drawing && drawHist ? drawHist.undo : cv.undo} onRedo={drawing && drawHist ? drawHist.redo : cv.redo} saving={cv.status === 'saving'} here={here}
             mode={story ? 'story' : printMode ? 'print' : 'edit'}
             onBack={onBack} onTitle={() => { if (!readOnly) onEdit() }}
             files={[
@@ -1746,8 +1749,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
               ...(!readOnly ? [{ label: 'Delete', icon: <IcTrash />, onClick: onDelete, danger: true }] : []),
             ] as FileItem[]}
             onShare={onShare}
-            onStory={() => { if (!story && !printMode) enterStory() }}
-            onPrint={() => { if (!story && !printMode) enterPrint() }}
+            onStory={() => { if (!story && !printMode) { closeSheet(); setStyleOpen(false); enterStory() } }}
+            onPrint={() => { if (!story && !printMode) { closeSheet(); setStyleOpen(false); enterPrint() } }}
             modeSize={story ? ratioLabel(size) : printSize.name.replace('Scrapbook ', '').replace('Photo ', '')}
             onModeSize={() => (story ? setSizeOpen(true) : setPrintSizeOpen(true))}
             onModeDone={() => (story ? setStoryPreview(true) : setPrintExportOpen(true))}
@@ -1757,7 +1760,19 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
           {!readOnly && !story && !printMode && (
             <DeskRail
               active={sheet === 'sticker' ? 'sticker' : sheet === 'templates' ? 'templates' : textStudio ? 'text' : styleOpen ? 'canvas' : sheet === 'location' ? 'location' : null}
-              onTool={(t) => { if ((t === 'sticker' && sheet === 'sticker') || (t === 'templates' && sheet === 'templates')) closeSheet(); else if (t === 'canvas' && styleOpen) setStyleOpen(false); else onTool(t) }}
+              onTool={(t) => {
+                const go = () => {
+                  if ((t === 'sticker' && sheet === 'sticker') || (t === 'templates' && sheet === 'templates')) closeSheet()
+                  else if (t === 'canvas' && styleOpen) setStyleOpen(false)
+                  else {
+                    // one panel at a time: picking a tool puts the open one away
+                    if (t !== 'canvas') setStyleOpen(false)
+                    else if (sheet) closeSheet()
+                    onTool(t)
+                  }
+                }
+                if (studioDone.current) { studioDone.current(); window.setTimeout(go, 80) } else go()
+              }}
             />
           )}
           {!drawing && !textStudio && <DeskFoot

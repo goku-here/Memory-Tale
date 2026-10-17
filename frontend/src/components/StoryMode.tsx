@@ -199,9 +199,9 @@ export function StoryPreview({ open, onClose, memory, accent, getItems, frameY, 
   )
 
   return (
-    <ToolSheet open={open} onClose={onClose} title="Story preview" snaps={[0.92]} z={85}>
-      <div className="space-y-3 px-6 pb-5">
-        <div className="mx-auto grid place-items-center overflow-hidden rounded-2xl bg-neutral-100" style={{ aspectRatio: `${size.w} / ${size.h}`, ...(size.w >= size.h ? { width: 'min(100%, 380px)' } : { height: 'min(52vh, 480px)' }), maxWidth: '100%' }}>
+    <ToolSheet open={open} onClose={onClose} title="Story preview" snaps={[0.92]} z={85} wide>
+      <div className="space-y-3 px-6 pb-5 lg:grid lg:grid-cols-[1fr_300px] lg:content-start lg:gap-x-8 lg:gap-y-3 lg:space-y-0">
+        <div className="mx-auto grid place-items-center overflow-hidden rounded-2xl bg-neutral-100 lg:col-start-2 lg:row-span-6 lg:row-start-1" style={{ aspectRatio: `${size.w} / ${size.h}`, ...(size.w >= size.h ? { width: 'min(100%, 380px)' } : { height: 'min(52vh, 480px)' }), maxWidth: '100%' }}>
           {state ? <img src={state.url} alt="Your story" className="h-full w-full object-contain" />
             : err ? (
               <div className="px-4 text-center text-[13.5px] font-semibold text-neutral-500">

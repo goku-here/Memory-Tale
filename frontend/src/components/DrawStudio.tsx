@@ -39,10 +39,14 @@ interface Props {
   /** a drawing being edited: its strokes, and how much bigger it is on the page than when it was made */
   seed?: { draw: DrawProps; scale: number }
   onDone: (strokes: Stroke[], pageW: number, pageH: number) => void
+  /** a laptop: the top bar's undo and redo work on this drawing while it is open */
+  onHistory?: (h: { canUndo: boolean; canRedo: boolean; undo: () => void; redo: () => void } | null) => void
+  /** lets the page finish this drawing when another tool is picked */
+  doneRef?: { current: (() => void) | null }
 }
 
 /** A page of its own for drawing: tools along the bottom, thickness and opacity, and the theme's colours with their shades. */
-export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
+export function DrawStudio({ palette, accent, look, seed, onDone, onHistory, doneRef }: Props) {
   const desk = useDesktop()
   const page = useRef<HTMLDivElement>(null)
   const shelf = useRef<HTMLDivElement>(null)
@@ -226,6 +230,27 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
   const clear = () => { if (!strokes.length) return; setPast((p) => [...p.slice(-40), strokes]); setFuture([]); setStrokes([]) }
   const done = () => { const r = page.current?.getBoundingClientRect(); onDone(strokes, (r?.width ?? 360) / zoom, (r?.height ?? 640) / zoom) }
 
+  if (doneRef) doneRef.current = done
+  useEffect(() => () => { if (doneRef) doneRef.current = null }, [doneRef])
+  const hist = useRef({ undo, redo })
+  hist.current = { undo, redo }
+  useEffect(() => {
+    onHistory?.({ canUndo: past.length > 0, canRedo: future.length > 0, undo: () => hist.current.undo(), redo: () => hist.current.redo() })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [past, future])
+  useEffect(() => () => onHistory?.(null), [])  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!desk) return
+    const k = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return
+      const key = e.key.toLowerCase()
+      if (key === 'z') { e.preventDefault(); if (e.shiftKey) hist.current.redo(); else hist.current.undo() }
+      else if (key === 'y') { e.preventDefault(); hist.current.redo() }
+    }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [desk])
+
   const pickTool = (id: ToolId) => {
     if (id === tool) setPop((p) => (p === 'tune' ? null : 'tune'))
     else { setTool(id); setPop(null) }
@@ -287,8 +312,8 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
 
         {/* top bar */}
         <div className="absolute inset-x-0 top-0 z-[50] flex items-center gap-1 px-3 pt-3">
-          <button type="button" aria-label="Undo" onClick={undo} disabled={!past.length} className="grid h-11 w-11 place-items-center rounded-full border-0 bg-white/80 text-[#17171a] backdrop-blur disabled:opacity-30"><Undo2 size={20} /></button>
-          <button type="button" aria-label="Redo" onClick={redo} disabled={!future.length} className="grid h-11 w-11 place-items-center rounded-full border-0 bg-white/80 text-[#17171a] backdrop-blur disabled:opacity-30"><Redo2 size={20} /></button>
+          {!desk && <button type="button" aria-label="Undo" onClick={undo} disabled={!past.length} className="grid h-11 w-11 place-items-center rounded-full border-0 bg-white/80 text-[#17171a] backdrop-blur disabled:opacity-30"><Undo2 size={20} /></button>}
+          {!desk && <button type="button" aria-label="Redo" onClick={redo} disabled={!future.length} className="grid h-11 w-11 place-items-center rounded-full border-0 bg-white/80 text-[#17171a] backdrop-blur disabled:opacity-30"><Redo2 size={20} /></button>}
           <button
             type="button" aria-label={hand ? 'Back to drawing' : 'Scroll with your finger'} aria-pressed={hand} onClick={() => { setHand((v) => !v); setPop(null) }}
             className="ml-1 grid h-11 w-11 place-items-center rounded-full border-0 backdrop-blur"

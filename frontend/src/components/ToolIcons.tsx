@@ -352,11 +352,23 @@ export const IcClapper = () => (
 export const IcCrayonTool = ({ c = '#E5486F' }: TP) => (
   <S size={30}>
     <Gem id="t3-cg" c={c} />
-    <path d="M9 8.8 12 1.6l3 7.2Z" fill="url(#t3-cg)" />
-    <path d="M10.8 6.4 12 3.4" stroke="#fff" strokeOpacity=".5" strokeWidth=".8" strokeLinecap="round" />
-    <Body id="t3-cb" x={7.8} y={8.6} w={8.4} h={16.4} r={1.6} />
-    <rect x="7.8" y="12.4" width="8.4" height="5.2" fill="url(#t3-cg)" />
-    <rect x="9.4" y="12.6" width="1" height="4.8" rx=".5" fill="#fff" opacity=".45" />
+    <defs>
+      {/* the grain of wax */}
+      <pattern id="t3-wax" width="1.5" height="1.5" patternUnits="userSpaceOnUse">
+        <circle cx=".35" cy=".45" r=".17" fill="#000" opacity=".24" />
+        <circle cx="1.1" cy="1.1" r=".15" fill="#fff" opacity=".4" />
+        <circle cx="1.15" cy=".3" r=".1" fill="#000" opacity=".16" />
+      </pattern>
+    </defs>
+    {/* the wax: a rounded top */}
+    <path d="M8.2 11.4V6.8C8.2 3.5 9.8 1.8 12 1.8s3.8 1.7 3.8 5v4.6Z" fill="url(#t3-cg)" />
+    <path d="M8.2 11.4V6.8C8.2 3.5 9.8 1.8 12 1.8s3.8 1.7 3.8 5v4.6Z" fill="url(#t3-wax)" />
+    <path d="M9.5 9.4V6.6C9.5 4.9 10.2 3.6 11.2 3.1" stroke="#fff" strokeOpacity=".55" strokeWidth=".9" strokeLinecap="round" fill="none" />
+    {/* the paper wrapper, with its two colour bands and a line of print */}
+    <Body id="t3-cb" x={7.6} y={10.8} w={8.8} h={14.2} r={1.2} />
+    <rect x="7.6" y="12.8" width="8.8" height="1.5" fill="url(#t3-cg)" />
+    <rect x="7.6" y="21.4" width="8.8" height="1.5" fill="url(#t3-cg)" />
+    <path d="M9.4 16.6h5.2M9.4 18.4h3.4" stroke={shade(c, -0.15)} strokeWidth=".9" strokeLinecap="round" opacity=".7" />
   </S>
 )
 export const IcCalligraphyTool = ({ c = '#3FA84E' }: TP) => (

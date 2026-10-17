@@ -65,3 +65,6 @@ body {
 
 /* chosen words: a light wash, so a new colour or size can be seen while they are still chosen */
 .mt-editor::selection, .mt-editor *::selection { background: rgba(70, 110, 255, .2); color: inherit; }
+
+/* a zoomed page is drawn again at its new size (a layer kept at the old size looks blurry) */
+.mt-zoomed [data-item] { will-change: auto !important; }

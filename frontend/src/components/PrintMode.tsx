@@ -253,12 +253,12 @@ export function PrintExportSheet({ open, onClose, memory, accent, getItems, y0, 
 
   const d = pageDims(size, landscape)
   return (
-    <ToolSheet open={open} onClose={() => { if (!busy) onClose() }} title="Export pages" snaps={[0.94]} z={85}>
-      <div className="space-y-4 px-5 pb-6">
+    <ToolSheet open={open} onClose={() => { if (!busy) onClose() }} title="Export pages" snaps={[0.94]} z={85} wide>
+      <div className="space-y-4 px-5 pb-6 lg:grid lg:grid-cols-[300px_1fr] lg:content-start lg:gap-x-6 lg:gap-y-4 lg:space-y-0">
         <p className="m-0 text-[13.5px] leading-snug text-neutral-500">
           {pageCount} page{pageCount > 1 ? 's' : ''} · {size.name} {landscape ? 'landscape' : 'portrait'}. Each page is saved as its own picture, numbered in order, inside one folder.
         </p>
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-3 gap-2.5 lg:col-start-2 lg:row-span-6 lg:row-start-1 lg:max-h-[62vh] lg:grid-cols-4 lg:content-start lg:overflow-y-auto">
           {Array.from({ length: pageCount }, (_, i) => (
             <div key={i} className="relative overflow-hidden rounded-xl bg-neutral-100" style={{ aspectRatio: `${d.w} / ${d.h}`, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.08)' }}>
               {thumbs[i] ? <img src={thumbs[i]} alt={`Page ${i + 1}`} className="h-full w-full object-cover" /> : <span className="absolute inset-0 grid place-items-center"><Loader2 size={18} className="animate-spin text-neutral-400" /></span>}
