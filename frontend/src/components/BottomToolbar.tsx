@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useState, type ReactNode } from 'react'
 import { useDesktop } from '../lib/useDesktop'
-import { IcBubble, IcCamera, IcGallery, IcDraw, IcFlag, IcGrid, IcMore, IcNote, IcPhoto, IcPhone, IcPin, IcSticker, IcTemplates, IcText, IcPages } from './ToolIcons'
+import { IcBubble, IcCamera, IcGallery, IcDraw, IcFlag, IcGrid, IcMore, IcNote, IcPhoto, IcPhone, IcPin, IcSticker, IcTemplates, IcText } from './ToolIcons'
 
 export type ToolId = 'templates' | 'sticker' | 'draw' | 'text' | 'photo' | 'camera' | 'note' | 'location' | 'divider' | 'bubble' | 'line' | 'story' | 'print' | 'canvas'
 
@@ -85,7 +85,6 @@ export function BottomToolbar({ visible, onTool, inStory }: Props) {
                     ['canvas', 'Canvas style', <IcGrid key="g" />],
                     ['templates', 'Templates', <IcTemplates key="t" />],
                     ['story', 'Story mode', <IcPhone key="s" />],
-                    ['print', 'Print pages', <IcPages key="pp" />],
                   ] as [ToolId, string, ReactNode][]).filter(([id]) => !(inStory && (id === 'story' || id === 'print'))).map(([id, label, icon]) => (
                     <motion.button
                       key={id} data-tour={id === 'story' ? 'story-item' : undefined} type="button" role="menuitem" whileTap={{ scale: 0.96 }} onClick={() => pick(id)}
