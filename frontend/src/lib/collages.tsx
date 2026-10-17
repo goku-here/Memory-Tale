@@ -34,6 +34,8 @@ export interface CollageDef {
   slots: Slot[]
   /** drawn behind the pictures */
   under?: ReactNode
+  /** a grid collage's board in any colour (the person can change it) */
+  boardArt?: (color: string) => ReactNode
   /** drawn over the pictures (camera body, bows, pins, tape) */
   over?: ReactNode
 }
@@ -419,12 +421,13 @@ function gridDef(label: string, H: number, layout: Layout, board: string, edge: 
     }
   }
   lay(layout, m, m, W - m * 2, H - m * 2)
-  return {
-    label, group: 'grids', w: W, h: H, slots,
-    under: <rect x=".4" y=".4" width={W - .8} height={H - .8} rx="3" fill={board} stroke={edge} strokeWidth=".5" style={{ filter: 'drop-shadow(0 1px 1.4px rgba(40,30,30,.3)) drop-shadow(0 3px 5px rgba(40,30,30,.18))' }} />,
-  }
+  const art = (c: string) => <rect x=".4" y=".4" width={W - .8} height={H - .8} rx="3" fill={c} stroke="rgba(0,0,0,.14)" strokeWidth=".5" style={{ filter: 'drop-shadow(0 1px 1.4px rgba(40,30,30,.3)) drop-shadow(0 3px 5px rgba(40,30,30,.18))' }} />
+  void board; void edge
+  return { label, group: 'grids', w: W, h: H, slots, under: art(BOARD_WHITE), boardArt: art }
 }
 
+const BOARD_WHITE = '#ffffff'
+export const BOARD_COLORS = ['#FFFFFF', '#F6EFE0', '#F7D9D6', '#D9E8F7', '#DBE8D6', '#E8DDF5', '#1D1D22']
 const WHITE = '#fffefb', CREAM = '#f6efe0', INK = '#1d1d22', ROSE = '#f7d9d6', SKY = '#d9e8f7', SAGE = '#dbe8d6'
 const GRID_LIST = {
   grid2side: gridDef('2 photos, side by side', 62, row([1, 1], [1, 1]), WHITE, '#e8e4da'),

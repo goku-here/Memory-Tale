@@ -31,7 +31,7 @@ function Preview({ draft }: { draft: Pick<Memory, 'title' | 'themeId' | 'cover' 
   const theme = getTheme(draft.themeId)
   return (
     <div
-      className="mx-4 grid place-items-center overflow-hidden rounded-[28px] py-6"
+      className="mx-4 grid place-items-center overflow-hidden rounded-[28px] py-6 lg:col-start-1 lg:row-span-8 lg:row-start-1 lg:mx-0 lg:ml-5 lg:self-start lg:py-12"
       style={{ background: `radial-gradient(circle at 50% 40%, #fff, ${theme.canvasBg})` }}
     >
       <motion.div
@@ -39,7 +39,7 @@ function Preview({ draft }: { draft: Pick<Memory, 'title' | 'themeId' | 'cover' 
         initial={{ scale: 0.95, rotate: -2 }}
         animate={{ scale: 1, rotate: 0 }}
         transition={{ type: 'spring', stiffness: 320, damping: 18 }}
-        className="w-[38%] pb-3"
+        className="w-[38%] pb-3 lg:w-[62%]"
       >
         <BookCover memory={draft} />
       </motion.div>
@@ -160,7 +160,7 @@ function Form({ state, memory, onSubmit }: { state: SheetState } & Omit<Props, '
             transition={{ duration: 0.2 }} className="px-4"
           >
             <p className="m-0 mb-4 px-1 text-[14px] text-neutral-500">What kind of memory is it? This sets the look of your book and canvas.</p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
               {CATEGORY_ORDER.map((id, i) => {
                 const t = THEMES[id]
                 return (
@@ -184,7 +184,7 @@ function Form({ state, memory, onSubmit }: { state: SheetState } & Omit<Props, '
         ) : (
           <motion.div
             key="det" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 30 }}
-            transition={{ duration: 0.2 }} className="space-y-5"
+            transition={{ duration: 0.2 }} className="space-y-5 lg:grid lg:grid-cols-[300px_1fr] lg:gap-x-4 lg:gap-y-5 lg:space-y-0 lg:pr-5"
           >
             {isCreate && (
               <button
@@ -284,7 +284,7 @@ export function CreateMemorySheet({ state, memory, onClose, onSubmit }: Props) {
   if (state) last.current = state
   const shown = last.current
   return (
-    <ToolSheet open={!!state} onClose={onClose} title={title} snaps={[0.92]} z={70}>
+    <ToolSheet open={!!state} onClose={onClose} title={title} snaps={[0.92]} z={70} wide>
       {shown && <Form key={shown.mode + ('id' in shown ? shown.id : '')} state={shown} memory={memory} onSubmit={onSubmit} />}
     </ToolSheet>
   )

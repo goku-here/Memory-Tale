@@ -1,6 +1,7 @@
 import { ImagePlus, Trash2 } from 'lucide-react'
 import { AssetImg } from '../lib/assets'
-import { COLLAGES } from '../lib/collages'
+import { BOARD_COLORS, COLLAGES } from '../lib/collages'
+import { CustomColor } from './ColorPicker'
 import type { CollageProps } from '../types'
 
 /** Change what is in a photo frame: the pictures and the writing under them. */
@@ -26,6 +27,25 @@ export function CollageEditor({
             <span className="absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-[left]" style={{ left: value.background ? 22 : 2 }} />
           </span>
         </button>
+      )}
+      {def.boardArt && (
+        <div className="rounded-2xl bg-[#f6f6f8] p-3" style={{ boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.05)' }}>
+          <div className="mb-1 text-[14px] font-extrabold text-[#17171a]">Board colour</div>
+          <div className="flex flex-wrap items-center gap-0.5" role="radiogroup" aria-label="Board colour">
+            {BOARD_COLORS.map((c) => {
+              const on = (value.board ?? '#FFFFFF').toLowerCase() === c.toLowerCase()
+              return (
+                <button key={c} type="button" role="radio" aria-checked={on} aria-label={c} onClick={() => onChange({ board: c })} className="grid h-11 w-11 place-items-center rounded-full border-0 bg-transparent">
+                  <span className="h-8 w-8 rounded-full" style={{ background: c, boxShadow: on ? `0 0 0 2px #fff, 0 0 0 4px ${accent}` : 'inset 0 0 0 1px rgba(0,0,0,.2)' }} />
+                </button>
+              )
+            })}
+            <CustomColor
+              value={value.board ?? '#FFFFFF'} listed={BOARD_COLORS.some((c) => c.toLowerCase() === (value.board ?? '#FFFFFF').toLowerCase())}
+              accent={accent} onPick={(c) => onChange({ board: c })} cell="h-11 w-11" dot={32}
+            />
+          </div>
+        </div>
       )}
       {def.slots.map((s, i) => {
         const src = value.photos[i]

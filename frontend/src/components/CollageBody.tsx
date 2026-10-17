@@ -23,7 +23,7 @@ export function CollageBody({
     <div className="relative h-full w-full" style={{ containerType: 'inline-size' }}>
       {def.underImg && <img src={def.underImg} alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full" />}
       <svg viewBox={`0 0 ${w} ${h}`} className="absolute inset-0 h-full w-full" style={{ overflow: 'visible' }} aria-hidden>
-        {def.under}
+        {def.boardArt && collage.board ? def.boardArt(collage.board) : def.under}
         {def.slots.map((s, i) => <FrameArt key={i} s={s} />)}
       </svg>
 

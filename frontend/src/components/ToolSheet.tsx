@@ -34,6 +34,8 @@ export interface ToolSheetProps {
   snapTo?: number
   /** a laptop: open beside the page like the other tools (otherwise it is a dialog, unless it barely dims the page) */
   dock?: boolean
+  /** a laptop dialog that needs room for two columns */
+  wide?: boolean
 }
 
 /**
@@ -42,7 +44,7 @@ export interface ToolSheetProps {
  */
 export function ToolSheet({
   open, onClose, children, title, snaps = [0.5, 0.92], initialSnap = 0,
-  dim = 0.32, z = 50, onVisibleHeight, passThrough, snapTo, dock,
+  dim = 0.32, z = 50, onVisibleHeight, passThrough, snapTo, dock, wide,
 }: ToolSheetProps) {
   const vh = useViewportHeight()
   const desk = useDesktop()
@@ -128,7 +130,7 @@ export function ToolSheet({
               role="dialog" aria-modal={!side && !passThrough} aria-label={title ?? 'Sheet'}
               className={side
                 ? 'absolute flex w-[360px] flex-col overflow-hidden bg-white'
-                : 'absolute left-1/2 top-1/2 flex max-h-[88vh] w-[540px] max-w-[94vw] flex-col overflow-hidden rounded-[28px] bg-white'}
+                : `absolute left-1/2 top-1/2 flex max-h-[88vh] ${wide ? 'w-[900px]' : 'w-[540px]'} max-w-[94vw] flex-col overflow-hidden rounded-[28px] bg-white`}
               style={side
                 ? { pointerEvents: 'auto', left: 84, top: 56, bottom: 0, boxShadow: '1px 0 0 rgba(20,24,40,.08), 10px 0 30px rgba(20,24,40,.08)' }
                 : { pointerEvents: 'auto', boxShadow: '0 24px 70px rgba(20,24,40,.28), 0 0 0 1px rgba(20,24,40,.06)', x: '-50%', y: '-50%' }}

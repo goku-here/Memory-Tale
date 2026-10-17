@@ -252,7 +252,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     if (sf) {
       const r = sf.getBoundingClientRect()
       const mid = (HEADER_H + window.innerHeight - 110) / 2
-      const midX = window.innerWidth / 2
+      const scr = scroller.current?.getBoundingClientRect()
+      const midX = scr ? scr.left + scr.width / 2 : window.innerWidth / 2
       // anything not given is the middle of what is on screen
       focal = {
         y: focal?.y ?? (mid - r.top) / zoomRef.current, screenY: focal?.screenY ?? mid,
@@ -401,7 +402,10 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     const r = surface.current!.getBoundingClientRect()
     const top = HEADER_H + 20
     const bottom = window.innerHeight - (ignoreSheet ? 110 : Math.max(sheetH, 110))
-    const x = ((window.innerWidth / 2 - r.left) / zoomRef.current / Math.max(1, canvasWRef.current)) * 100
+    // the middle of the page area (on a laptop a docked panel takes the left side of the window)
+    const sr = scroller.current?.getBoundingClientRect()
+    const midX = sr ? sr.left + sr.width / 2 : window.innerWidth / 2
+    const x = ((midX - r.left) / zoomRef.current / Math.max(1, canvasWRef.current)) * 100
     return { x: clamp(x, 8, 92), y: Math.max(160, ((top + bottom) / 2 - r.top) / zoomRef.current) }
   }, [sheetH])
 

@@ -187,6 +187,8 @@ export interface CollageProps {
   texts?: string[]
   /** used as a background: full canvas width, behind everything else, only moves up and down */
   background?: boolean
+  /** the colour of a grid collage's board (white when missing) */
+  board?: string
 }
 /** a locked template (like a frame in a design tool): its pieces, positioned from its centre, in a box w x h that scales as one */
 export interface GroupProps {
