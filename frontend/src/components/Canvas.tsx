@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useMotionValue, useTransform, type MotionValue } from 'framer-motion'
-import { ArrowLeft, Check, ChevronDown, Eye, Keyboard, Image as ImageIcon, Loader2, Maximize2, MoreHorizontal, Redo2, Undo2, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, Eye, Image as ImageIcon, Loader2, Maximize2, MoreHorizontal, Redo2, Undo2, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../data/useAuth'
 import { canEdit } from '../data/people'
@@ -49,7 +49,7 @@ import { LocationTool } from './LocationTool'
 import { PeopleSheet } from './PeopleSheet'
 import { mapAspect } from '../lib/geo'
 import { CanvasStyleSheet } from './CanvasStyleSheet'
-import { IcClapper, IcDownload, IcEdit, IcLock, IcPages, IcPalette, IcPeople, IcShare, IcTrash } from './ToolIcons'
+import { IcKeyboard, IcClapper, IcDownload, IcEdit, IcLock, IcPages, IcPalette, IcPeople, IcShare, IcTrash } from './ToolIcons'
 import { resolveCanvas } from '../lib/canvasStyle'
 import { SizeSheet, StoryOverlay, StoryPreview } from './StoryMode'
 import { useDesktop } from '../lib/useDesktop'
@@ -1383,7 +1383,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       <div
         ref={scroller}
         className="absolute inset-0 overflow-x-hidden"
-        style={{ overflowY: drawing ? 'hidden' : 'auto', touchAction: 'pan-y', overscrollBehavior: 'contain', ...(desk ? { overflowX: 'auto' } : {}), ...(desk ? { background: '#eceef2', top: BAR_H, bottom: FOOT_H, left: `calc(${RAIL_W}px + var(--dock-w, 0px))`, right: 0, transition: 'left .22s ease' } : {}) }}
+        style={{ overflowY: drawing ? 'hidden' : 'auto', touchAction: 'pan-y', overscrollBehavior: 'contain', ...(desk ? { overflowX: 'auto' } : {}), ...(desk ? { background: '#eceef2', top: BAR_H, bottom: FOOT_H, left: RAIL_W, right: 0, ['--page-w' as string]: `${canvasW * zoom}px`, paddingLeft: `max(0px, calc(2 * var(--dock-w, 0px) + 32px - (100vw - ${RAIL_W}px - var(--page-w))))`, transition: 'padding-left .22s ease' } : {}) }}
         onScroll={onScroll}
         onDragOver={(e) => { if (!readOnly && e.dataTransfer.types.includes('Files')) e.preventDefault() }}
         onDrop={(e) => {
@@ -1615,7 +1615,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
               </div>
             )}
             {selected && actions && !drawing && editingId !== selected.id && draggingId !== selected.id && (
-              <SelectionOverlay item={selected} canvasW={canvasW} topLimit={((scroller.current?.scrollTop ?? 0) + 8) / zoom} accent={accent} actions={actions} hideToolbar={!!sheet} zoom={zoom} locked={isBg(selected)} connecting={!!connectFrom} grouping={!!groupFrom} />
+              <SelectionOverlay item={selected} canvasW={canvasW} topLimit={((scroller.current?.scrollTop ?? 0) + 8) / zoom} accent={accent} actions={actions} hideToolbar={!!sheet && !desk} zoom={zoom} locked={isBg(selected)} connecting={!!connectFrom} grouping={!!groupFrom} />
             )}
             {selected && actions && draggingId === selected.id && (
               <SelectionOverlay item={selected} canvasW={canvasW} topLimit={-9999} accent={accent} actions={{ ...actions, onFrame: undefined, onEdit: undefined }} hideToolbar zoom={zoom} locked={isBg(selected)} />
@@ -1774,7 +1774,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
               { label: 'Share', icon: <IcShare />, onClick: onShare },
               ...(user ? [{ label: 'People', icon: <IcPeople />, onClick: () => setPeopleOpen(true) }, { label: memory.e2ee ? 'Private book' : 'Privacy', icon: <IcLock />, onClick: () => setPrivacyOpen(true) }] : []),
               { label: 'Download book', icon: <IcDownload />, onClick: () => void downloadBook() },
-              { label: 'Keyboard shortcuts', icon: <Keyboard size={20} />, onClick: () => setShortcutsOpen(true) },
+              { label: 'Keyboard shortcuts', icon: <IcKeyboard />, onClick: () => setShortcutsOpen(true) },
               ...(!readOnly ? [{ label: 'Delete', icon: <IcTrash />, onClick: onDelete, danger: true }] : []),
             ] as FileItem[]}
             onShare={onShare}

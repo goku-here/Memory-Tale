@@ -296,6 +296,32 @@ export function BubbleEditor({ value, accent, box, onChange }: EditorProps) {
           </div>
         </section>
 
+        <section>
+          <span className={label}>Outline</span>
+          <div className="flex items-center gap-3">
+            <span className="w-16 text-[13px] font-bold text-neutral-500">Thickness</span>
+            <input
+              type="range" min={0} max={10} step={0.5} value={value.stroke ?? 2.2} aria-label="Outline thickness"
+              onChange={(e) => onChange({ stroke: +e.target.value })} className="h-11 flex-1" style={{ accentColor: accent }}
+            />
+          </div>
+          <div className="no-scrollbar -mx-4 mt-1 flex gap-1 overflow-x-auto px-4" style={{ touchAction: 'pan-x' }} role="radiogroup" aria-label="Outline colour">
+            {BUBBLE_STROKE_COLORS.map((c) => {
+              const on = (value.strokeColor ?? INK).toLowerCase() === c.toLowerCase()
+              return (
+                <motion.button
+                  key={c} type="button" role="radio" aria-checked={on} aria-label={`Outline ${c}`} whileTap={{ scale: 0.88 }}
+                  onClick={() => onChange({ strokeColor: c })}
+                  className="grid h-12 w-12 shrink-0 place-items-center rounded-full border-0 bg-transparent"
+                >
+                  <span className="h-8 w-8 rounded-full" style={{ background: c, boxShadow: on ? `0 0 0 2px #fff, 0 0 0 4px ${accent}` : 'inset 0 0 0 1px rgba(0,0,0,.18)' }} />
+                </motion.button>
+              )
+            })}
+            <CustomColor value={value.strokeColor ?? INK} listed={BUBBLE_STROKE_COLORS.some((c) => c.toLowerCase() === (value.strokeColor ?? INK).toLowerCase())} accent={accent} onPick={(c) => onChange({ strokeColor: c })} />
+          </div>
+        </section>
+
         {tailOk && (
           <section>
             <span className={label}>Tail</span>
@@ -336,32 +362,6 @@ export function BubbleEditor({ value, accent, box, onChange }: EditorProps) {
               type="range" min={5} max={18} step={0.5} value={value.size} aria-label="Text size"
               onChange={(e) => onChange({ size: +e.target.value })} className="h-11 flex-1" style={{ accentColor: accent }}
             />
-          </div>
-        </section>
-
-        <section>
-          <span className={label}>Outline</span>
-          <div className="flex items-center gap-3">
-            <span className="w-16 text-[13px] font-bold text-neutral-500">Thickness</span>
-            <input
-              type="range" min={0} max={10} step={0.5} value={value.stroke ?? 2.2} aria-label="Outline thickness"
-              onChange={(e) => onChange({ stroke: +e.target.value })} className="h-11 flex-1" style={{ accentColor: accent }}
-            />
-          </div>
-          <div className="no-scrollbar -mx-4 mt-1 flex gap-1 overflow-x-auto px-4" style={{ touchAction: 'pan-x' }} role="radiogroup" aria-label="Outline colour">
-            {BUBBLE_STROKE_COLORS.map((c) => {
-              const on = (value.strokeColor ?? INK).toLowerCase() === c.toLowerCase()
-              return (
-                <motion.button
-                  key={c} type="button" role="radio" aria-checked={on} aria-label={`Outline ${c}`} whileTap={{ scale: 0.88 }}
-                  onClick={() => onChange({ strokeColor: c })}
-                  className="grid h-12 w-12 shrink-0 place-items-center rounded-full border-0 bg-transparent"
-                >
-                  <span className="h-8 w-8 rounded-full" style={{ background: c, boxShadow: on ? `0 0 0 2px #fff, 0 0 0 4px ${accent}` : 'inset 0 0 0 1px rgba(0,0,0,.18)' }} />
-                </motion.button>
-              )
-            })}
-            <CustomColor value={value.strokeColor ?? INK} listed={BUBBLE_STROKE_COLORS.some((c) => c.toLowerCase() === (value.strokeColor ?? INK).toLowerCase())} accent={accent} onPick={(c) => onChange({ strokeColor: c })} />
           </div>
         </section>
       </div>

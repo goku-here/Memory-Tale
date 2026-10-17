@@ -477,3 +477,13 @@ export const IcUngroup = () => (
     <rect x="14" y="14" width="5.6" height="5.6" rx="1.6" fill="url(#ic-ug2)" />
   </S>
 )
+
+export const IcKeyboard = () => (
+  <S>
+    <defs><G id="ic-kb" a="#F4F6FB" b="#C9D2E8" /></defs>
+    <rect x="2.2" y="5.6" width="19.6" height="13" rx="3" fill="url(#ic-kb)" stroke="#8C98B8" strokeWidth="1.2" />
+    {[6.6, 10, 13.4, 16.8].map((x) => <rect key={x} x={x} y="8.4" width="2.6" height="2.4" rx=".6" fill="#4F7BFF" />)}
+    {[6.6, 10, 13.4, 16.8].map((x) => <rect key={x} x={x} y="11.8" width="2.6" height="2.4" rx=".6" fill="#7B8BB5" opacity=".7" />)}
+    <rect x="7.4" y="15.1" width="9.2" height="2" rx=".8" fill="#F28A1E" />
+  </S>
+)

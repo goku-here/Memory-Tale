@@ -226,7 +226,7 @@ export function SelectionOverlay({
           transform: `translate(${cx}px, ${item.y}px) rotate(${item.rotation}deg)`, zIndex: 9500, willChange: 'transform',
         }}
       >
-        <div className="absolute -inset-1 rounded-[6px]" style={{ border: `1.5px solid ${accent}`, boxShadow: '0 0 0 1px rgba(255,255,255,.9)' }} />
+        <div className="absolute -inset-1 rounded-[6px]" style={{ border: `1px solid ${accent}`, boxShadow: '0 0 0 .5px rgba(255,255,255,.8)' }} />
         {/* the other three corners: bigger / smaller */}
         {!locked && [[-1, -1], [1, -1], [-1, 1]].map(([sx, sy]) => (
           <button
@@ -235,7 +235,7 @@ export function SelectionOverlay({
             style={{ left: sx < 0 ? -26 : 'auto', right: sx > 0 ? -26 : 'auto', top: sy < 0 ? -26 : 'auto', bottom: sy > 0 ? -26 : 'auto', transform: `scale(${k})`, cursor: sx === sy ? 'nwse-resize' : 'nesw-resize' }}
             onPointerDown={(e) => actions.onHandle(e, 'scale')}
           >
-            <span className="h-3.5 w-3.5 rounded-full bg-white" style={{ border: `2px solid ${accent}`, boxShadow: '0 1px 3px rgba(0,0,0,.25)' }} />
+            <span className="h-3 w-3 rounded-full bg-white" style={{ border: `1.5px solid ${accent}`, boxShadow: '0 1px 2px rgba(0,0,0,.2)' }} />
           </button>
         ))}
         {/* resize + rotate */}
@@ -245,8 +245,8 @@ export function SelectionOverlay({
           style={{ right: -26, bottom: -26, transform: `scale(${k})` }}
           onPointerDown={(e) => actions.onHandle(e, 'resize')}
         >
-          <span className="grid h-6 w-6 place-items-center rounded-full bg-white shadow" style={{ border: `2px solid ${accent}` }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <span className="grid h-5 w-5 place-items-center rounded-full bg-white shadow" style={{ border: `1.5px solid ${accent}` }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M20 12a8 8 0 1 1-2.6-5.9" /><path d="M20 4v5h-5" />
             </svg>
           </span>
@@ -258,7 +258,7 @@ export function SelectionOverlay({
           style={{ left: '50%', top: -30 * k - 22, marginLeft: -22, transform: `scale(${k})` }}
           onPointerDown={(e) => actions.onHandle(e, 'rotate')}
         >
-          <span className="h-3 w-3 rounded-full bg-white" style={{ border: `2px solid ${accent}` }} />
+          <span className="h-2.5 w-2.5 rounded-full bg-white" style={{ border: `1.5px solid ${accent}` }} />
         </button>}
         {!locked && <i className="absolute left-1/2 -ml-px w-0.5" style={{ top: -30 * k, height: 26 * k, background: accent, opacity: 0.6 }} />}
       </div>
