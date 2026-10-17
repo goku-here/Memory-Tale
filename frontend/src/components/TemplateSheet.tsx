@@ -5,7 +5,7 @@ import { TEMPLATE_CATEGORIES, TEMPLATES, THEME_CATEGORY, type TemplateCategory, 
 import { CollageBody } from './CollageBody'
 import { StickerArt, SVG_STICKERS } from './stickers'
 import { CollageCard } from './StickerTray'
-import { IcLine } from './ToolIcons'
+import { ClotheslineBody } from './Clothesline'
 import { ToolSheet } from './ToolSheet'
 
 /** a page template drawn small, from its real pieces */
@@ -79,14 +79,20 @@ export function TemplateSheet({
               Tap one to put it on your page, then tap the plus to add your photo. Double-tap it later to change the photo or write a caption.
             </p>
             <div className="grid grid-cols-2 gap-2.5">
-              <motion.button
-                type="button" aria-label="Polaroid line" whileTap={{ scale: 0.96 }} onClick={onLine}
-                className="flex flex-col items-center gap-2 rounded-2xl border-0 bg-[#f6f6f8] p-3 text-center" style={{ boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.05)' }}
+              <motion.div
+                role="button" tabIndex={0} aria-label="Polaroid line" whileTap={{ scale: 0.96 }} onClick={onLine}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onLine() } }}
+                className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl bg-[#f6f6f8] p-3 text-center" style={{ boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.05)' }}
               >
-                <span className="grid h-[148px] w-full place-items-center [&_svg]:h-[84px] [&_svg]:w-[84px]"><IcLine /></span>
+                <span className="grid h-[148px] w-full place-items-center overflow-hidden">
+                  {/* the real thing: three polaroids pinned to a twine, empty */}
+                  <span className="block" style={{ width: `min(100%, ${148 / 0.64}px)`, aspectRatio: '1 / 0.64' }}>
+                    <span className="pointer-events-none block h-full w-full"><ClotheslineBody line={{ photos: ['', '', ''] }} selected={false} /></span>
+                  </span>
+                </span>
                 <span className="text-[13px] font-bold text-[#17171a]">Polaroid line</span>
                 <span className="text-[11.5px] font-semibold" style={{ color: accent }}>3 photos</span>
-              </motion.button>
+              </motion.div>
               {FRAME_KINDS.map((k) => <CollageCard key={k} kind={k} accent={accent} onPick={() => onFrame(k)} />)}
             </div>
           </>
