@@ -284,6 +284,16 @@ export function TextStudio({ seed, boxW, palette, accent, look, onDone, onCancel
   }
 
   if (doneRef) doneRef.current = finish
+  const liveKeys = useRef({ finish, onCancel })
+  liveKeys.current = { finish, onCancel }
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); liveKeys.current.finish() }
+      else if (e.key === 'Escape') { e.preventDefault(); liveKeys.current.onCancel() }
+    }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [])
   useEffect(() => () => { if (doneRef) doneRef.current = null }, [doneRef])
 
   // tools do not take the keyboard's focus (that would lose the selection); with nothing selected the keyboard goes away

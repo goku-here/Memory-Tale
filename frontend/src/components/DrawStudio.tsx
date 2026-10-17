@@ -239,13 +239,28 @@ export function DrawStudio({ palette, accent, look, seed, onDone, onHistory, don
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [past, future])
   useEffect(() => () => onHistory?.(null), [])  // eslint-disable-line react-hooks/exhaustive-deps
+  const live = useRef({ done })
+  live.current = { done }
   useEffect(() => {
     if (!desk) return
     const k = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey)) return
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
       const key = e.key.toLowerCase()
-      if (key === 'z') { e.preventDefault(); if (e.shiftKey) hist.current.redo(); else hist.current.undo() }
-      else if (key === 'y') { e.preventDefault(); hist.current.redo() }
+      if (e.ctrlKey || e.metaKey) {
+        if (key === 'z') { e.preventDefault(); if (e.shiftKey) hist.current.redo(); else hist.current.undo() }
+        else if (key === 'y') { e.preventDefault(); hist.current.redo() }
+        else if (key === 'enter') { e.preventDefault(); live.current.done() }
+        return
+      }
+      if (e.altKey) return
+      if (/^[1-7]$/.test(key)) { e.preventDefault(); setTool(TOOLS[+key - 1].id); setPop(null) }
+      else if (key === 'e') { e.preventDefault(); setTool('eraser'); setPop(null) }
+      else if (key === 'h') { e.preventDefault(); setHand((v) => !v) }
+      else if (key === '[' || key === ']') {
+        e.preventDefault()
+        setSize((cur) => { const i = SIZES.findIndex((s) => Math.abs(s.size - cur) < 0.01); const n = Math.min(SIZES.length - 1, Math.max(0, (i < 0 ? 1 : i) + (key === ']' ? 1 : -1))); return SIZES[n].size })
+      } else if (key === 'escape') setPop(null)
     }
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)

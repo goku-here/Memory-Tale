@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useMotionValue, useTransform, type MotionValue } from 'framer-motion'
-import { ArrowLeft, Check, ChevronDown, Eye, Image as ImageIcon, Loader2, Maximize2, MoreHorizontal, Redo2, Undo2, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, Eye, Keyboard, Image as ImageIcon, Loader2, Maximize2, MoreHorizontal, Redo2, Undo2, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../data/useAuth'
 import { canEdit } from '../data/people'
@@ -53,7 +53,7 @@ import { IcClapper, IcDownload, IcEdit, IcLock, IcPages, IcPalette, IcPeople, Ic
 import { resolveCanvas } from '../lib/canvasStyle'
 import { SizeSheet, StoryOverlay, StoryPreview } from './StoryMode'
 import { useDesktop } from '../lib/useDesktop'
-import { BAR_H, DeskBar, DeskFoot, DeskRail, FOOT_H, RAIL_W, type FileItem } from './DeskLayout'
+import { BAR_H, DeskBar, DeskFoot, DeskRail, FOOT_H, RAIL_W, ShortcutsSheet, TOOL_KEYS, type FileItem } from './DeskLayout'
 import { PrintExportSheet, PrintOverlay, PrintSizeSheet, pagesNeeded } from './PrintMode'
 import { getPrintSize, pageDims, type PrintSize } from '../lib/printSizes'
 import { CustomColor } from './ColorPicker'
@@ -149,6 +149,9 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   const deskRef = useRef(desk)
   /** finishes the open drawing / text page, so picking another tool does not leave it stuck on screen */
   const studioDone = useRef<(() => void) | null>(null)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  /** the last item copied with Ctrl+C */
+  const copied = useRef<CanvasItem | null>(null)
   const [drawHist, setDrawHist] = useState<{ canUndo: boolean; canRedo: boolean; undo: () => void; redo: () => void } | null>(null)
   deskRef.current = desk
   /** on a laptop the whole page (its frame) grows and shrinks with the zoom, not just what is drawn inside it */
@@ -1218,21 +1221,46 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, sheet, viewer, cameraOpen])
 
-  // laptop shortcuts: undo / redo, delete, duplicate, nudge with the arrow keys, Esc to let go
+  // laptop shortcuts (the list is in the Book menu, or press ?)
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
-      if (sheet || viewer || cameraOpen || textStudio || drawing || readOnly || printSizeOpen || printExportOpen) return
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return
+      if (viewer || cameraOpen || textStudio || drawing || readOnly || printSizeOpen || printExportOpen || storyPreview || sizeOpen || shortcutsOpen || peopleOpen || privacyOpen) return
+      // on a laptop the tool panels sit beside the page and the keys keep working; on a phone a sheet takes over
+      if (sheet && !deskRef.current) return
       const mod = e.ctrlKey || e.metaKey
       const key = e.key.toLowerCase()
       if (mod && key === 'z') { e.preventDefault(); if (e.shiftKey) cv.redo(); else cv.undo(); return }
       if (mod && key === 'y') { e.preventDefault(); cv.redo(); return }
+      if (mod && key === 's') { e.preventDefault(); toast('Everything saves by itself'); return }
+      if (mod && (key === '=' || key === '+')) { e.preventDefault(); applyZoom(zoomRef.current + 0.1); return }
+      if (mod && (key === '-' || key === '_')) { e.preventDefault(); applyZoom(zoomRef.current - 0.1); return }
+      if (mod && key === '0') { e.preventDefault(); applyZoom(1); return }
+      if (e.key === '?' || (mod && key === '/')) { e.preventDefault(); setShortcutsOpen(true); return }
+      if (mod && key === 'v') {
+        const c = copied.current
+        if (c) { e.preventDefault(); let id = ''; commit((list) => { const n = cloneItem(c, nextZ(list)); id = n.id; return [...list, n] }); setSelectedId(id) }
+        return
+      }
+      if (mod && key === 'c' && selected && !isBg(selected)) { copied.current = structuredClone(selected); toast('Copied'); return }
+      // pick a tool with one key
+      if (!mod && !e.altKey && deskRef.current) {
+        const tool = (Object.keys(TOOL_KEYS) as ToolId[]).find((id) => TOOL_KEYS[id]!.toLowerCase() === key)
+        if (tool) { e.preventDefault(); setSelectedId(null); if (studioDone.current) studioDone.current(); if (tool !== 'canvas') setStyleOpen(false); else if (sheet) closeSheet(); onTool(tool); return }
+      }
       if (!selected) return
       if (key === 'escape') { setSelectedId(null); setConnectFrom(null); setGroupFrom(null); return }
       if (!actions || isBg(selected)) return
       if (key === 'delete' || key === 'backspace') { e.preventDefault(); actions.onDelete(); return }
       if (mod && key === 'd') { e.preventDefault(); actions.onDuplicate(); return }
+      if (mod && key === 'g') {
+        e.preventDefault()
+        if (e.shiftKey) { if (selected.type === 'group') actions.onGroup?.run() } else actions.onGather?.()
+        return
+      }
+      if (key === ']') { e.preventDefault(); actions.onForward?.(); return }
+      if (key === '[') { e.preventDefault(); actions.onBackward?.(); return }
       if (key === 'enter' && actions.onEdit) { e.preventDefault(); actions.onEdit(); return }
       if (key.startsWith('arrow')) {
         e.preventDefault()
@@ -1245,7 +1273,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, actions, sheet, viewer, cameraOpen, textStudio, drawing, readOnly, printSizeOpen, printExportOpen, canvasW])
+  }, [selected, actions, sheet, viewer, cameraOpen, textStudio, drawing, readOnly, printSizeOpen, printExportOpen, storyPreview, sizeOpen, shortcutsOpen, peopleOpen, privacyOpen, canvasW, styleOpen])
 
   const run = (fn: () => void) => () => { setMenu(false); fn() }
 
@@ -1746,6 +1774,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
               { label: 'Share', icon: <IcShare />, onClick: onShare },
               ...(user ? [{ label: 'People', icon: <IcPeople />, onClick: () => setPeopleOpen(true) }, { label: memory.e2ee ? 'Private book' : 'Privacy', icon: <IcLock />, onClick: () => setPrivacyOpen(true) }] : []),
               { label: 'Download book', icon: <IcDownload />, onClick: () => void downloadBook() },
+              { label: 'Keyboard shortcuts', icon: <Keyboard size={20} />, onClick: () => setShortcutsOpen(true) },
               ...(!readOnly ? [{ label: 'Delete', icon: <IcTrash />, onClick: onDelete, danger: true }] : []),
             ] as FileItem[]}
             onShare={onShare}
@@ -1757,7 +1786,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
             onModeClose={story ? leaveStory : leavePrint}
             onFit={fitToPages}
           />
-          {!readOnly && !story && !printMode && (
+          {!readOnly && (
             <DeskRail
               active={sheet === 'sticker' ? 'sticker' : sheet === 'templates' ? 'templates' : textStudio ? 'text' : styleOpen ? 'canvas' : sheet === 'location' ? 'location' : null}
               onTool={(t) => {
@@ -1786,6 +1815,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       <CanvasStyleSheet open={styleOpen} onClose={() => setStyleOpen(false)} memory={memory} value={cstyle} onChange={changeStyle} onHeight={(h) => setSheetHs((s) => ({ ...s, style: h }))} />
       {user && <PeopleSheet open={peopleOpen} onClose={() => setPeopleOpen(false)} memory={memory} />}
       <StoryPreview open={storyPreview} onClose={() => setStoryPreview(false)} memory={memory} accent={accent} getItems={() => itemsRef.current} frameY={storyY} canvasW={canvasW} size={size} />
+      <ShortcutsSheet open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <PrintSizeSheet open={printSizeOpen} onClose={() => setPrintSizeOpen(false)} size={printSize} landscape={printPick.landscape} onPick={pickPrint} accent={accent} />
       <PrintExportSheet open={printExportOpen} onClose={() => setPrintExportOpen(false)} memory={memory} accent={accent} getItems={() => withBackground(itemsRef.current, canvasW)} y0={printY} pageCount={printUsed} canvasW={canvasW} size={printSize} landscape={printPick.landscape} />
       <SizeSheet open={sizeOpen} onClose={() => setSizeOpen(false)} value={size} onPick={pickSize} accent={accent} />

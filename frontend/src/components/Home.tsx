@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import { isDesktop } from '../lib/useDesktop'
 import { Copy, Palette, PenLine, Plus, Trash2, User } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Memory } from '../types'
@@ -173,6 +174,19 @@ export function Home({ memories, loading, hiddenId, onAdd, onSettings, onReorder
 
   useEffect(() => endPress, [endPress])
   const closeMenu = () => setMenuOpen(false)
+  // laptop: N starts a new memory
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      if (e.ctrlKey || e.metaKey || e.altKey || e.key.toLowerCase() !== 'n' || !isDesktop()) return
+      if (document.querySelector('[role=dialog]')) return
+      e.preventDefault()
+      onAdd()
+    }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [onAdd])
   const act = (fn: (m: Memory) => void) => () => { if (menu) fn(menu); closeMenu() }
 
   return (
@@ -229,7 +243,7 @@ export function Home({ memories, loading, hiddenId, onAdd, onSettings, onReorder
 
       <div className="pointer-events-none fixed inset-x-0 z-30 flex justify-center" style={{ bottom: 'calc(var(--safe-bottom) + 22px)' }}>
         <motion.button
-          type="button" data-tour="add"
+          type="button" data-tour="add" title="Add memory (N)"
           onClick={onAdd}
           className="no-select pointer-events-auto relative flex h-14 items-center gap-2.5 rounded-full border-0 bg-transparent pl-5 pr-6 text-[16px] font-semibold text-white outline-none"
           style={{ boxShadow: '0 12px 32px rgba(10,12,24,.32)' }}

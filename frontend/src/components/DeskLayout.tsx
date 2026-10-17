@@ -1,5 +1,6 @@
 import { ArrowLeft, Check, ChevronDown, Loader2, Minus, Plus, Redo2, Undo2, X } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
+import { ToolSheet } from './ToolSheet'
 import type { ToolId } from './BottomToolbar'
 import { IcBubble, IcCamera, IcDraw, IcFlag, IcGrid, IcMore, IcPages, IcPhone, IcPhoto, IcPin, IcNote, IcSticker, IcTemplates, IcText } from './ToolIcons'
 
@@ -120,6 +121,9 @@ export function DeskBar(p: BarProps) {
 
 /* ---------------------------------- tool rail ---------------------------------- */
 
+/** the key that picks each tool */
+export const TOOL_KEYS: Partial<Record<ToolId, string>> = { templates: 'M', sticker: 'S', text: 'T', draw: 'D', photo: 'P', bubble: 'B', location: 'L', canvas: 'C', note: 'N' }
+
 const TOOLS: { id: ToolId; label: string; icon: ReactNode }[] = [
   { id: 'templates', label: 'Templates', icon: <IcTemplates /> },
   { id: 'sticker', label: 'Stickers', icon: <IcSticker /> },
@@ -150,7 +154,7 @@ export function DeskRail({ active, onTool }: { active: ToolId | null; onTool: (t
         const on = active === t.id
         return (
           <button
-            key={t.id} type="button" aria-label={t.label} aria-pressed={on} data-tour={t.id === 'sticker' ? 'sticker' : t.id === 'photo' ? 'photo' : undefined} onClick={() => onTool(t.id)}
+            key={t.id} type="button" aria-label={t.label} title={TOOL_KEYS[t.id] ? `${t.label} (${TOOL_KEYS[t.id]})` : t.label} aria-keyshortcuts={TOOL_KEYS[t.id]} aria-pressed={on} data-tour={t.id === 'sticker' ? 'sticker' : t.id === 'photo' ? 'photo' : undefined} onClick={() => onTool(t.id)}
             className="grid h-[66px] w-[70px] shrink-0 place-items-center rounded-2xl border-0 bg-transparent text-[#17171a] transition-colors hover:bg-neutral-100"
             style={on ? { background: 'rgba(23,23,26,.09)' } : undefined}
           >
@@ -180,7 +184,7 @@ export function DeskRail({ active, onTool }: { active: ToolId | null; onTool: (t
                 <button
                   key={m.id} type="button" role="menuitem" onClick={() => { setMore(false); onTool(m.id) }}
                   className="flex min-h-11 w-full items-center gap-3 rounded-xl border-0 bg-transparent px-3 text-left text-[14.5px] font-semibold text-[#17171a] hover:bg-neutral-100"
-                >{m.icon}{m.label}</button>
+                >{m.icon}<span className="flex-1">{m.label}</span>{TOOL_KEYS[m.id] && <kbd className="rounded-md bg-neutral-100 px-1.5 py-0.5 text-[11px] font-bold text-neutral-500">{TOOL_KEYS[m.id]}</kbd>}</button>
               ))}
             </div>
           </>
@@ -212,5 +216,65 @@ export function DeskFoot({
         <button type="button" onClick={() => onZoom(1)} className="h-8 rounded-full border-0 bg-neutral-100 px-3.5 text-[12.5px] font-bold text-[#17171a] hover:bg-neutral-200">Fit</button>
       </span>
     </div>
+  )
+}
+
+/* ---------------------------------- keyboard shortcuts ---------------------------------- */
+
+const MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
+const MOD = MAC ? '⌘' : 'Ctrl'
+
+const GROUPS: { title: string; rows: [string[], string][] }[] = [
+  {
+    title: 'Add to the page',
+    rows: [
+      [['S'], 'Stickers'], [['T'], 'Text'], [['D'], 'Draw'], [['P'], 'Photos'], [['B'], 'Chat bubble'],
+      [['N'], 'Sticky note'], [['L'], 'Places'], [['M'], 'Templates, collages and frames'], [['C'], 'Canvas style'],
+    ],
+  },
+  {
+    title: 'Edit',
+    rows: [
+      [[MOD, 'Z'], 'Undo'], [[MOD, 'Shift', 'Z'], 'Redo'], [[MOD, 'C'], 'Copy'], [[MOD, 'V'], 'Paste'], [[MOD, 'D'], 'Duplicate'],
+      [['Delete'], 'Delete'], [['Enter'], 'Edit the selected item'], [['Esc'], 'Let go / close'],
+      [['← ↑ ↓ →'], 'Nudge 1 px (with Shift: 10 px)'], [[']'], 'Bring forward'], [['['], 'Send backward'],
+      [[MOD, 'G'], 'Group with another item'], [[MOD, 'Shift', 'G'], 'Ungroup'], [['Space'], 'View the selected photo'],
+    ],
+  },
+  {
+    title: 'Page',
+    rows: [[[MOD, '+'], 'Zoom in'], [[MOD, '−'], 'Zoom out'], [[MOD, '0'], 'Fit to width'], [[MOD, 'Scroll'], 'Zoom with the wheel'], [['?'], 'This list']],
+  },
+  {
+    title: 'Drawing page',
+    rows: [[['1', '…', '7'], 'Pen, marker, highlighter, pencil, crayon, calligraphy, eraser'], [['[', ']'], 'Thinner / thicker'], [['H'], 'Hand: move the page'], [[MOD, 'Z'], 'Undo a stroke'], [[MOD, 'Enter'], 'Done']],
+  },
+  {
+    title: 'Text page',
+    rows: [[[MOD, 'Enter'], 'Done'], [['Esc'], 'Cancel']],
+  },
+]
+
+export function ShortcutsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <ToolSheet open={open} onClose={onClose} title="Keyboard shortcuts" snaps={[0.9]} z={90} wide>
+      <div className="grid gap-x-10 gap-y-6 px-6 pb-6 lg:grid-cols-2">
+        {GROUPS.map((g) => (
+          <section key={g.title}>
+            <h3 className="m-0 mb-2 text-[12px] font-extrabold uppercase tracking-wider text-neutral-400">{g.title}</h3>
+            <div className="space-y-1.5">
+              {g.rows.map(([keys, what]) => (
+                <div key={what} className="flex items-center justify-between gap-3 text-[14px] font-semibold text-[#17171a]">
+                  <span>{what}</span>
+                  <span className="flex shrink-0 items-center gap-1">
+                    {keys.map((k) => <kbd key={k} className="min-w-6 rounded-md bg-neutral-100 px-1.5 py-0.5 text-center text-[12px] font-bold text-neutral-600 shadow-[inset_0_-1px_0_rgba(0,0,0,.12)]">{k}</kbd>)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </ToolSheet>
   )
 }
