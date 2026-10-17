@@ -270,7 +270,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     if (nz === zoomRef.current) {
       // same zoom: still honour the anchor (scroll to it)
       if (focal && sf && scroller.current && wrap.current) {
-        scroller.current.scrollTop = wrap.current.offsetTop + focal.y * nz - focal.screenY
+        scroller.current.scrollTop = wrap.current.offsetTop + focal.y * nz - (focal.screenY - scroller.current.getBoundingClientRect().top)
         if (deskRef.current) scroller.current.scrollLeft += sf.getBoundingClientRect().left + focal.x! * nz - focal.screenX!
         else wrap.current.scrollLeft = focal.x! * nz - (focal.screenX! - wrap.current.getBoundingClientRect().left)
       }
@@ -298,7 +298,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     if (dk && col.current) col.current.style.width = `${cw * nz}px`
     sf.style.left = `${!dk && nz < 1 ? (cw * (1 - nz)) / 2 : 0}px`
     sf.style.transform = nz !== 1 ? `scale(${nz})` : ''
-    sc.scrollTop = w.offsetTop + f.y * nz - f.screenY
+    sc.scrollTop = w.offsetTop + f.y * nz - (f.screenY - sc.getBoundingClientRect().top)
     if (dk) sc.scrollLeft += sf.getBoundingClientRect().left + f.x * nz - f.screenX
     else w.scrollLeft = Math.max(0, f.x * nz - (f.screenX - w.getBoundingClientRect().left))
     window.clearTimeout(commitTimer.current)
@@ -312,7 +312,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     const w = wrap.current
     zoomAnchor.current = null
     if (a && sc && w) {
-      sc.scrollTop = w.offsetTop + a.y * zoom - a.screenY
+      sc.scrollTop = w.offsetTop + a.y * zoom - (a.screenY - sc.getBoundingClientRect().top)
       if (a.x !== undefined && a.screenX !== undefined) {
         if (deskRef.current && surface.current) sc.scrollLeft += surface.current.getBoundingClientRect().left + a.x * zoom - a.screenX
         else w.scrollLeft = Math.max(0, a.x * zoom - (a.screenX - w.getBoundingClientRect().left))
@@ -1202,9 +1202,17 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     return it.y + half < range.top || it.y - half > range.bottom
   }
 
+  /** the selection menu is placed from what is on screen, so it is placed again while the page scrolls */
+  const [, setScrollTick] = useState(0)
+  const tickRaf = useRef(0)
+  const bump = () => {
+    if (!selectedIdRef.current || tickRaf.current) return
+    tickRaf.current = requestAnimationFrame(() => { tickRaf.current = 0; setScrollTick((n) => n + 1) })
+  }
   const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget
     scrollY.set(el.scrollTop)
+    bump()
     updateRange()
     if (el.scrollTop + el.clientHeight > heightRef.current * zoomRef.current - 700) setHeight(heightRef.current + 1200)
   }
@@ -1368,6 +1376,14 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     if (!bb.length) return null
     return { l: Math.min(...bb.map((b) => b.l)), r: Math.max(...bb.map((b) => b.r)), t: Math.min(...bb.map((b) => b.t)), b: Math.max(...bb.map((b) => b.b)) }
   })()
+  /** the part of the page that is on screen, in canvas pixels: the selection menu stays inside it */
+  const viewport = (() => {
+    const sc = scroller.current, sf = surface.current
+    if (!selected || !sc || !sf) return undefined
+    const a = sc.getBoundingClientRect(), b = sf.getBoundingClientRect()
+    const hdr = desk ? 0 : HEADER_H, foot = desk ? 0 : 110
+    return { top: (a.top + hdr - b.top) / zoom + 8 / zoom, bottom: (a.bottom - foot - b.top) / zoom - 8 / zoom, left: (a.left - b.left) / zoom, right: (a.right - b.left) / zoom }
+  })()
   const collageItem = selected?.type === 'collage' ? selected : undefined
   const photoItem = selected?.type === 'photo' ? selected : undefined
 
@@ -1517,7 +1533,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
           </header>
 
           {/* the infinite canvas surface */}
-          <div ref={wrap} className="no-scrollbar" style={{ height: height * zoom, overflowX: zoom > 1.001 ? 'auto' : 'hidden', overflowY: 'hidden', touchAction: zoom > 1.001 ? 'pan-x pan-y' : 'pan-y' }}>
+          <div ref={wrap} onScroll={bump} className="no-scrollbar" style={{ height: height * zoom, overflowX: zoom > 1.001 ? 'auto' : 'hidden', overflowY: 'hidden', touchAction: zoom > 1.001 ? 'pan-x pan-y' : 'pan-y' }}>
           <div ref={inner} style={{ position: 'relative', width: canvasW * (desk ? zoom : Math.max(1, zoom)), height: height * zoom }}>
           <div
             ref={surface}
@@ -1615,7 +1631,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
               </div>
             )}
             {selected && actions && !drawing && editingId !== selected.id && draggingId !== selected.id && (
-              <SelectionOverlay item={selected} canvasW={canvasW} topLimit={((scroller.current?.scrollTop ?? 0) + 8) / zoom} accent={accent} actions={actions} hideToolbar={!!sheet && !desk} zoom={zoom} locked={isBg(selected)} connecting={!!connectFrom} grouping={!!groupFrom} />
+              <SelectionOverlay item={selected} canvasW={canvasW} topLimit={((scroller.current?.scrollTop ?? 0) + 8) / zoom} accent={accent} actions={actions} hideToolbar={!!sheet && !desk} view={viewport} zoom={zoom} locked={isBg(selected)} connecting={!!connectFrom} grouping={!!groupFrom} />
             )}
             {selected && actions && draggingId === selected.id && (
               <SelectionOverlay item={selected} canvasW={canvasW} topLimit={-9999} accent={accent} actions={{ ...actions, onFrame: undefined, onEdit: undefined }} hideToolbar zoom={zoom} locked={isBg(selected)} />

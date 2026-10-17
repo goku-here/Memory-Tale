@@ -196,8 +196,8 @@ function TB({ label, onClick, children, danger, caption, w = 42, active }: { lab
 }
 
 export function SelectionOverlay({
-  item, canvasW, topLimit, accent, actions, hideToolbar, zoom = 1, locked = false, connecting = false, grouping = false,
-}: { item: CanvasItem; canvasW: number; topLimit: number; accent: string; actions: SelectionActions; hideToolbar?: boolean; zoom?: number; locked?: boolean; connecting?: boolean; grouping?: boolean }) {
+  item, canvasW, topLimit, accent, actions, hideToolbar, zoom = 1, locked = false, connecting = false, grouping = false, view,
+}: { item: CanvasItem; canvasW: number; topLimit: number; /** what is on screen, in canvas px: the menu stays inside it */ view?: { top: number; bottom: number; left: number; right: number }; accent: string; actions: SelectionActions; hideToolbar?: boolean; zoom?: number; locked?: boolean; connecting?: boolean; grouping?: boolean }) {
   const cx = (item.x / 100) * canvasW
   const rad = (item.rotation * Math.PI) / 180
   const hh = (Math.abs(item.width * Math.sin(rad)) + Math.abs(item.height * Math.cos(rad))) / 2
@@ -209,10 +209,18 @@ export function SelectionOverlay({
   const bw = canvasW >= 440 ? 50 : 42
   const gap = canvasW >= 440 ? 8 : 4
   const tbW = (nButtons * bw + (nButtons - 1) * gap + 16) * k
-  const bottomEdge = item.y - hh - 18 * k
-  const placeAbove = bottomEdge - 54 * k > topLimit
-  const tbY = placeAbove ? bottomEdge - 54 : item.y + hh + 16 * k
-  const tbX = Math.min(Math.max(cx, tbW / 2 + 6 * k), canvasW - tbW / 2 - 6 * k)
+  // above the item if that is on screen, else below it, else inside the visible part of the page: never cut off
+  const tbH = 54 * k
+  const aboveTop = item.y - hh - 18 * k - tbH
+  const belowTop = item.y + hh + 16 * k
+  const vTop = view ? view.top : topLimit
+  const vBottom = view ? view.bottom : Infinity
+  const placeAbove = aboveTop >= vTop
+  const placeBelow = !placeAbove && belowTop + tbH <= vBottom
+  const tbY = placeAbove ? aboveTop : placeBelow ? belowTop : Math.max(aboveTop < vTop ? vTop : aboveTop, Math.min(aboveTop, vBottom - tbH))
+  const minX = Math.max(0, view?.left ?? 0) + tbW / 2 + 6 * k
+  const maxX = Math.min(canvasW, view?.right ?? canvasW) - tbW / 2 - 6 * k
+  const tbX = maxX >= minX ? Math.min(Math.max(cx, minX), maxX) : (minX + maxX) / 2
   const origin = placeAbove ? '50% 100%' : '50% 0%'
 
   return (
