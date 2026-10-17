@@ -1,7 +1,7 @@
 import { ArrowLeft, Check, ChevronDown, Loader2, Minus, Plus, Redo2, Undo2, X } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import type { ToolId } from './BottomToolbar'
-import { IcBubble, IcCamera, IcDraw, IcFlag, IcGrid, IcLine, IcPages, IcPhone, IcPhoto, IcPin, IcNote, IcSticker, IcTemplates, IcText } from './ToolIcons'
+import { IcBubble, IcCamera, IcDraw, IcFlag, IcGrid, IcLine, IcMore, IcPages, IcPhone, IcPhoto, IcPin, IcNote, IcSticker, IcTemplates, IcText } from './ToolIcons'
 
 /** the laptop layout: a bar along the top, a tool rail down the left (its panel opens beside it), the page in the middle, a strip along the bottom */
 export const BAR_H = 56
@@ -126,16 +126,20 @@ const TOOLS: { id: ToolId; label: string; icon: ReactNode }[] = [
   { id: 'text', label: 'Text', icon: <IcText /> },
   { id: 'draw', label: 'Draw', icon: <IcDraw /> },
   { id: 'photo', label: 'Photos', icon: <IcPhoto /> },
-  { id: 'camera', label: 'Camera', icon: <IcCamera /> },
-  { id: 'note', label: 'Notes', icon: <IcNote /> },
   { id: 'bubble', label: 'Bubbles', icon: <IcBubble /> },
   { id: 'line', label: 'Polaroids', icon: <IcLine /> },
   { id: 'location', label: 'Places', icon: <IcPin /> },
-  { id: 'divider', label: 'Stops', icon: <IcFlag /> },
   { id: 'canvas', label: 'Canvas', icon: <IcGrid /> },
 ]
 
+const MORE: { id: ToolId; label: string; icon: ReactNode }[] = [
+  { id: 'camera', label: 'Camera', icon: <IcCamera /> },
+  { id: 'note', label: 'Sticky note', icon: <IcNote /> },
+  { id: 'divider', label: 'Stop divider', icon: <IcFlag /> },
+]
+
 export function DeskRail({ active, onTool }: { active: ToolId | null; onTool: (t: ToolId) => void }) {
+  const [more, setMore] = useState(false)
   return (
     <nav
       aria-label="Tools" data-ui
@@ -157,6 +161,31 @@ export function DeskRail({ active, onTool }: { active: ToolId | null; onTool: (t
           </button>
         )
       })}
+      <div className="relative">
+        <button
+          type="button" aria-label="More" aria-haspopup="menu" aria-expanded={more} onClick={() => setMore((v) => !v)}
+          className="grid h-[66px] w-[70px] shrink-0 place-items-center rounded-2xl border-0 bg-transparent text-[#17171a] transition-colors hover:bg-neutral-100"
+          style={more ? { background: 'rgba(23,23,26,.09)' } : undefined}
+        >
+          <span className="flex flex-col items-center gap-1.5 leading-none">
+            <IcMore />
+            <span className="text-[11px] font-bold tracking-tight text-neutral-600">More</span>
+          </span>
+        </button>
+        {more && (
+          <>
+            <div className="fixed inset-0 z-40" onPointerDown={() => setMore(false)} />
+            <div role="menu" className="fixed z-50 w-56 rounded-2xl bg-white p-1.5 shadow-[0_14px_40px_rgba(20,24,40,.25),0_0_0_1px_rgba(20,24,40,.05)]" style={{ left: RAIL_W + 8, bottom: 16 }}>
+              {MORE.map((m) => (
+                <button
+                  key={m.id} type="button" role="menuitem" onClick={() => { setMore(false); onTool(m.id) }}
+                  className="flex min-h-11 w-full items-center gap-3 rounded-xl border-0 bg-transparent px-3 text-left text-[14.5px] font-semibold text-[#17171a] hover:bg-neutral-100"
+                >{m.icon}{m.label}</button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </nav>
   )
 }

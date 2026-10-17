@@ -146,6 +146,10 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
 
   const [menu, setMenu] = useState(false)
   const desk = useDesktop()
+  const deskRef = useRef(desk)
+  deskRef.current = desk
+  /** on a laptop the whole page (its frame) grows and shrinks with the zoom, not just what is drawn inside it */
+  const col = useRef<HTMLDivElement>(null)
   const [story, setStory] = useState(false)
   /** print mode: the book laid out as pages (one image per page), for a scrapbook or a frame */
   const [printMode, setPrintMode] = useState(false)
@@ -260,7 +264,8 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       // same zoom: still honour the anchor (scroll to it)
       if (focal && sf && scroller.current && wrap.current) {
         scroller.current.scrollTop = wrap.current.offsetTop + focal.y * nz - focal.screenY
-        wrap.current.scrollLeft = focal.x! * nz - (focal.screenX! - wrap.current.getBoundingClientRect().left)
+        if (deskRef.current) scroller.current.scrollLeft += sf.getBoundingClientRect().left + focal.x! * nz - focal.screenX!
+        else wrap.current.scrollLeft = focal.x! * nz - (focal.screenX! - wrap.current.getBoundingClientRect().left)
       }
       zoomAnchor.current = null
       return
@@ -279,13 +284,16 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     if (!sf || !w || !sc || !box) return
     const cw = canvasWRef.current, h = heightRef.current
     zoomRef.current = nz
-    box.style.width = `${cw * Math.max(1, nz)}px`
+    const dk = deskRef.current
+    box.style.width = `${cw * (dk ? nz : Math.max(1, nz))}px`
     box.style.height = `${h * nz}px`
     w.style.height = `${h * nz}px`
-    sf.style.left = `${nz < 1 ? (cw * (1 - nz)) / 2 : 0}px`
+    if (dk && col.current) col.current.style.width = `${cw * nz}px`
+    sf.style.left = `${!dk && nz < 1 ? (cw * (1 - nz)) / 2 : 0}px`
     sf.style.transform = nz !== 1 ? `scale(${nz})` : ''
     sc.scrollTop = w.offsetTop + f.y * nz - f.screenY
-    w.scrollLeft = Math.max(0, f.x * nz - (f.screenX - w.getBoundingClientRect().left))
+    if (dk) sc.scrollLeft += sf.getBoundingClientRect().left + f.x * nz - f.screenX
+    else w.scrollLeft = Math.max(0, f.x * nz - (f.screenX - w.getBoundingClientRect().left))
     window.clearTimeout(commitTimer.current)
     commitTimer.current = window.setTimeout(() => setZoomState(zoomRef.current), 120)
   }, [])
@@ -298,7 +306,10 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     zoomAnchor.current = null
     if (a && sc && w) {
       sc.scrollTop = w.offsetTop + a.y * zoom - a.screenY
-      if (a.x !== undefined && a.screenX !== undefined) w.scrollLeft = Math.max(0, a.x * zoom - (a.screenX - w.getBoundingClientRect().left))
+      if (a.x !== undefined && a.screenX !== undefined) {
+        if (deskRef.current && surface.current) sc.scrollLeft += surface.current.getBoundingClientRect().left + a.x * zoom - a.screenX
+        else w.scrollLeft = Math.max(0, a.x * zoom - (a.screenX - w.getBoundingClientRect().left))
+      }
     }
   }, [zoom])
 
@@ -371,7 +382,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   useEffect(() => {
     const el = wrap.current
     if (!el) return
-    const ro = new ResizeObserver(() => { const w = el.clientWidth; setCanvasW(w); cv.setWidth(w) })
+    const ro = new ResizeObserver(() => { const w = deskRef.current ? 520 : el.clientWidth; setCanvasW(w); cv.setWidth(w) })
     ro.observe(el)
     return () => ro.disconnect()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1337,7 +1348,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       <div
         ref={scroller}
         className="absolute inset-0 overflow-x-hidden"
-        style={{ overflowY: drawing ? 'hidden' : 'auto', touchAction: 'pan-y', overscrollBehavior: 'contain', ...(desk ? { background: '#eceef2', top: BAR_H, bottom: FOOT_H, left: `calc(${RAIL_W}px + var(--dock-w, 0px))`, right: 0, transition: 'left .22s ease' } : {}) }}
+        style={{ overflowY: drawing ? 'hidden' : 'auto', touchAction: 'pan-y', overscrollBehavior: 'contain', ...(desk ? { overflowX: 'auto' } : {}), ...(desk ? { background: '#eceef2', top: BAR_H, bottom: FOOT_H, left: `calc(${RAIL_W}px + var(--dock-w, 0px))`, right: 0, transition: 'left .22s ease' } : {}) }}
         onScroll={onScroll}
         onDragOver={(e) => { if (!readOnly && e.dataTransfer.types.includes('Files')) e.preventDefault() }}
         onDrop={(e) => {
@@ -1348,7 +1359,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
           void addPhotos(files)
         }}
       >
-        <div className="relative mx-auto max-w-[520px]" style={desk ? { background: rc.bg, minHeight: '100%', boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 18px 60px rgba(20,24,40,.14)' } : undefined}>
+        <div ref={col} className="relative mx-auto max-w-[520px]" style={desk ? { maxWidth: 'none', width: canvasW * zoom, background: rc.bg, minHeight: '100%', boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 18px 60px rgba(20,24,40,.14)' } : undefined}>
           <header
             className="sticky top-0 z-30 px-4"
             style={{
@@ -1472,12 +1483,12 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
 
           {/* the infinite canvas surface */}
           <div ref={wrap} className="no-scrollbar" style={{ height: height * zoom, overflowX: zoom > 1.001 ? 'auto' : 'hidden', overflowY: 'hidden', touchAction: zoom > 1.001 ? 'pan-x pan-y' : 'pan-y' }}>
-          <div ref={inner} style={{ position: 'relative', width: canvasW * Math.max(1, zoom), height: height * zoom }}>
+          <div ref={inner} style={{ position: 'relative', width: canvasW * (desk ? zoom : Math.max(1, zoom)), height: height * zoom }}>
           <div
             ref={surface}
             className="isolate"
             style={{
-              position: 'absolute', top: 0, left: zoom < 1 ? (canvasW * (1 - zoom)) / 2 : 0, width: canvasW, height,
+              position: 'absolute', top: 0, left: !desk && zoom < 1 ? (canvasW * (1 - zoom)) / 2 : 0, width: canvasW, height,
               transform: zoom !== 1 ? `scale(${zoom})` : undefined, transformOrigin: 'top left',
               ...rc.css,
               touchAction: zoom > 1.001 ? 'pan-x pan-y' : 'pan-y',
@@ -1716,7 +1727,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
         )}
       </AnimatePresence>
 
-      {desk && !drawing && (
+      {desk && (
         <>
           <DeskBar
             title={memory.title} from={theme.palette[0]} to={theme.palette[1] ?? theme.palette[0]} readOnly={readOnly}
@@ -1745,10 +1756,10 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
               onTool={(t) => { if ((t === 'sticker' && sheet === 'sticker') || (t === 'templates' && sheet === 'templates')) closeSheet(); else if (t === 'canvas' && styleOpen) setStyleOpen(false); else onTool(t) }}
             />
           )}
-          <DeskFoot
+          {!drawing && !textStudio && <DeskFoot
             left={<>{photoCount} {photoCount === 1 ? 'Photo' : 'Photos'} <span className="mx-1">•</span> {formatDate(memory.date)}</>}
             zoom={zoom} zmin={ZMIN} zmax={ZMAX} onZoom={(z) => applyZoom(z)} accent={accent}
-          />
+          />}
         </>
       )}
 
@@ -1797,7 +1808,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       </ToolSheet>
 
       <ToolSheet
-        open={sheet === 'bubble' && !!bubbleItem} onClose={closeSheet} title="Chat bubble" snaps={[0.94]} dim={0.32} z={55}
+        open={sheet === 'bubble' && !!bubbleItem} onClose={closeSheet} title="Chat bubble" snaps={[0.94]} dim={0.32} dock z={55}
         onVisibleHeight={(h) => setSheetHs((s) => ({ ...s, bubble: h }))}
       >
         {bubbleItem && (

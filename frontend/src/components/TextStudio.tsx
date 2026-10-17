@@ -5,6 +5,7 @@ import type { ResolvedCanvas } from '../lib/canvasStyle'
 import type { TextProps, TextRun } from '../types'
 import { TEXT_FONTS } from './TextEditor'
 import { CustomColor } from './ColorPicker'
+import { useDesktop } from '../lib/useDesktop'
 import { IcAlignTool, IcColorTool, IcFontTool, IcSizeTool } from './ToolIcons'
 
 const EXTRA = ['#17171A', '#FFFFFF', '#E5486F', '#F28C38', '#FFC93C', '#2F8FD0', '#5F8650', '#8F5BD0']
@@ -149,6 +150,14 @@ interface Props {
  * change just those. Done puts the block on the canvas exactly as written.
  */
 export function TextStudio({ seed, boxW, palette, accent, look, onDone, onCancel }: Props) {
+  const desk = useDesktop()
+  // the tools take the left panel, and the page makes way for it
+  useEffect(() => {
+    if (!desk) return
+    const root = document.documentElement
+    root.style.setProperty('--dock-w', '360px')
+    return () => root.style.setProperty('--dock-w', '0px')
+  }, [desk])
   const [v, setV] = useState<TextProps>(seed)
   const vRef = useRef(v)
   vRef.current = v
@@ -289,15 +298,16 @@ export function TextStudio({ seed, boxW, palette, accent, look, onDone, onCancel
 
   return (
     <motion.div
-      className="fixed inset-0 z-[80]" role="dialog" aria-label="Write text"
+      className={desk ? 'fixed z-[80]' : 'fixed inset-0 z-[80]'} role="dialog" aria-label="Write text"
+      style={desk ? { left: 84 + 360, top: 56, right: 0, bottom: 0, background: '#eceef2' } : undefined}
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}
     >
-      <div className="absolute inset-0 bg-black/35" aria-hidden />
+      {!desk && <div className="absolute inset-0 bg-black/35" aria-hidden />}
       {/* the same sheet as the drawing page: slides up with a curved top edge, over a dimmed book */}
       <motion.div
-        className="absolute inset-x-0 bottom-0 mx-auto flex max-w-[520px] flex-col overflow-hidden rounded-t-[30px] lg:max-w-[900px]"
-        style={{ ...look.css, top: 'calc(var(--safe-top) + 6px)', background: look.bg, backgroundColor: look.bg }}
-        initial={{ y: 60 }} animate={{ y: 0 }} transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+        className={desk ? 'absolute inset-y-0 left-1/2 flex w-full max-w-[780px] -translate-x-1/2 flex-col overflow-hidden' : 'absolute inset-x-0 bottom-0 mx-auto flex max-w-[520px] flex-col overflow-hidden rounded-t-[30px]'}
+        style={desk ? { ...look.css, background: look.bg, backgroundColor: look.bg, boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 18px 60px rgba(20,24,40,.14)' } : { ...look.css, top: 'calc(var(--safe-top) + 6px)', background: look.bg, backgroundColor: look.bg }}
+        initial={desk ? false : { y: 60 }} animate={desk ? undefined : { y: 0 }} transition={{ type: 'spring', stiffness: 320, damping: 32 }}
       >
       <div className="flex items-center justify-between px-3 pt-3">
         <button type="button" aria-label="Cancel" onClick={onCancel} className="grid h-11 w-11 place-items-center rounded-full border-0 bg-white/80 text-[#17171a] backdrop-blur"><X size={20} /></button>
@@ -323,7 +333,7 @@ export function TextStudio({ seed, boxW, palette, accent, look, onDone, onCancel
       </div>
 
       {/* tools, riding above the keyboard */}
-      <div className="shrink-0" style={{ paddingBottom: kb > 0 ? kb : 'var(--safe-bottom)' }} onPointerDown={holdFocus} onPointerUp={afterTool}>
+      {!desk && <div className="shrink-0" style={{ paddingBottom: kb > 0 ? kb : 'var(--safe-bottom)' }} onPointerDown={holdFocus} onPointerUp={afterTool}>
         <div className="mx-3 mb-2 overflow-hidden rounded-[22px] bg-white shadow-[0_10px_34px_rgba(20,24,40,.2),0_0_0_1px_rgba(20,24,40,.05)]">
           {sel && <div className="px-4 pt-2.5 text-[12px] font-extrabold uppercase tracking-wider" style={{ color: accent }}>Changing the selected words</div>}
           <div className="min-h-[84px] py-3">
@@ -395,8 +405,72 @@ export function TextStudio({ seed, boxW, palette, accent, look, onDone, onCancel
             })}
           </div>
         </div>
-      </div>
+      </div>}
       </motion.div>
+
+      {/* a laptop: every tool in the left panel, next to the page */}
+      {desk && (
+        <div
+          className="fixed z-[80] flex flex-col overflow-y-auto bg-white" onPointerDown={holdFocus} data-ui
+          style={{ left: 84, top: 56, bottom: 0, width: 360, boxShadow: '1px 0 0 rgba(20,24,40,.08), 10px 0 30px rgba(20,24,40,.08)' }}
+        >
+          <div className="px-5 pb-5 pt-4">
+            <h2 className="m-0 text-[16px] font-extrabold text-[#17171a]">Text</h2>
+            <p className="m-0 mt-1 text-[12.5px] leading-snug text-neutral-500">
+              {sel ? <b style={{ color: accent }}>Changing the selected words.</b> : 'Type on the page. Select words to style just those.'}
+            </p>
+
+            <div className="mt-5 text-[12px] font-extrabold uppercase tracking-wider text-neutral-400">Font</div>
+            <div className="mt-2 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Font">
+              {TEXT_FONTS.map((f) => {
+                const on = curFont === f.css
+                return (
+                  <button
+                    key={f.css} type="button" role="radio" aria-checked={on} onClick={() => style('font', f.css)}
+                    className="grid h-[68px] place-items-center rounded-2xl border-0"
+                    style={{ background: on ? `${accent}18` : '#f6f6f8', boxShadow: on ? `inset 0 0 0 2px ${accent}` : 'none' }}
+                  >
+                    <span className="text-[24px] leading-none" style={{ fontFamily: f.css, color: '#17171a' }}>Aa</span>
+                    <span className="text-[11px] font-bold text-neutral-500">{f.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="mt-6 text-[12px] font-extrabold uppercase tracking-wider text-neutral-400">Size</div>
+            <div className="mt-1 flex items-center gap-3">
+              <span className="text-[13px] font-bold text-neutral-400">A</span>
+              <input type="range" min={10} max={120} value={curSize} aria-label="Text size" onChange={(e) => style('size', +e.target.value)} className="h-11 flex-1" style={{ accentColor: accent }} />
+              <span className="text-[24px] font-bold text-neutral-500">A</span>
+              <span className="w-9 text-right text-[13px] font-bold tabular-nums text-neutral-500">{Math.round(curSize)}</span>
+            </div>
+
+            <div className="mt-5 text-[12px] font-extrabold uppercase tracking-wider text-neutral-400">Align</div>
+            <div className="mt-2 grid grid-cols-3 gap-2" role="group" aria-label="Alignment">
+              {([['left', AlignLeft], ['center', AlignCenter], ['right', AlignRight]] as const).map(([a, Icon]) => (
+                <button
+                  key={a} type="button" aria-label={`Align ${a}`} aria-pressed={v.align === a} onClick={() => setV((x) => ({ ...x, align: a }))}
+                  className="grid h-12 place-items-center rounded-2xl border-0"
+                  style={v.align === a ? { background: '#17171a', color: '#fff' } : { background: '#f1f1f3', color: '#55555f' }}
+                ><Icon size={20} /></button>
+              ))}
+            </div>
+
+            <div className="mt-6 text-[12px] font-extrabold uppercase tracking-wider text-neutral-400">Colour</div>
+            <div className="mt-1 flex flex-wrap gap-0.5" role="radiogroup" aria-label="Colour">
+              {swatches.map((c) => {
+                const on = curColor.toLowerCase() === c.toLowerCase()
+                return (
+                  <button key={c} type="button" role="radio" aria-checked={on} aria-label={c} onClick={() => style('color', c)} className="grid h-12 w-12 place-items-center rounded-full border-0 bg-transparent">
+                    <span className="h-9 w-9 rounded-full" style={{ background: c, boxShadow: on ? `0 0 0 2px #fff, 0 0 0 4px ${accent}` : 'inset 0 0 0 1px rgba(0,0,0,.16)' }} />
+                  </button>
+                )
+              })}
+              <CustomColor value={curColor} listed={swatches.some((c) => c.toLowerCase() === curColor.toLowerCase())} accent={accent} onPick={(c) => style('color', c)} cell="h-12 w-12" dot={36} />
+            </div>
+          </div>
+        </div>
+      )}
     </motion.div>
   )
 }

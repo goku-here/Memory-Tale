@@ -32,6 +32,8 @@ export interface ToolSheetProps {
   passThrough?: boolean
   /** move to this snap point while the sheet is open (e.g. a page inside it needs more room) */
   snapTo?: number
+  /** a laptop: open beside the page like the other tools (otherwise it is a dialog, unless it barely dims the page) */
+  dock?: boolean
 }
 
 /**
@@ -40,7 +42,7 @@ export interface ToolSheetProps {
  */
 export function ToolSheet({
   open, onClose, children, title, snaps = [0.5, 0.92], initialSnap = 0,
-  dim = 0.32, z = 50, onVisibleHeight, passThrough, snapTo,
+  dim = 0.32, z = 50, onVisibleHeight, passThrough, snapTo, dock,
 }: ToolSheetProps) {
   const vh = useViewportHeight()
   const desk = useDesktop()
@@ -100,7 +102,7 @@ export function ToolSheet({
   }, [open, onClose])
 
   // a docked panel takes room from the page: the page makes way for it
-  const docked = desk && open && dim <= 0.2
+  const docked = desk && open && (dock ?? dim <= 0.2)
   useEffect(() => {
     if (!docked) return
     const root = document.documentElement
@@ -110,7 +112,7 @@ export function ToolSheet({
 
   if (desk) {
     // tool sheets (little dimming) sit beside the page so the page stays in reach; the rest are dialogs in the middle
-    const side = dim <= 0.2
+    const side = dock ?? dim <= 0.2
     return (
       <AnimatePresence>
         {open && (

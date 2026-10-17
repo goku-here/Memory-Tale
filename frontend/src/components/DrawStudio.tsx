@@ -7,6 +7,7 @@ import type { BrushId, DrawProps, Stroke } from '../types'
 import { DrawLayer, DrawStrokes } from './DrawLayer'
 import { TRACE_ART, traceUrl } from '../lib/traceArt'
 import { CustomColor } from './ColorPicker'
+import { useDesktop } from '../lib/useDesktop'
 import { IcCalligraphyTool, IcCrayonTool, IcEraserTool, IcHighlighterTool, IcMarkerTool, IcPenTool, IcPencilTool } from './ToolIcons'
 
 type ToolId = BrushId | 'eraser'
@@ -41,6 +42,7 @@ interface Props {
 
 /** A page of its own for drawing: tools along the bottom, thickness and opacity, and the theme's colours with their shades. */
 export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
+  const desk = useDesktop()
   const page = useRef<HTMLDivElement>(null)
   const shelf = useRef<HTMLDivElement>(null)
   const [shelfH, setShelfH] = useState(150)
@@ -232,16 +234,18 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
 
   return (
     <motion.div
-      className="fixed inset-0 z-[62]" role="dialog" aria-label="Draw"
+      className={desk ? 'fixed z-[62]' : 'fixed inset-0 z-[62]'} role="dialog" aria-label="Draw"
+      style={desk ? { left: 'calc(84px + var(--dock-w, 0px))', top: 56, right: 0, bottom: 0, background: '#eceef2' } : undefined}
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}
       onPointerDown={startTrack} onPointerMove={track_} onPointerUp={stopTrack} onPointerCancel={stopTrack}
       onWheel={(e) => { const el = scroller.current; if (!el) return; if (e.deltaY > 0 && el.scrollTop + el.clientHeight > el.scrollHeight - 300) setExtra((x) => x + 600); el.scrollTop += e.deltaY }}
     >
-      <div className="absolute inset-0 bg-black/35" aria-hidden />
+      {!desk && <div className="absolute inset-0 bg-black/35" aria-hidden />}
+      {/* on a laptop the canvas area itself turns into the drawing page; the bar and tools stay where they are */}
       <motion.div
-        className="absolute inset-x-0 bottom-0 mx-auto max-w-[520px] overflow-hidden rounded-t-[30px] lg:max-w-[900px]"
-        style={{ top: 'calc(var(--safe-top) + 6px)', background: look.bg }}
-        initial={{ y: 60 }} animate={{ y: 0 }} transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+        className={desk ? 'absolute inset-y-0 left-1/2 w-full max-w-[780px] -translate-x-1/2 overflow-hidden' : 'absolute inset-x-0 bottom-0 mx-auto max-w-[520px] overflow-hidden rounded-t-[30px]'}
+        style={desk ? { background: look.bg, boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 18px 60px rgba(20,24,40,.14)' } : { top: 'calc(var(--safe-top) + 6px)', background: look.bg }}
+        initial={desk ? false : { y: 60 }} animate={desk ? undefined : { y: 0 }} transition={{ type: 'spring', stiffness: 320, damping: 32 }}
       >
         {/* the page: your canvas look, strokes on top */}
         <div ref={scroller} onScroll={(e) => grow(e.currentTarget)} className="no-scrollbar absolute inset-0 overflow-auto" style={{ touchAction: hand ? 'pan-x pan-y' : 'none', overscrollBehavior: 'contain' }}>
@@ -262,7 +266,7 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
         </div>
         <DrawLayer
           surfaceRef={page} strokes={strokes} color={color} size={size} brush={eraser ? 'pen' : tool} opacity={opacity} erase={eraser}
-          onChange={setStrokes} onBegin={begin} bottomInset={shelfH} zoom={zoom} off={hand || (moveTrace && pop === 'trace')}
+          onChange={setStrokes} onBegin={begin} bottomInset={shelfH} zoom={zoom} local={desk} off={hand || (moveTrace && pop === 'trace')}
         />
 
         {zoom > 1.01 && (
@@ -430,14 +434,14 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
         )}
 
         {/* tools along the bottom */}
-        <div ref={shelf} className="absolute inset-x-0 bottom-0 z-[50] flex items-end pl-3" style={{ paddingBottom: 'var(--safe-bottom)', transform: pop === 'color' ? 'translateY(130%)' : 'none', opacity: pop === 'color' ? 0 : 1, transition: 'transform .22s ease, opacity .18s', pointerEvents: pop === 'color' ? 'none' : 'auto' }}>
+        <div ref={shelf} className={`absolute inset-x-0 bottom-0 z-[50] flex items-end ${desk ? 'justify-center' : 'pl-3'}`} style={{ paddingBottom: 'var(--safe-bottom)', transform: pop === 'color' ? 'translateY(130%)' : 'none', opacity: pop === 'color' ? 0 : 1, transition: 'transform .22s ease, opacity .18s', pointerEvents: pop === 'color' ? 'none' : 'auto' }}>
           <button
             type="button" aria-label="Colour" aria-pressed={pop === 'color'} disabled={eraser} onClick={() => setPop((p) => (p === 'color' ? null : 'color'))}
             className="mb-5 grid h-12 w-12 shrink-0 place-items-center rounded-full border-0 bg-transparent disabled:opacity-30"
           >
             <span className="h-10 w-10 rounded-full" style={{ background: color, boxShadow: '0 0 0 3px #fff, 0 3px 10px rgba(0,0,0,.28)' }} />
           </button>
-          <div className="no-scrollbar flex flex-1 items-end gap-3 overflow-x-auto px-3 pt-3" style={{ touchAction: 'pan-x' }} role="radiogroup" aria-label="Drawing tool">
+          <div className={`no-scrollbar flex items-end gap-3 overflow-x-auto px-3 pt-3 ${desk ? '' : 'flex-1'}`} style={{ touchAction: 'pan-x' }} role="radiogroup" aria-label="Drawing tool">
             {TOOLS.map((t) => {
               const on = t.id === tool
               return (
