@@ -401,26 +401,26 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
         {/* thickness and opacity */}
         {pop === 'tune' && (
           <motion.div
-            className="absolute inset-x-3 z-[55] flex items-stretch justify-center gap-2" style={{ bottom: shelfH + 10 }}
+            className={`absolute inset-x-3 z-[55] flex items-stretch justify-center gap-2 ${desk ? 'mx-auto max-w-[380px]' : ''}`} style={{ bottom: shelfH + 10 }}
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} onPointerDown={(e) => e.stopPropagation()}
           >
             {!eraser && (
-              <div className={`${card} flex min-w-0 flex-1 items-center px-4 py-3.5`}>
+              <div className={`${card} flex min-w-0 flex-1 items-center ${desk ? 'px-3 py-2' : 'px-4 py-3.5'}`}>
                 <div
                   ref={track} role="slider" aria-label="Opacity" aria-valuemin={10} aria-valuemax={100} aria-valuenow={Math.round(opacity * 100)}
-                  className="relative h-9 w-full touch-none rounded-full" style={{ background: `linear-gradient(90deg, transparent, ${color}), ${CHECKER}` }}
+                  className={`relative w-full touch-none rounded-full ${desk ? 'h-6' : 'h-9'}`} style={{ background: `linear-gradient(90deg, transparent, ${color}), ${CHECKER}` }}
                   onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); setFrom(e.clientX) }}
                   onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) setFrom(e.clientX) }}
                 >
-                  <span className="absolute top-1/2 h-9 w-9 -translate-y-1/2 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,.3)]" style={{ left: `calc(${((opacity - 0.1) / 0.9) * 100}% - ${((opacity - 0.1) / 0.9) * 36}px)` }} />
+                  <span className={`absolute top-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,.3)] ${desk ? 'h-6 w-6' : 'h-9 w-9'}`} style={{ left: `calc(${((opacity - 0.1) / 0.9) * 100}% - ${((opacity - 0.1) / 0.9) * (desk ? 24 : 36)}px)` }} />
                 </div>
               </div>
             )}
-            <div className={`${card} flex flex-1 items-center justify-around px-2 py-3.5`}>
+            <div className={`${card} flex flex-1 items-center justify-around px-2 ${desk ? 'py-1.5' : 'py-3.5'}`}>
               {SIZES.map((s) => {
                 const on = Math.abs(size - s.size) < 0.01
                 return (
-                  <button key={s.size} type="button" aria-label={`Thickness ${s.size}`} onClick={() => setSize(s.size)} className="grid h-10 w-10 place-items-center rounded-full border-0 bg-transparent">
+                  <button key={s.size} type="button" aria-label={`Thickness ${s.size}`} onClick={() => setSize(s.size)} className={`grid place-items-center rounded-full border-0 bg-transparent ${desk ? 'h-8 w-8' : 'h-10 w-10'}`}>
                     <span className="rounded-full" style={{ width: s.dot, height: s.dot, background: eraser ? '#f0a3a3' : on ? '#17171a' : '#b9b9c1', boxShadow: on ? `0 0 0 3px #fff, 0 0 0 4.5px ${accent}` : 'none' }} />
                   </button>
                 )
