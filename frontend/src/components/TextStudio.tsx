@@ -295,7 +295,7 @@ export function TextStudio({ seed, boxW, palette, accent, look, onDone, onCancel
       <div className="absolute inset-0 bg-black/35" aria-hidden />
       {/* the same sheet as the drawing page: slides up with a curved top edge, over a dimmed book */}
       <motion.div
-        className="absolute inset-x-0 bottom-0 mx-auto flex max-w-[520px] flex-col overflow-hidden rounded-t-[30px]"
+        className="absolute inset-x-0 bottom-0 mx-auto flex max-w-[520px] flex-col overflow-hidden rounded-t-[30px] lg:max-w-[900px]"
         style={{ ...look.css, top: 'calc(var(--safe-top) + 6px)', background: look.bg, backgroundColor: look.bg }}
         initial={{ y: 60 }} animate={{ y: 0 }} transition={{ type: 'spring', stiffness: 320, damping: 32 }}
       >

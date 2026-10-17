@@ -1,4 +1,6 @@
-import { animate, motion, useDragControls, useMotionValue, useTransform } from 'framer-motion'
+import { AnimatePresence, animate, motion, useDragControls, useMotionValue, useTransform } from 'framer-motion'
+import { X } from 'lucide-react'
+import { useDesktop } from '../lib/useDesktop'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 function useViewportHeight() {
@@ -41,6 +43,7 @@ export function ToolSheet({
   dim = 0.32, z = 50, onVisibleHeight, passThrough, snapTo,
 }: ToolSheetProps) {
   const vh = useViewportHeight()
+  const desk = useDesktop()
   const top = snaps[snaps.length - 1]
   const H = Math.round(vh * top)
   const yFor = (i: number) => H - Math.round(vh * snaps[i])
@@ -84,9 +87,10 @@ export function ToolSheet({
   }, [vh])
 
   useEffect(() => {
-    onVisibleHeight?.(open ? Math.round(vh * snaps[idx]) : 0)
+    // a side panel or dialog does not cover the bottom of the page
+    onVisibleHeight?.(open && !desk ? Math.round(vh * snaps[idx]) : 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, idx, vh])
+  }, [open, idx, vh, desk])
 
   useEffect(() => {
     if (!open) return
@@ -94,6 +98,43 @@ export function ToolSheet({
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
   }, [open, onClose])
+
+  if (desk) {
+    // tool sheets (little dimming) sit beside the page so the page stays in reach; the rest are dialogs in the middle
+    const side = dim <= 0.2
+    return (
+      <AnimatePresence>
+        {open && (
+          <div key="sheet" className="fixed inset-0" style={{ zIndex: z, pointerEvents: 'none' }}>
+            {!side && (
+              <motion.div
+                aria-hidden className="absolute inset-0 bg-black" style={{ pointerEvents: passThrough ? 'none' : 'auto' }}
+                initial={{ opacity: 0 }} animate={{ opacity: dim }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}
+                onPointerDown={() => onClose()}
+              />
+            )}
+            <motion.div
+              role="dialog" aria-modal={!side && !passThrough} aria-label={title ?? 'Sheet'}
+              className={side
+                ? 'absolute bottom-3 right-3 top-3 flex w-[400px] max-w-[92vw] flex-col overflow-hidden rounded-[24px] bg-white'
+                : 'absolute left-1/2 top-1/2 flex max-h-[88vh] w-[540px] max-w-[94vw] flex-col overflow-hidden rounded-[28px] bg-white'}
+              style={{ pointerEvents: 'auto', boxShadow: '0 24px 70px rgba(20,24,40,.28), 0 0 0 1px rgba(20,24,40,.06)', ...(side ? {} : { x: '-50%', y: '-50%' }) }}
+              initial={side ? { x: 60, opacity: 0 } : { opacity: 0, scale: 0.96 }}
+              animate={side ? { x: 0, opacity: 1 } : { opacity: 1, scale: 1 }}
+              exit={side ? { x: 60, opacity: 0 } : { opacity: 0, scale: 0.97 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 36 }}
+            >
+              <div className="flex shrink-0 items-center justify-between px-5 pb-1 pt-4">
+                <div className="text-[16px] font-extrabold">{title ?? ''}</div>
+                <button type="button" aria-label="Close" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full border-0 bg-neutral-100 text-neutral-600 hover:bg-neutral-200"><X size={17} /></button>
+              </div>
+              <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain pb-6 pt-1">{children}</div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    )
+  }
 
   if (!mounted) return null
 

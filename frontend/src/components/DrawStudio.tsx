@@ -239,7 +239,7 @@ export function DrawStudio({ palette, accent, look, seed, onDone }: Props) {
     >
       <div className="absolute inset-0 bg-black/35" aria-hidden />
       <motion.div
-        className="absolute inset-x-0 bottom-0 mx-auto max-w-[520px] overflow-hidden rounded-t-[30px]"
+        className="absolute inset-x-0 bottom-0 mx-auto max-w-[520px] overflow-hidden rounded-t-[30px] lg:max-w-[900px]"
         style={{ top: 'calc(var(--safe-top) + 6px)', background: look.bg }}
         initial={{ y: 60 }} animate={{ y: 0 }} transition={{ type: 'spring', stiffness: 320, damping: 32 }}
       >

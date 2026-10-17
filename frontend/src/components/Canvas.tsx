@@ -52,6 +52,7 @@ import { CanvasStyleSheet } from './CanvasStyleSheet'
 import { IcClapper, IcDownload, IcEdit, IcLock, IcPages, IcPalette, IcPeople, IcShare, IcTrash } from './ToolIcons'
 import { resolveCanvas } from '../lib/canvasStyle'
 import { SizeSheet, StoryOverlay, StoryPreview } from './StoryMode'
+import { useDesktop } from '../lib/useDesktop'
 import { PrintExportSheet, PrintOverlay, PrintSizeSheet, pagesNeeded } from './PrintMode'
 import { getPrintSize, pageDims, type PrintSize } from '../lib/printSizes'
 import { CustomColor } from './ColorPicker'
@@ -143,6 +144,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
   }, [user, cv.loaded, readOnly, memory.id])
 
   const [menu, setMenu] = useState(false)
+  const desk = useDesktop()
   const [story, setStory] = useState(false)
   /** print mode: the book laid out as pages (one image per page), for a scrapbook or a frame */
   const [printMode, setPrintMode] = useState(false)
@@ -1197,6 +1199,35 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, sheet, viewer, cameraOpen])
 
+  // laptop shortcuts: undo / redo, delete, duplicate, nudge with the arrow keys, Esc to let go
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      if (sheet || viewer || cameraOpen || textStudio || drawing || readOnly || printSizeOpen || printExportOpen) return
+      const mod = e.ctrlKey || e.metaKey
+      const key = e.key.toLowerCase()
+      if (mod && key === 'z') { e.preventDefault(); if (e.shiftKey) cv.redo(); else cv.undo(); return }
+      if (mod && key === 'y') { e.preventDefault(); cv.redo(); return }
+      if (!selected) return
+      if (key === 'escape') { setSelectedId(null); setConnectFrom(null); setGroupFrom(null); return }
+      if (!actions || isBg(selected)) return
+      if (key === 'delete' || key === 'backspace') { e.preventDefault(); actions.onDelete(); return }
+      if (mod && key === 'd') { e.preventDefault(); actions.onDuplicate(); return }
+      if (key === 'enter' && actions.onEdit) { e.preventDefault(); actions.onEdit(); return }
+      if (key.startsWith('arrow')) {
+        e.preventDefault()
+        const step = e.shiftKey ? 10 : 1
+        const dx = key === 'arrowleft' ? -step : key === 'arrowright' ? step : 0
+        const dy = key === 'arrowup' ? -step : key === 'arrowdown' ? step : 0
+        patch(selected.id, { x: selected.x + (dx / canvasW) * 100, y: selected.y + dy }, true)
+      }
+    }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, actions, sheet, viewer, cameraOpen, textStudio, drawing, readOnly, printSizeOpen, printExportOpen, canvasW])
+
   const run = (fn: () => void) => () => { setMenu(false); fn() }
 
   // the first time something is selected, show what the little toolbar does (never over the main tour)
@@ -1305,10 +1336,18 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       <div
         ref={scroller}
         className="absolute inset-0 overflow-x-hidden"
-        style={{ overflowY: drawing ? 'hidden' : 'auto', touchAction: 'pan-y', overscrollBehavior: 'contain' }}
+        style={{ overflowY: drawing ? 'hidden' : 'auto', touchAction: 'pan-y', overscrollBehavior: 'contain', ...(desk ? { background: '#e6e4df' } : {}) }}
         onScroll={onScroll}
+        onDragOver={(e) => { if (!readOnly && e.dataTransfer.types.includes('Files')) e.preventDefault() }}
+        onDrop={(e) => {
+          if (readOnly) return
+          const files = [...e.dataTransfer.files].filter((f) => f.type.startsWith('image/'))
+          if (!files.length) return
+          e.preventDefault()
+          void addPhotos(files)
+        }}
       >
-        <div className="relative mx-auto max-w-[520px]">
+        <div className="relative mx-auto max-w-[520px]" style={desk ? { background: rc.bg, minHeight: '100%', boxShadow: '0 0 0 1px rgba(0,0,0,.06), 0 18px 60px rgba(20,24,40,.14)' } : undefined}>
           <header
             className="sticky top-0 z-30 px-4"
             style={{
@@ -1550,7 +1589,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
             {cv.loaded && items.length === 0 && !drawing && (
               <div className="pointer-events-none absolute inset-x-0 top-[180px] px-10 text-center">
                 <div className="text-[44px]">{theme.emoji}</div>
-                <p className="m-0 mt-2 text-[15px] font-semibold text-neutral-500">A blank page. Add photos, stickers, notes and doodles with the toolbar below.</p>
+                <p className="m-0 mt-2 text-[15px] font-semibold text-neutral-500">A blank page. Add photos, stickers, notes and doodles with the toolbar {desk ? 'on the left' : 'below'}. You can also drop pictures here from your computer.</p>
               </div>
             )}
           </div>
@@ -1633,15 +1672,17 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       </AnimatePresence>
 
       <AnimatePresence>
-        {Math.abs(zoom - 1) > 0.001 && !drawing && !story && (
+        {(desk || Math.abs(zoom - 1) > 0.001) && !drawing && !story && (
           <motion.div
-            key="zoom" data-ui className="fixed right-3 z-40 flex items-center rounded-full bg-white p-1"
-            style={{ bottom: 'calc(var(--safe-bottom) + 96px)', boxShadow: '0 6px 22px rgba(20,24,40,.2), 0 0 0 1px rgba(20,24,40,.05)' }}
+            key="zoom" data-ui className="fixed z-40 flex items-center rounded-full bg-white p-1"
+            style={{ right: desk ? 20 : 12, bottom: desk ? 20 : 'calc(var(--safe-bottom) + 96px)', boxShadow: '0 6px 22px rgba(20,24,40,.2), 0 0 0 1px rgba(20,24,40,.05)' }}
             initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
           >
-            <button type="button" aria-label="Fit to width" onClick={() => applyZoom(1)} className="flex h-10 items-center gap-2 rounded-full border-0 bg-transparent px-4 text-[13px] font-extrabold text-[#17171a]">
-              {Math.round(zoom * 100)}% <span className="font-semibold text-neutral-400">Fit to width</span>
+            {desk && <button type="button" aria-label="Zoom out" onClick={() => applyZoom(zoom - 0.1)} className="grid h-10 w-10 place-items-center rounded-full border-0 bg-transparent text-[20px] font-bold text-[#17171a] hover:bg-neutral-100">−</button>}
+            <button type="button" aria-label="Fit to width" onClick={() => applyZoom(1)} className="flex h-10 items-center gap-2 rounded-full border-0 bg-transparent px-3 text-[13px] font-extrabold text-[#17171a] hover:bg-neutral-100">
+              {Math.round(zoom * 100)}% {Math.abs(zoom - 1) > 0.001 && <span className="font-semibold text-neutral-400">Fit to width</span>}
             </button>
+            {desk && <button type="button" aria-label="Zoom in" onClick={() => applyZoom(zoom + 0.1)} className="grid h-10 w-10 place-items-center rounded-full border-0 bg-transparent text-[20px] font-bold text-[#17171a] hover:bg-neutral-100">+</button>}
           </motion.div>
         )}
       </AnimatePresence>

@@ -176,9 +176,10 @@ export function Home({ memories, loading, hiddenId, onAdd, onSettings, onReorder
   const act = (fn: (m: Memory) => void) => () => { if (menu) fn(menu); closeMenu() }
 
   return (
-    <div className="relative mx-auto min-h-full max-w-[520px]" style={{ background: 'linear-gradient(180deg,#fff 0%,#fff 55%,#f1f3f8 100%)' }}>
-      <header className="flex items-center justify-between px-6" style={{ paddingTop: 'calc(var(--safe-top) + 28px)' }}>
-        <h1 className="m-0 text-[34px] font-extrabold leading-none tracking-tight">Memories</h1>
+    <div className="relative min-h-full" style={{ background: 'linear-gradient(180deg,#fff 0%,#fff 55%,#f1f3f8 100%)' }}>
+     <div className="relative mx-auto max-w-[520px] lg:max-w-[1180px]">
+      <header className="flex items-center justify-between px-6 lg:px-10" style={{ paddingTop: 'calc(var(--safe-top) + 28px)' }}>
+        <h1 className="m-0 text-[34px] font-extrabold leading-none tracking-tight lg:text-[40px]">Memories</h1>
         <IconButton label={user ? `Profile and settings (${user.name})` : 'Sign in and settings'} onClick={onSettings} className={user ? '!p-0 overflow-hidden' : ''}>
           {user ? (
             user.photo ? (
@@ -192,14 +193,14 @@ export function Home({ memories, loading, hiddenId, onAdd, onSettings, onReorder
         </IconButton>
       </header>
 
-      <main className="px-6 pt-8" style={{ paddingBottom: 'calc(var(--safe-bottom) + 150px)' }}>
+      <main className="px-6 pt-8 lg:px-10 lg:pt-12" style={{ paddingBottom: 'calc(var(--safe-bottom) + 150px)' }}>
         {!loading && memories.length === 0 ? (
           <motion.div
             className="flex flex-col items-center px-6 pt-10 text-center"
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
           >
             <motion.div
-              className="w-[46%]"
+              className="w-[46%] lg:w-[240px]"
               animate={{ y: [0, -8, 0], rotate: [-2, 2, -2] }}
               transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
             >
@@ -211,19 +212,20 @@ export function Home({ memories, loading, hiddenId, onAdd, onSettings, onReorder
             </p>
           </motion.div>
         ) : (
-          <div className="grid grid-cols-2 gap-x-5 gap-y-12">
+          <div className="grid grid-cols-2 gap-x-5 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 lg:gap-x-9 lg:gap-y-16 xl:grid-cols-5">
             <AnimatePresence mode="popLayout">
               {ordered.map((m, i) => (
                 <BookCard
                   key={m.id} memory={m} index={i} hidden={hiddenId === m.id}
                   dragging={dragId === m.id} offset={dragId === m.id ? offset : null}
-                  onPress={onPress} onKeyOpen={onOpen}
+                  onPress={onPress} onKeyOpen={onOpen} onMenu={openMenu}
                 />
               ))}
             </AnimatePresence>
           </div>
         )}
       </main>
+     </div>
 
       <div className="pointer-events-none fixed inset-x-0 z-30 flex justify-center" style={{ bottom: 'calc(var(--safe-bottom) + 22px)' }}>
         <motion.button

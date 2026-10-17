@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { MoreHorizontal } from 'lucide-react'
 import { useEffect, useRef, type CSSProperties, type Ref } from 'react'
 import type { Memory } from '../types'
 import { getTheme } from './ThemeEngine'
@@ -138,9 +139,11 @@ interface BookCardProps {
   offset?: { x: number; y: number } | null
   onPress: (e: React.PointerEvent, memory: Memory) => void
   onKeyOpen: (memory: Memory, rect: DOMRect) => void
+  /** laptop: the book's menu from right-click or the button that shows on hover */
+  onMenu?: (memory: Memory) => void
 }
 
-export function BookCard({ memory, index, hidden, dragging, offset, onPress, onKeyOpen }: BookCardProps) {
+export function BookCard({ memory, index, hidden, dragging, offset, onPress, onKeyOpen, onMenu }: BookCardProps) {
   const ref = useRef<HTMLDivElement>(null)
   const first = useRef(true)
   useEffect(() => { first.current = false }, [])
@@ -149,7 +152,7 @@ export function BookCard({ memory, index, hidden, dragging, offset, onPress, onK
   return (
     <motion.div
       data-book-wrap
-      className="relative"
+      className="group relative"
       style={{ zIndex: dragging ? 30 : 0 }}
       initial={{ opacity: 0, y: 28, scale: 0.94 }}
       animate={{ opacity: hidden ? 0 : 1, y: 0, scale: 1 }}
@@ -170,7 +173,7 @@ export function BookCard({ memory, index, hidden, dragging, offset, onPress, onK
           style={{ touchAction: 'pan-y' }}
           whileTap={dragging ? undefined : { scale: 0.96 }}
           transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-          onContextMenu={(e) => e.preventDefault()}
+          onContextMenu={(e) => { e.preventDefault(); if (onMenu && window.matchMedia('(hover: hover) and (pointer: fine)').matches) onMenu(memory) }}
           onPointerDown={(e) => onPress(e, memory)}
           onClick={(e) => {
             // pointer taps are handled in Home; this is keyboard / assistive-tech activation
@@ -182,6 +185,12 @@ export function BookCard({ memory, index, hidden, dragging, offset, onPress, onK
           <BookCover memory={memory} ref={ref} />
         </motion.button>
       </motion.div>
+      {onMenu && (
+        <button
+          type="button" aria-label={`Options for ${memory.title}`} onClick={() => onMenu(memory)}
+          className="absolute right-3 top-3 z-10 hidden h-9 w-9 place-items-center rounded-full border-0 bg-white/90 text-[#17171a] opacity-0 shadow-[0_2px_8px_rgba(20,24,40,.25)] transition-opacity hover:bg-white focus-visible:opacity-100 group-hover:opacity-100 lg:grid"
+        ><MoreHorizontal size={18} /></button>
+      )}
     </motion.div>
   )
 }
