@@ -53,6 +53,7 @@ import { IcClapper, IcDownload, IcEdit, IcLock, IcPages, IcPalette, IcPeople, Ic
 import { resolveCanvas } from '../lib/canvasStyle'
 import { SizeSheet, StoryOverlay, StoryPreview } from './StoryMode'
 import { useDesktop } from '../lib/useDesktop'
+import { BAR_H, DeskBar, DeskFoot, DeskRail, FOOT_H, RAIL_W, type FileItem } from './DeskLayout'
 import { PrintExportSheet, PrintOverlay, PrintSizeSheet, pagesNeeded } from './PrintMode'
 import { getPrintSize, pageDims, type PrintSize } from '../lib/printSizes'
 import { CustomColor } from './ColorPicker'
@@ -1329,14 +1330,14 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
     <motion.div
       className="fixed inset-0 z-40"
       onPointerDownCapture={(e) => { lastPointer.current = e.pointerType; suppressClick.current = false }}
-      style={{ ...themeVars(theme), background: rc.bg, pointerEvents: reveal ? 'none' : undefined, clipPath: clip }}
+      style={{ ...themeVars(theme), background: desk ? '#eceef2' : rc.bg, pointerEvents: reveal ? 'none' : undefined, clipPath: clip }}
       initial={{ opacity: reveal ? 1 : 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.06 } }}
       transition={{ duration: 0.22 }}
     >
       <div
         ref={scroller}
         className="absolute inset-0 overflow-x-hidden"
-        style={{ overflowY: drawing ? 'hidden' : 'auto', touchAction: 'pan-y', overscrollBehavior: 'contain', ...(desk ? { background: '#e6e4df' } : {}) }}
+        style={{ overflowY: drawing ? 'hidden' : 'auto', touchAction: 'pan-y', overscrollBehavior: 'contain', ...(desk ? { background: '#eceef2', top: BAR_H, bottom: FOOT_H, left: `calc(${RAIL_W}px + var(--dock-w, 0px))`, right: 0, transition: 'left .22s ease' } : {}) }}
         onScroll={onScroll}
         onDragOver={(e) => { if (!readOnly && e.dataTransfer.types.includes('Files')) e.preventDefault() }}
         onDrop={(e) => {
@@ -1351,7 +1352,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
           <header
             className="sticky top-0 z-30 px-4"
             style={{
-              height: HEADER_H, paddingTop: 'calc(var(--safe-top) + 12px)', boxSizing: 'content-box',
+              height: HEADER_H, paddingTop: 'calc(var(--safe-top) + 12px)', boxSizing: 'content-box', ...(desk ? { display: 'none' } : {}),
               background: `linear-gradient(${rc.bg} 78%, ${rc.bg}00)`,
               color: rc.dark ? '#f4f4f6' : undefined,
             }}
@@ -1672,7 +1673,7 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
       </AnimatePresence>
 
       <AnimatePresence>
-        {(desk || Math.abs(zoom - 1) > 0.001) && !drawing && !story && (
+        {!desk && Math.abs(zoom - 1) > 0.001 && !drawing && !story && (
           <motion.div
             key="zoom" data-ui className="fixed z-40 flex items-center rounded-full bg-white p-1"
             style={{ right: desk ? 20 : 12, bottom: desk ? 20 : 'calc(var(--safe-bottom) + 96px)', boxShadow: '0 6px 22px rgba(20,24,40,.2), 0 0 0 1px rgba(20,24,40,.05)' }}
@@ -1715,7 +1716,43 @@ export function Canvas({ memory, onBack, onEdit, onTheme, onShare, onDelete, onC
         )}
       </AnimatePresence>
 
-      <BottomToolbar visible={!sheet && !editingId && !readOnly} inStory={story || printMode} accent={accent} onTool={onTool} />
+      {desk && !drawing && (
+        <>
+          <DeskBar
+            title={memory.title} from={theme.palette[0]} to={theme.palette[1] ?? theme.palette[0]} readOnly={readOnly}
+            canUndo={cv.canUndo} canRedo={cv.canRedo} onUndo={cv.undo} onRedo={cv.redo} saving={cv.status === 'saving'} here={here}
+            mode={story ? 'story' : printMode ? 'print' : 'edit'}
+            onBack={onBack} onTitle={() => { if (!readOnly) onEdit() }}
+            files={[
+              ...(!readOnly ? [{ label: 'Edit book', icon: <IcEdit />, onClick: onEdit }, { label: 'Change theme', icon: <IcPalette />, onClick: onTheme }] : []),
+              { label: 'Share', icon: <IcShare />, onClick: onShare },
+              ...(user ? [{ label: 'People', icon: <IcPeople />, onClick: () => setPeopleOpen(true) }, { label: memory.e2ee ? 'Private book' : 'Privacy', icon: <IcLock />, onClick: () => setPrivacyOpen(true) }] : []),
+              { label: 'Download book', icon: <IcDownload />, onClick: () => void downloadBook() },
+              ...(!readOnly ? [{ label: 'Delete', icon: <IcTrash />, onClick: onDelete, danger: true }] : []),
+            ] as FileItem[]}
+            onShare={onShare}
+            onStory={() => { if (!story && !printMode) enterStory() }}
+            onPrint={() => { if (!story && !printMode) enterPrint() }}
+            modeSize={story ? ratioLabel(size) : printSize.name.replace('Scrapbook ', '').replace('Photo ', '')}
+            onModeSize={() => (story ? setSizeOpen(true) : setPrintSizeOpen(true))}
+            onModeDone={() => (story ? setStoryPreview(true) : setPrintExportOpen(true))}
+            onModeClose={story ? leaveStory : leavePrint}
+            onFit={fitToPages}
+          />
+          {!readOnly && !story && !printMode && (
+            <DeskRail
+              active={sheet === 'sticker' ? 'sticker' : sheet === 'templates' ? 'templates' : textStudio ? 'text' : styleOpen ? 'canvas' : sheet === 'location' ? 'location' : null}
+              onTool={(t) => { if ((t === 'sticker' && sheet === 'sticker') || (t === 'templates' && sheet === 'templates')) closeSheet(); else if (t === 'canvas' && styleOpen) setStyleOpen(false); else onTool(t) }}
+            />
+          )}
+          <DeskFoot
+            left={<>{photoCount} {photoCount === 1 ? 'Photo' : 'Photos'} <span className="mx-1">•</span> {formatDate(memory.date)}</>}
+            zoom={zoom} zmin={ZMIN} zmax={ZMAX} onZoom={(z) => applyZoom(z)} accent={accent}
+          />
+        </>
+      )}
+
+      <BottomToolbar visible={!sheet && !editingId && !readOnly && !desk} inStory={story || printMode} accent={accent} onTool={onTool} />
       <CanvasStyleSheet open={styleOpen} onClose={() => setStyleOpen(false)} memory={memory} value={cstyle} onChange={changeStyle} onHeight={(h) => setSheetHs((s) => ({ ...s, style: h }))} />
       {user && <PeopleSheet open={peopleOpen} onClose={() => setPeopleOpen(false)} memory={memory} />}
       <StoryPreview open={storyPreview} onClose={() => setStoryPreview(false)} memory={memory} accent={accent} getItems={() => itemsRef.current} frameY={storyY} canvasW={canvasW} size={size} />

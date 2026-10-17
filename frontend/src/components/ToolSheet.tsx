@@ -99,6 +99,15 @@ export function ToolSheet({
     return () => window.removeEventListener('keydown', k)
   }, [open, onClose])
 
+  // a docked panel takes room from the page: the page makes way for it
+  const docked = desk && open && dim <= 0.2
+  useEffect(() => {
+    if (!docked) return
+    const root = document.documentElement
+    root.style.setProperty('--dock-w', '360px')
+    return () => root.style.setProperty('--dock-w', '0px')
+  }, [docked])
+
   if (desk) {
     // tool sheets (little dimming) sit beside the page so the page stays in reach; the rest are dialogs in the middle
     const side = dim <= 0.2
@@ -116,12 +125,14 @@ export function ToolSheet({
             <motion.div
               role="dialog" aria-modal={!side && !passThrough} aria-label={title ?? 'Sheet'}
               className={side
-                ? 'absolute bottom-3 right-3 top-3 flex w-[400px] max-w-[92vw] flex-col overflow-hidden rounded-[24px] bg-white'
+                ? 'absolute flex w-[360px] flex-col overflow-hidden bg-white'
                 : 'absolute left-1/2 top-1/2 flex max-h-[88vh] w-[540px] max-w-[94vw] flex-col overflow-hidden rounded-[28px] bg-white'}
-              style={{ pointerEvents: 'auto', boxShadow: '0 24px 70px rgba(20,24,40,.28), 0 0 0 1px rgba(20,24,40,.06)', ...(side ? {} : { x: '-50%', y: '-50%' }) }}
-              initial={side ? { x: 60, opacity: 0 } : { opacity: 0, scale: 0.96 }}
+              style={side
+                ? { pointerEvents: 'auto', left: 84, top: 56, bottom: 0, boxShadow: '1px 0 0 rgba(20,24,40,.08), 10px 0 30px rgba(20,24,40,.08)' }
+                : { pointerEvents: 'auto', boxShadow: '0 24px 70px rgba(20,24,40,.28), 0 0 0 1px rgba(20,24,40,.06)', x: '-50%', y: '-50%' }}
+              initial={side ? { x: -40, opacity: 0 } : { opacity: 0, scale: 0.96 }}
               animate={side ? { x: 0, opacity: 1 } : { opacity: 1, scale: 1 }}
-              exit={side ? { x: 60, opacity: 0 } : { opacity: 0, scale: 0.97 }}
+              exit={side ? { x: -40, opacity: 0 } : { opacity: 0, scale: 0.97 }}
               transition={{ type: 'spring', stiffness: 420, damping: 36 }}
             >
               <div className="flex shrink-0 items-center justify-between px-5 pb-1 pt-4">
